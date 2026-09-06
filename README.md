@@ -1,9 +1,6 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Julienlgn123/open-studio/main/resources/icon.png" width="96" height="96" alt="Open Studio" />
+  <img src="https://raw.githubusercontent.com/Julienlgn123/open-studio/main/banner.png" alt="Open Studio" width="100%" />
 </p>
-
-<h1 align="center">Open Studio</h1>
-<p align="center">Le hub qui réunit tous mes outils "Studio" : télécharge, installe et lance-les depuis une seule app.</p>
 
 Hub desktop (Electron + React + TypeScript) qui rassemble les apps de la suite
 « Julien Studio » en un seul endroit — vue catalogue, installation/mise à jour
