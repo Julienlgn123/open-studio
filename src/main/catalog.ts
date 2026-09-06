@@ -25,7 +25,7 @@ export const CATALOG: CatalogEntry[] = [
       'Centralise plusieurs comptes Google Drive : distribution automatique des uploads, backup planifié, dashboard.',
     category: 'Stockage',
     owner: 'Julienlgn123',
-    repo: 'stockage-studio',
+    repo: 'drive-studio',
     fallbackEmoji: '☁️',
     accent: '#38bdf8'
   }
