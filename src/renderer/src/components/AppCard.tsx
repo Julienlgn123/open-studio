@@ -17,10 +17,13 @@ const STATUS_LABEL: Record<AppState['status'], string> = {
 
 export default function AppCard({
   app,
-  progress
+  progress,
+  onDone
 }: {
   app: AppState
   progress?: InstallProgress
+  /** Appelé quand une action (install/lancement/désinstall) se termine, succès ou échec. */
+  onDone: () => void
 }): JSX.Element {
   const { install, launch, uninstall, toast } = useStore()
   const [busy, setBusy] = useState(false)
@@ -34,6 +37,7 @@ export default function AppCard({
       else await install(app.id)
     } finally {
       setBusy(false)
+      onDone()
     }
   }
 
@@ -44,6 +48,7 @@ export default function AppCard({
       await uninstall(app.id)
     } finally {
       setBusy(false)
+      onDone()
     }
   }
 

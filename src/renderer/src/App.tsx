@@ -10,6 +10,15 @@ export default function App(): JSX.Element {
   const { apps, loading, loadSettings, loadApps } = useStore()
   const [progress, setProgress] = useState<Record<string, InstallProgress>>({})
 
+  function clearProgress(id: string): void {
+    setProgress((prev) => {
+      if (!(id in prev)) return prev
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+  }
+
   useEffect(() => {
     ;(async () => {
       await loadSettings()
@@ -47,7 +56,12 @@ export default function App(): JSX.Element {
               ) : (
                 <div className="card-grid">
                   {apps.map((a) => (
-                    <AppCard key={a.id} app={a} progress={progress[a.id]} />
+                    <AppCard
+                      key={a.id}
+                      app={a}
+                      progress={progress[a.id]}
+                      onDone={() => clearProgress(a.id)}
+                    />
                   ))}
                 </div>
               )}
