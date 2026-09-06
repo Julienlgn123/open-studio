@@ -4,7 +4,14 @@ import { join, basename } from 'path'
 import type { CatalogEntry } from '@shared/types'
 import type { PlatformInstaller } from './types'
 
-function run(cmd: string, args: string[]): Promise<void> {
+/**
+ * `timeoutMs` évite un blocage infini côté UI (barre de progression qui ne
+ * finit jamais) si l'installateur reste coincé en interne — par exemple NSIS
+ * qui attend en boucle qu'un fichier verrouillé se libère, sans jamais
+ * pouvoir le signaler puisqu'il tourne en mode silencieux (`/S`, aucune
+ * fenêtre pour montrer une éventuelle erreur/retry).
+ */
+function run(cmd: string, args: string[], timeoutMs = 180_000): Promise<void> {
   return new Promise((resolve, reject) => {
     // detached : évite que l'installateur/désinstalleur NSIS (qui se recopie
     // dans un dossier temp et se relance tout seul) reste rattaché à l'arbre
@@ -12,8 +19,20 @@ function run(cmd: string, args: string[]): Promise<void> {
     // sinon garder un handle ouvert sur les fichiers bien après la fin
     // apparente de la commande, verrouillant tout le dossier.
     const child = spawn(cmd, args, { windowsHide: true, detached: true })
-    child.on('error', reject)
+    const timer = setTimeout(() => {
+      child.kill()
+      reject(
+        new Error(
+          `${cmd} ne répond plus après ${Math.round(timeoutMs / 1000)}s — abandon.`
+        )
+      )
+    }, timeoutMs)
+    child.on('error', (err) => {
+      clearTimeout(timer)
+      reject(err)
+    })
     child.on('exit', (code) => {
+      clearTimeout(timer)
       if (code === 0) resolve()
       else reject(new Error(`${cmd} a échoué (code ${code})`))
     })
@@ -63,6 +82,13 @@ export const winInstaller: PlatformInstaller = {
     // Une mise à jour sur une app encore ouverte verrouille son .exe : le
     // silent install échouerait à écraser ce fichier sans le signaler.
     await run('taskkill', ['/IM', `${entry.productName}.exe`, '/F']).catch(() => null)
+    // Après le taskkill, Windows (ou un antivirus qui scanne le process qui
+    // vient de mourir) peut garder le .exe verrouillé encore un court instant.
+    // Sans cette pause, l'installateur silencieux tente d'écraser un fichier
+    // encore locké : NSIS boucle alors en interne en attendant que le verrou
+    // se libère, sans jamais pouvoir l'afficher (`/S` = aucune fenêtre) — vu
+    // d'Open Studio, ça ressemble à un chargement infini.
+    await sleep(800)
 
     // NSIS exige que /D soit le DERNIER argument et ne soit jamais entre
     // guillemets, même si le chemin contient des espaces.

@@ -12,28 +12,41 @@ export interface GhRelease {
   assets: GhAsset[]
 }
 
+/** Délai au-delà duquel une connexion sans aucune donnée est considérée bloquée. */
+const IDLE_TIMEOUT_MS = 20_000
+
 function getJson<T>(url: string): Promise<T> {
   return new Promise((resolve, reject) => {
-    https.get(
-      url,
-      { headers: { 'User-Agent': 'open-studio', Accept: 'application/vnd.github+json' } },
-      (res) => {
-        if (res.statusCode && res.statusCode >= 400) {
-          reject(new Error(`GitHub API ${res.statusCode} pour ${url}`))
-          res.resume()
-          return
-        }
-        let data = ''
-        res.on('data', (c) => (data += c))
-        res.on('end', () => {
-          try {
-            resolve(JSON.parse(data) as T)
-          } catch (err) {
-            reject(err)
+    const req = https
+      .get(
+        url,
+        {
+          headers: { 'User-Agent': 'open-studio', Accept: 'application/vnd.github+json' },
+          timeout: IDLE_TIMEOUT_MS
+        },
+        (res) => {
+          if (res.statusCode && res.statusCode >= 400) {
+            reject(new Error(`GitHub API ${res.statusCode} pour ${url}`))
+            res.resume()
+            return
           }
-        })
-      }
-    ).on('error', reject)
+          let data = ''
+          res.on('data', (c) => (data += c))
+          res.on('end', () => {
+            try {
+              resolve(JSON.parse(data) as T)
+            } catch (err) {
+              reject(err)
+            }
+          })
+        }
+      )
+      .on('error', reject)
+    // `timeout` ci-dessus coupe si la connexion ne s'établit jamais ; celui-ci
+    // couvre le cas où elle s'établit mais reste ensuite muette (pas de
+    // 'error' ni de 'end') — sans ça, une requête GitHub qui traîne bloque
+    // silencieusement toute la vérification de mise à jour.
+    req.on('timeout', () => req.destroy(new Error('Délai dépassé en contactant GitHub.')))
   })
 }
 
@@ -67,24 +80,49 @@ export function downloadTo(
   onProgress?: (ratio: number) => void
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    https
+    let settled = false
+    const finish = (fn: () => void): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(idleTimer)
+      fn()
+    }
+
+    // Timeout glissant plutôt que fixe : un gros installateur sur une
+    // connexion lente doit pouvoir prendre plusieurs minutes tant que des
+    // octets arrivent toujours ; seule une connexion qui s'arrête net (plus
+    // aucune donnée) déclenche l'abandon, au lieu de laisser la barre de
+    // progression tourner indéfiniment sans jamais échouer.
+    let idleTimer: NodeJS.Timeout
+    const resetIdleTimer = (): void => {
+      clearTimeout(idleTimer)
+      idleTimer = setTimeout(() => {
+        req.destroy()
+        finish(() => reject(new Error('Téléchargement interrompu (connexion inactive trop longtemps).')))
+      }, IDLE_TIMEOUT_MS)
+    }
+
+    const req = https
       .get(url, { headers: { 'User-Agent': 'open-studio' } }, (res) => {
         if (res.statusCode && res.statusCode >= 400) {
-          reject(new Error(`Téléchargement échoué (HTTP ${res.statusCode})`))
+          finish(() => reject(new Error(`Téléchargement échoué (HTTP ${res.statusCode})`)))
           res.resume()
           return
         }
         const total = Number(res.headers['content-length'] || 0)
         let done = 0
         const file = createWriteStream(destPath)
+        resetIdleTimer()
         res.on('data', (chunk: Buffer) => {
           done += chunk.length
+          resetIdleTimer()
           if (total > 0) onProgress?.(done / total)
         })
         res.pipe(file)
-        file.on('finish', () => file.close(() => resolve()))
-        file.on('error', reject)
+        file.on('finish', () => file.close(() => finish(resolve)))
+        file.on('error', (err) => finish(() => reject(err)))
       })
-      .on('error', reject)
+      .on('error', (err) => finish(() => reject(err)))
+    resetIdleTimer()
   })
 }
