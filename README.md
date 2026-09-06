@@ -47,26 +47,6 @@ suivi (quelle app est installée, quelle version) vit dans son dossier à lui.
 
 ---
 
-## Démarrage
-
-```bash
-npm install
-npm run dev
-```
-
-Build & packaging :
-
-```bash
-npm run build
-npm run typecheck
-npm run dist         # installeur Windows (nsis + portable) -> dist-installer/
-npm run dist:mac      # dmg + zip (x64 + arm64)
-npm run dist:linux    # AppImage + deb
-```
-
-> Avant `npm run dist`, place `resources/icon.ico` (Windows) et `resources/icon.png`
-> (512×512, macOS/Linux).
-
 ## Ajouter une app au catalogue
 
 Un seul endroit à toucher : [`src/main/catalog.ts`](src/main/catalog.ts). Chaque
