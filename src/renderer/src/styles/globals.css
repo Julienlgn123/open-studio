@@ -312,12 +312,14 @@ button {
 /* App catalogue */
 .app-card {
   background: var(--bg-surface);
-  /* border-medium (pas le `--border` de base, trop discret à 7% d'opacité) :
-     sans ça le contour devient quasi invisible sur les cartes dont le logo
-     a de grandes zones sombres proches du fond de la carte. */
-  border: 1px solid var(--border-medium);
+  /* 2px (pas 1px) : un contour de 1px atterrit parfois sur une frontière de
+     pixel physique fractionnaire selon la mise à l'échelle de l'écran, et
+     s'étale sur 2 pixels à moitié opacité chacun — au point de devenir
+     invisible sur certaines cartes selon leur position exacte, alors que le
+     CSS est rigoureusement identique partout. 2px laisse de la marge. */
+  border: 2px solid var(--border-medium);
   border-radius: var(--radius-lg);
-  padding: 18px;
+  padding: 17px;
   display: flex;
   flex-direction: column;
   gap: 12px;
