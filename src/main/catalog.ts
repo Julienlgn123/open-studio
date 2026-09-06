@@ -18,8 +18,8 @@ export const CATALOG: CatalogEntry[] = [
   },
   {
     id: 'stockage-studio',
-    name: 'Drive Backup Manager',
-    productName: 'Drive Backup Manager',
+    name: 'Drive Studio',
+    productName: 'Drive Studio',
     debPackageName: 'gdrive-backup-manager',
     description:
       'Centralise plusieurs comptes Google Drive : distribution automatique des uploads, backup planifié, dashboard.',

@@ -7,7 +7,7 @@ et lancement en un clic, comme Adobe Creative Cloud mais pour mes propres apps.
 Apps actuellement au catalogue :
 
 - **[Cours Studio](https://github.com/Julienlgn123/cours-studio)** — prise et gestion de cours en local.
-- **[Drive Backup Manager](https://github.com/Julienlgn123/stockage-studio)** — gestionnaire multi-comptes Google Drive.
+- **[Drive Studio](https://github.com/Julienlgn123/stockage-studio)** — gestionnaire multi-comptes Google Drive.
 
 100 % local, aucun serveur : Open Studio ne fait qu'interroger l'API GitHub
 publique (releases) et gérer les fichiers déjà publiés par chaque app.

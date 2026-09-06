@@ -25,7 +25,7 @@ export default function AppCard({
   /** Appelé quand une action (install/lancement/désinstall) se termine, succès ou échec. */
   onDone: () => void
 }): JSX.Element {
-  const { install, launch, uninstall, toast } = useStore()
+  const { install, update, launch, uninstall, toast } = useStore()
   const [busy, setBusy] = useState(false)
   const [logoFailed, setLogoFailed] = useState(false)
   const working = busy || !!progress
@@ -34,6 +34,7 @@ export default function AppCard({
     setBusy(true)
     try {
       if (app.status === 'installed') await launch(app.id)
+      else if (app.status === 'update_available') await update(app.id)
       else await install(app.id)
     } finally {
       setBusy(false)

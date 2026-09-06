@@ -21,6 +21,7 @@ interface Store {
 
   loadApps: () => Promise<void>
   install: (id: string) => Promise<void>
+  update: (id: string) => Promise<void>
   launch: (id: string) => Promise<void>
   uninstall: (id: string) => Promise<void>
 
@@ -66,6 +67,17 @@ export const useStore = create<Store>((set, get) => ({
       get().toast('Installé — prêt à lancer ✓', 'success')
     } catch (err) {
       get().toast(err instanceof Error ? err.message : "Échec de l'installation", 'error')
+    }
+  },
+
+  update: async (id) => {
+    try {
+      // Même flow que l'installation initiale : installOrUpdateApp gère les deux cas.
+      await api.apps.install(id)
+      await get().loadApps()
+      get().toast('Mise à jour installée ✓', 'success')
+    } catch (err) {
+      get().toast(err instanceof Error ? err.message : 'Échec de la mise à jour', 'error')
     }
   },
 

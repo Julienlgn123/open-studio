@@ -4,11 +4,13 @@ import { useStore } from './store'
 import TitleBar from './components/TitleBar'
 import ToastStack from './components/Toast'
 import AppCard from './components/AppCard'
+import UpdateBanner from './components/UpdateBanner'
 import type { InstallProgress } from '@shared/types'
 
 export default function App(): JSX.Element {
   const { apps, loading, loadSettings, loadApps } = useStore()
   const [progress, setProgress] = useState<Record<string, InstallProgress>>({})
+  const [dismissedUpdates, setDismissedUpdates] = useState<Set<string>>(new Set())
 
   function clearProgress(id: string): void {
     setProgress((prev) => {
@@ -49,6 +51,11 @@ export default function App(): JSX.Element {
 
           <div className="view-scroll">
             <div className="view-pad">
+              <UpdateBanner
+                apps={apps}
+                dismissed={dismissedUpdates}
+                onDismiss={(id) => setDismissedUpdates((prev) => new Set(prev).add(id))}
+              />
               {loading ? (
                 <div className="empty-state">
                   <div className="spinner" style={{ width: 24, height: 24 }} />
