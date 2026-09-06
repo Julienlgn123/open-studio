@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { LayoutGrid } from 'lucide-react'
+import { LayoutGrid, ArrowUpCircle } from 'lucide-react'
 import { useStore } from './store'
 import TitleBar from './components/TitleBar'
 import ToastStack from './components/Toast'
@@ -11,6 +11,8 @@ export default function App(): JSX.Element {
   const { apps, loading, loadSettings, loadApps } = useStore()
   const [progress, setProgress] = useState<Record<string, InstallProgress>>({})
   const [dismissedUpdates, setDismissedUpdates] = useState<Set<string>>(new Set())
+  const [selfUpdate, setSelfUpdate] = useState<{ version: string } | null>(null)
+  const [installingSelfUpdate, setInstallingSelfUpdate] = useState(false)
 
   function clearProgress(id: string): void {
     setProgress((prev) => {
@@ -28,10 +30,14 @@ export default function App(): JSX.Element {
       window.api.app.notifyReady()
     })()
 
-    const off = window.api.apps.onProgress((p) => {
+    const offProgress = window.api.apps.onProgress((p) => {
       setProgress((prev) => ({ ...prev, [p.id]: p }))
     })
-    return off
+    const offUpdate = window.api.app.onUpdateReady((p) => setSelfUpdate(p))
+    return () => {
+      offProgress()
+      offUpdate()
+    }
   }, [])
 
   return (
@@ -51,6 +57,41 @@ export default function App(): JSX.Element {
 
           <div className="view-scroll">
             <div className="view-pad">
+              {selfUpdate && (
+                <div className="update-banner fade-in" style={{ marginBottom: 14 }}>
+                  <ArrowUpCircle size={18} className="update-banner-icon" />
+                  <div className="update-banner-text">
+                    <div className="update-banner-title">
+                      Mise à jour d'Open Studio prête — v{selfUpdate.version}
+                    </div>
+                    <div className="update-banner-sub muted">
+                      Téléchargée en arrière-plan, un redémarrage suffit pour l'appliquer.
+                    </div>
+                  </div>
+                  <div className="row" style={{ gap: 6 }}>
+                    <button
+                      className="btn btn-sm btn-secondary"
+                      onClick={() => setSelfUpdate(null)}
+                      disabled={installingSelfUpdate}
+                    >
+                      Plus tard
+                    </button>
+                    <button
+                      className="btn btn-sm btn-primary"
+                      disabled={installingSelfUpdate}
+                      onClick={() => {
+                        setInstallingSelfUpdate(true)
+                        window.api.app.installUpdate().catch(() => setInstallingSelfUpdate(false))
+                      }}
+                    >
+                      {installingSelfUpdate ? (
+                        <div className="spinner" style={{ width: 12, height: 12, borderWidth: 2 }} />
+                      ) : null}
+                      Redémarrer maintenant
+                    </button>
+                  </div>
+                </div>
+              )}
               <UpdateBanner
                 apps={apps}
                 dismissed={dismissedUpdates}

@@ -29,7 +29,10 @@ const api = {
     openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:openExternal', url)
   },
   app: {
-    notifyReady: () => ipcRenderer.send('renderer:ready')
+    notifyReady: () => ipcRenderer.send('renderer:ready'),
+    installUpdate: (): Promise<void> => ipcRenderer.invoke('app:installUpdate'),
+    onUpdateReady: (cb: (payload: { version: string }) => void) =>
+      on<{ version: string }>('app:updateReady', cb)
   }
 }
 

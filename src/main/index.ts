@@ -3,6 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import { registerIpc } from './ipc'
+import { broadcast } from './events'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -82,20 +83,30 @@ app.whenReady().then(() => {
   })
 
   if (app.isPackaged) {
-    autoUpdater.autoDownload = false
+    // `checkForUpdates()` seul ne fait rien de visible : sans écouter ses
+    // événements ni déclencher le téléchargement, une mise à jour trouvée
+    // n'était jamais ni téléchargée ni proposée à la personne — c'est ce
+    // qui faisait qu'Open Studio semblait ne jamais se mettre à jour tout seul.
+    autoUpdater.autoDownload = true
     autoUpdater.autoInstallOnAppQuit = true
+
+    autoUpdater.on('update-downloaded', (info) => {
+      broadcast('app:updateReady', { version: info.version })
+    })
+    autoUpdater.on('error', (err) => {
+      // Une vérif qui échoue (pas de réseau, GitHub indisponible...) ne doit
+      // jamais gêner l'utilisation normale de l'app.
+      console.error('[autoUpdater]', err)
+    })
+
     let checked = false
-    ipcMain.on('renderer:ready', () => {
+    const runCheck = (): void => {
       if (checked) return
       checked = true
       autoUpdater.checkForUpdates().catch(() => null)
-    })
-    setTimeout(() => {
-      if (!checked) {
-        checked = true
-        autoUpdater.checkForUpdates().catch(() => null)
-      }
-    }, 8000)
+    }
+    ipcMain.on('renderer:ready', runCheck)
+    setTimeout(runCheck, 8000)
   }
 })
 

@@ -1,4 +1,5 @@
 import { ipcMain, BrowserWindow, shell } from 'electron'
+import { autoUpdater } from 'electron-updater'
 import { getSettings, setTheme } from './store'
 import { listAppStates, installOrUpdateApp, launchApp, uninstallApp } from './install'
 
@@ -27,4 +28,6 @@ export function registerIpc(): void {
   ipcMain.handle('apps:uninstall', (_, id: string) => uninstallApp(id))
 
   ipcMain.handle('shell:openExternal', (_, url: string) => shell.openExternal(url))
+
+  ipcMain.handle('app:installUpdate', () => autoUpdater.quitAndInstall())
 }
