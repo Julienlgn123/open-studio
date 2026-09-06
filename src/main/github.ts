@@ -26,7 +26,16 @@ function getJson<T>(url: string): Promise<T> {
         },
         (res) => {
           if (res.statusCode && res.statusCode >= 400) {
-            reject(new Error(`GitHub API ${res.statusCode} pour ${url}`))
+            // 403 sans authentification = très souvent la limite de l'API
+            // GitHub (60 requêtes/heure par IP, parfois partagée par tout un
+            // réseau) plutôt qu'une vraie erreur — message dédié pour que la
+            // personne comprenne que ce n'est pas cassé, juste à retenter
+            // plus tard.
+            const msg =
+              res.statusCode === 403
+                ? "Limite de requêtes GitHub atteinte (trop de vérifications en peu de temps sur ce réseau) — réessaie dans quelques minutes."
+                : `GitHub API ${res.statusCode} pour ${url}`
+            reject(new Error(msg))
             res.resume()
             return
           }
@@ -50,8 +59,33 @@ function getJson<T>(url: string): Promise<T> {
   })
 }
 
-export function fetchLatestRelease(owner: string, repo: string): Promise<GhRelease> {
-  return getJson<GhRelease>(`https://api.github.com/repos/${owner}/${repo}/releases/latest`)
+/**
+ * Cache mémoire des releases (clé = "owner/repo"). Sans ça, chaque
+ * rafraîchissement du catalogue (au démarrage, et après chaque install /
+ * update / uninstall) refait un appel par app à l'API GitHub non
+ * authentifiée — plafonnée à 60 requêtes/heure par IP, vite atteinte rien
+ * qu'en testant l'app plusieurs fois de suite (403 sinon). Une entrée
+ * fraîche évite l'appel réseau ; une entrée périmée est réutilisée en
+ * dépannage si GitHub répond en erreur, plutôt que de faire échouer toute
+ * l'action en cours pour une info qui a peu de chances d'avoir changé.
+ */
+const RELEASE_CACHE_TTL_MS = 5 * 60_000
+const releaseCache = new Map<string, { data: GhRelease; fetchedAt: number }>()
+
+export async function fetchLatestRelease(owner: string, repo: string): Promise<GhRelease> {
+  const key = `${owner}/${repo}`
+  const cached = releaseCache.get(key)
+  if (cached && Date.now() - cached.fetchedAt < RELEASE_CACHE_TTL_MS) {
+    return cached.data
+  }
+  try {
+    const data = await getJson<GhRelease>(`https://api.github.com/repos/${owner}/${repo}/releases/latest`)
+    releaseCache.set(key, { data, fetchedAt: Date.now() })
+    return data
+  } catch (err) {
+    if (cached) return cached.data
+    throw err
+  }
 }
 
 /** Choisit l'asset adapté à l'OS/arch courants dans les assets d'une release. */
