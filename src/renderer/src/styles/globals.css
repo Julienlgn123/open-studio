@@ -312,7 +312,10 @@ button {
 /* App catalogue */
 .app-card {
   background: var(--bg-surface);
-  border: 1px solid var(--border);
+  /* border-medium (pas le `--border` de base, trop discret à 7% d'opacité) :
+     sans ça le contour devient quasi invisible sur les cartes dont le logo
+     a de grandes zones sombres proches du fond de la carte. */
+  border: 1px solid var(--border-medium);
   border-radius: var(--radius-lg);
   padding: 18px;
   display: flex;
@@ -320,7 +323,7 @@ button {
   gap: 12px;
   transition: all var(--transition);
 }
-.app-card:hover { border-color: var(--border-medium); }
+.app-card:hover { border-color: var(--border-strong); }
 
 .app-card-head { display: flex; align-items: center; gap: 12px; }
 
