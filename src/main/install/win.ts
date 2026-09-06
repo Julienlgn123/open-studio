@@ -1,18 +1,49 @@
 import { spawn } from 'child_process'
 import { existsSync, rmSync } from 'fs'
-import { join } from 'path'
+import { join, basename } from 'path'
 import type { CatalogEntry } from '@shared/types'
 import type { PlatformInstaller } from './types'
 
 function run(cmd: string, args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { windowsHide: true })
+    // detached : évite que l'installateur/désinstalleur NSIS (qui se recopie
+    // dans un dossier temp et se relance tout seul) reste rattaché à l'arbre
+    // de processus/job object d'Open Studio — un tel enfant orphelin peut
+    // sinon garder un handle ouvert sur les fichiers bien après la fin
+    // apparente de la commande, verrouillant tout le dossier.
+    const child = spawn(cmd, args, { windowsHide: true, detached: true })
     child.on('error', reject)
     child.on('exit', (code) => {
       if (code === 0) resolve()
       else reject(new Error(`${cmd} a échoué (code ${code})`))
     })
   })
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms))
+}
+
+/**
+ * Un désinstalleur NSIS lancé en `/S` se recopie dans un dossier temporaire
+ * et se relance depuis là — le process initial (celui qu'on attend) sort
+ * presque tout de suite, pendant que la vraie suppression de fichiers se
+ * termine juste après en arrière-plan (parfois plusieurs secondes, un
+ * antivirus peut aussi verrouiller brièvement un .exe/.asar fraîchement
+ * écrit). On retente longtemps avant d'abandonner — et un échec final n'est
+ * pas fatal : l'app est déjà bien désinstallée à ce stade, il ne reste
+ * qu'un dossier résiduel qu'on pourra reprendre plus tard.
+ */
+async function rmDirBestEffort(dir: string, attempts = 20, delayMs = 600): Promise<void> {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      rmSync(dir, { recursive: true, force: true })
+      return
+    } catch {
+      if (i === attempts - 1) return
+      await sleep(delayMs)
+    }
+  }
 }
 
 export const winInstaller: PlatformInstaller = {
@@ -29,6 +60,10 @@ export const winInstaller: PlatformInstaller = {
   },
 
   async install(entry, downloadedPath, managedDir) {
+    // Une mise à jour sur une app encore ouverte verrouille son .exe : le
+    // silent install échouerait à écraser ce fichier sans le signaler.
+    await run('taskkill', ['/IM', `${entry.productName}.exe`, '/F']).catch(() => null)
+
     // NSIS exige que /D soit le DERNIER argument et ne soit jamais entre
     // guillemets, même si le chemin contient des espaces.
     await run(downloadedPath, ['/S', `/D=${managedDir}`])
@@ -46,11 +81,20 @@ export const winInstaller: PlatformInstaller = {
   },
 
   async uninstall(entry, execPath) {
+    // Si l'app est encore ouverte, ses fichiers (dont app.asar) sont
+    // verrouillés et la suppression échoue — on la ferme d'abord.
+    await run('taskkill', ['/IM', basename(execPath), '/F']).catch(() => null)
+
     const dir = execPath.slice(0, execPath.lastIndexOf('\\'))
     const uninstaller = join(dir, `Uninstall ${entry.productName}.exe`)
     if (existsSync(uninstaller)) {
       await run(uninstaller, ['/S']).catch(() => null)
+      // Laisse le temps au désinstalleur (relancé depuis un dossier temp) de
+      // terminer son propre nettoyage avant qu'on tente le nôtre.
+      await sleep(800)
     }
-    rmSync(dir, { recursive: true, force: true })
+    // Best-effort : même si un résidu verrouillé traîne, l'app elle-même est
+    // bien désinstallée (l'exécutable et son entrée de registre ont disparu).
+    await rmDirBestEffort(dir)
   }
 }
