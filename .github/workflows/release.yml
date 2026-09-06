@@ -1,0 +1,155 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  # ─── Windows ────────────────────────────────────────────────
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Windows (NSIS + Portable)
+        run: npm run dist -- --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            dist-installer/*.exe
+            dist-installer/*.yml
+            dist-installer/*.blockmap
+
+  # ─── macOS ─────────────────────────────────────────────────
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build macOS (DMG x64 + arm64)
+        run: npm run dist:mac -- --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No paid Developer ID cert available: leave identity/CSC_* unset so
+          # electron-builder falls back to ad-hoc signing (`codesign -s -`).
+          # A fully unsigned arm64 app is rejected by Gatekeeper as "damaged" —
+          # ad-hoc signing is the free fix. Do NOT set CSC_IDENTITY_AUTO_DISCOVERY=false
+          # here, it disables that fallback too.
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac
+          path: |
+            dist-installer/*.dmg
+            dist-installer/*.zip
+            dist-installer/*.yml
+            dist-installer/*.blockmap
+
+  # ─── Linux ─────────────────────────────────────────────────
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y rpm fakeroot dpkg
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Linux (AppImage + deb)
+        run: npm run dist:linux -- --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            dist-installer/*.AppImage
+            dist-installer/*.deb
+            dist-installer/*.yml
+            dist-installer/*.blockmap
+
+  # ─── Create Release ─────────────────────────────────────────
+  release:
+    needs: [build-windows, build-mac, build-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-artifacts
+          merge-multiple: true
+
+      - name: Get version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Open Studio v${{ steps.version.outputs.VERSION }}"
+          body: |
+            ## 🗂️ Open Studio v${{ steps.version.outputs.VERSION }}
+
+            Hub qui installe et lance les apps de la suite (Cours Studio, Drive Backup
+            Manager...) — chaque app garde son propre dossier de données, inchangé.
+
+            ### 🪟 Windows
+            | Fichier | Description |
+            |---|---|
+            | `Open-Studio-Setup-*.exe` | Installateur (recommandé) |
+            | `Open-Studio-Portable-*.exe` | Portable — clé USB, aucune installation |
+
+            ### 🍎 macOS
+            | Fichier | Description |
+            |---|---|
+            | `Open-Studio-*-x64.dmg` | Mac Intel (2020 et avant) |
+            | `Open-Studio-*-arm64.dmg` | Mac Apple Silicon M1/M2/M3/M4 |
+
+            > Première ouverture sur macOS : clic droit → **Ouvrir** → **Ouvrir quand même**
+
+            ### 🐧 Linux
+            | Fichier | Description |
+            |---|---|
+            | `Open-Studio-*.AppImage` | Universel — toutes les distros |
+            | `Open-Studio-*.deb` | Debian / Ubuntu / Mint |
+
+            ---
+            🔄 Mises à jour automatiques au démarrage.
+          files: dist-artifacts/**/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
