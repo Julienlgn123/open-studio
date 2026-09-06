@@ -1,8 +1,25 @@
-# Open Studio
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Julienlgn123/open-studio/main/resources/icon.png" width="96" height="96" alt="Open Studio" />
+</p>
+
+<h1 align="center">Open Studio</h1>
+<p align="center">Le hub qui réunit tous mes outils "Studio" : télécharge, installe et lance-les depuis une seule app.</p>
 
 Hub desktop (Electron + React + TypeScript) qui rassemble les apps de la suite
 « Julien Studio » en un seul endroit — vue catalogue, installation/mise à jour
 et lancement en un clic, comme Adobe Creative Cloud mais pour mes propres apps.
+
+## Installation
+
+1. Télécharge la dernière release d'**Open Studio** : [Releases](https://github.com/Julienlgn123/open-studio/releases/latest)
+   (`Setup.exe` sur Windows, `.dmg` sur macOS, `.AppImage`/`.deb` sur Linux).
+2. Installe-le et lance-le.
+3. Depuis son catalogue, choisis les outils qui t'intéressent — Open Studio les
+   télécharge, les installe et les lance à ta place.
+
+➡️ **Pas besoin d'aller télécharger un `.exe` sur chaque repo séparément** : une
+fois Open Studio installé, tous les autres outils de la suite (Cours Studio,
+Drive Studio…) sont disponibles directement depuis son catalogue.
 
 Apps actuellement au catalogue :
 
