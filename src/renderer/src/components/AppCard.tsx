@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Download, ExternalLink, Play, RefreshCw, Trash2 } from 'lucide-react'
 import { useStore } from '../store'
 import ProgressBar from './ProgressBar'
+import { getCategoryColor } from '../lib/categories'
 import type { AppState, InstallProgress } from '@shared/types'
 
 const STATUS_LABEL: Record<AppState['status'], string> = {
@@ -59,7 +60,14 @@ export default function AppCard({
   return (
     <div className="app-card fade-in">
       <div className="app-card-head">
-        <div className="app-logo" style={{ background: app.accent }}>
+        <div
+          className="app-logo"
+          style={{
+            background: logoFailed ? app.accent : 'var(--bg-elevated)',
+            borderColor: getCategoryColor(app.category)
+          }}
+          data-tooltip={app.category}
+        >
           {!logoFailed ? (
             <img src={app.logoUrl} alt="" onError={() => setLogoFailed(true)} />
           ) : (
