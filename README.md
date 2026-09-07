@@ -11,6 +11,16 @@ et lancement en un clic, comme Adobe Creative Cloud mais pour mes propres apps.
 1. Télécharge la dernière release d'**Open Studio** : [Releases](https://github.com/Julienlgn123/open-studio/releases/latest)
    (`Setup.exe` sur Windows, `.dmg` sur macOS, `.AppImage`/`.deb` sur Linux).
 2. Installe-le et lance-le.
+   - **macOS uniquement** : Open Studio n'a pas de certificat Apple Developer
+     payant, la build n'est donc signée qu'en *ad-hoc*. Au premier lancement,
+     macOS affiche **« Open Studio est endommagée et ne peut pas être
+     ouverte »** (le clic droit → Ouvrir ne suffit pas ici, contrairement à
+     une app juste non-notariée). Deux façons de le débloquer :
+     - double-clique `Fix-macOS-Signature.command` présent dans le `.dmg`, ou
+     - ouvre Terminal et lance :
+       ```bash
+       xattr -cr "/Applications/Open Studio.app"
+       ```
 3. Depuis son catalogue, choisis les outils qui t'intéressent — Open Studio les
    télécharge, les installe et les lance à ta place.
 

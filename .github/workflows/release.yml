@@ -138,7 +138,15 @@ jobs:
             | `Open-Studio-*-x64.dmg` | Mac Intel (2020 et avant) |
             | `Open-Studio-*-arm64.dmg` | Mac Apple Silicon M1/M2/M3/M4 |
 
-            > Première ouverture sur macOS : clic droit → **Ouvrir** → **Ouvrir quand même**
+            > ⚠️ Première ouverture sur macOS : pas de certificat Apple Developer payant,
+            > donc l'app n'est signée qu'en *ad-hoc* → macOS affiche **« Open Studio est
+            > endommagée et ne peut pas être ouverte »** (le clic droit → Ouvrir ne suffit
+            > pas ici, contrairement à une vraie app non-notariée). Ouvre **Terminal** et lance :
+            > ```
+            > xattr -cr "/Applications/Open Studio.app"
+            > ```
+            > puis ouvre l'app normalement. (Ou double-clique `Fix-macOS-Signature.command`
+            > fourni avec le `.dmg`.)
 
             ### 🐧 Linux
             | Fichier | Description |
