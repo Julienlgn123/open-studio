@@ -1,8 +1,9 @@
 import { spawn } from 'child_process'
 import { existsSync, rmSync } from 'fs'
-import { join, basename } from 'path'
+import { join, basename, dirname } from 'path'
 import type { CatalogEntry } from '@shared/types'
 import type { PlatformInstaller } from './types'
+import { dirSize } from './dirSize'
 
 /**
  * `timeoutMs` évite un blocage infini côté UI (barre de progression qui ne
@@ -122,5 +123,17 @@ export const winInstaller: PlatformInstaller = {
     // Best-effort : même si un résidu verrouillé traîne, l'app elle-même est
     // bien désinstallée (l'exécutable et son entrée de registre ont disparu).
     await rmDirBestEffort(dir)
+  },
+
+  async getInstalledSize(_entry, execPath) {
+    // L'exe suivi vit dans le dossier d'install géré par Open Studio (ou
+    // détecté sous Programs\<productName>) — sa taille représente donc toute
+    // l'app. Un chemin devenu invalide (copie déplacée/supprimée manuellement
+    // depuis la dernière détection) ne doit pas faire planter l'appel.
+    try {
+      return dirSize(dirname(execPath))
+    } catch {
+      return null
+    }
   }
 }

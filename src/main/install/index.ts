@@ -32,9 +32,11 @@ export async function listAppStates(): Promise<AppState[]> {
       const execPath = await resolveExecPath(entry.id).catch(() => null)
       const tracked = getTrackedApp(entry.id)
       let latestVersion: string | null = null
+      let latestChangelog: string | null = null
       try {
         const rel = await fetchLatestRelease(entry.owner, entry.repo)
         latestVersion = rel.tag_name.replace(/^v/, '')
+        latestChangelog = rel.body ?? null
       } catch {
         // Pas de connexion / repo indisponible : on garde le statut connu.
       }
@@ -50,6 +52,7 @@ export async function listAppStates(): Promise<AppState[]> {
         status,
         installedVersion,
         latestVersion,
+        latestChangelog,
         repoUrl: `https://github.com/${entry.owner}/${entry.repo}`,
         logoUrl: `https://raw.githubusercontent.com/${entry.owner}/${entry.repo}/main/resources/icon.png`
       }
@@ -111,4 +114,18 @@ export async function uninstallApp(id: string): Promise<void> {
   if (execPath) await platformInstaller.uninstall(entry, execPath)
   clearTrackedApp(id)
   rmSync(managedDir(id), { recursive: true, force: true })
+}
+
+/**
+ * Calculée à la demande seulement (pas dans listAppStates) : un parcours disque
+ * (ou un appel dpkg) par app à chaque rafraîchissement du catalogue serait du
+ * travail inutile pour une info que personne ne regarde tant qu'elle n'est
+ * pas affichée.
+ */
+export async function getInstalledSize(id: string): Promise<number | null> {
+  const entry = CATALOG.find((c) => c.id === id)
+  if (!entry) return null
+  const execPath = await resolveExecPath(id)
+  if (!execPath) return null
+  return platformInstaller.getInstalledSize(entry, execPath).catch(() => null)
 }

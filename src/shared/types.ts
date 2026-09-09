@@ -32,6 +32,8 @@ export interface AppState extends CatalogEntry {
   status: AppStatus
   installedVersion: string | null
   latestVersion: string | null
+  /** Notes de version (markdown brut) de la dernière release, si disponibles. */
+  latestChangelog?: string | null
   repoUrl: string
   logoUrl: string
   /** Message d'erreur court, si status === 'error'. */

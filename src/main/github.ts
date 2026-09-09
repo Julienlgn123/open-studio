@@ -10,6 +10,7 @@ export interface GhAsset {
 export interface GhRelease {
   tag_name: string
   assets: GhAsset[]
+  body?: string
 }
 
 /** Délai au-delà duquel une connexion sans aucune donnée est considérée bloquée. */

@@ -4,6 +4,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import type { CatalogEntry } from '@shared/types'
 import type { PlatformInstaller } from './types'
+import { dirSize } from './dirSize'
 
 function run(cmd: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -90,5 +91,16 @@ export const macInstaller: PlatformInstaller = {
   async uninstall(entry, execPath) {
     await quitApp(entry.productName)
     await rmDirBestEffort(execPath)
+  },
+
+  async getInstalledSize(_entry, execPath) {
+    // `execPath` est déjà le bundle .app lui-même (voir appPathFor) — sa
+    // taille couvre donc toute l'app, pas besoin de remonter à un dossier
+    // parent comme sous Windows.
+    try {
+      return dirSize(execPath)
+    } catch {
+      return null
+    }
   }
 }

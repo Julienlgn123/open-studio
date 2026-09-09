@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowUpCircle } from 'lucide-react'
+import { ArrowUpCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { useStore } from '../store'
 import type { AppState } from '@shared/types'
 
@@ -20,6 +20,7 @@ export default function UpdateBanner({
 }): JSX.Element | null {
   const { update } = useStore()
   const [updating, setUpdating] = useState<Set<string>>(new Set())
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   const pending = apps.filter((a) => a.status === 'update_available' && !dismissed.has(a.id))
   if (pending.length === 0) return null
@@ -37,10 +38,20 @@ export default function UpdateBanner({
     }
   }
 
+  function toggleExpanded(id: string): void {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
   return (
     <div className="update-banner-stack">
       {pending.map((a) => {
         const busy = updating.has(a.id)
+        const isExpanded = expanded.has(a.id)
         return (
           <div key={a.id} className="update-banner fade-in">
             <ArrowUpCircle size={18} className="update-banner-icon" />
@@ -49,6 +60,17 @@ export default function UpdateBanner({
               <div className="update-banner-sub muted">
                 {a.installedVersion ?? '?'} → {a.latestVersion ?? '?'}
               </div>
+              {a.latestChangelog && (
+                <>
+                  <button className="update-banner-toggle" onClick={() => toggleExpanded(a.id)}>
+                    {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    Voir les nouveautés
+                  </button>
+                  {isExpanded && (
+                    <div className="update-banner-changelog">{a.latestChangelog}</div>
+                  )}
+                </>
+              )}
             </div>
             <div className="row" style={{ gap: 6 }}>
               <button
