@@ -1,5 +1,5 @@
 import { spawn } from 'child_process'
-import { existsSync, rmSync } from 'fs'
+import { existsSync, mkdirSync, rmSync } from 'fs'
 import { join, basename, dirname } from 'path'
 import type { CatalogEntry } from '@shared/types'
 import type { PlatformInstaller } from './types'
@@ -42,6 +42,40 @@ function run(cmd: string, args: string[], timeoutMs = 180_000): Promise<void> {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms))
+}
+
+/**
+ * Un installateur tout juste écrit sur disque (venant d'être téléchargé,
+ * souvent d'une app neuve sans aucune réputation connue de Windows Defender)
+ * peut se faire verrouiller/scanner brièvement pile au moment où on l'exécute
+ * — NSIS échoue alors immédiatement (code 2) sans que rien ne soit réellement
+ * cassé : une seconde tentative quelques instants plus tard passe. Confirmé
+ * en reproduisant : le même .exe, invoqué exactement pareil juste après,
+ * réussit à chaque fois.
+ */
+async function runWithRetry(
+  cmd: string,
+  args: string[],
+  targetDir: string,
+  attempts = 3,
+  delayMs = 1500
+): Promise<void> {
+  let lastErr: unknown
+  for (let i = 0; i < attempts; i++) {
+    try {
+      await run(cmd, args)
+      return
+    } catch (err) {
+      lastErr = err
+      if (i < attempts - 1) {
+        await sleep(delayMs)
+        // Un abort NSIS peut faire disparaître le dossier cible qu'on avait
+        // déjà créé (rollback) — on le recrée avant de retenter /D=.
+        mkdirSync(targetDir, { recursive: true })
+      }
+    }
+  }
+  throw lastErr
 }
 
 /**
@@ -93,7 +127,7 @@ export const winInstaller: PlatformInstaller = {
 
     // NSIS exige que /D soit le DERNIER argument et ne soit jamais entre
     // guillemets, même si le chemin contient des espaces.
-    await run(downloadedPath, ['/S', `/D=${managedDir}`])
+    await runWithRetry(downloadedPath, ['/S', `/D=${managedDir}`], managedDir)
     const exe = join(managedDir, `${entry.productName}.exe`)
     if (!existsSync(exe)) {
       throw new Error(
