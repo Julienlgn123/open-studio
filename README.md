@@ -35,6 +35,7 @@ Apps actuellement au catalogue :
 - **[Drive Studio](https://github.com/Julienlgn123/drive-studio)** — gestionnaire multi-comptes Google Drive.
 - **[Plan Studio](https://github.com/Julienlgn123/plan-studio)** — planning personnel local (événements, tâches, objectifs).
 - **[PDF Studio](https://github.com/Julienlgn123/pdf-studio)** — lecture, édition et organisation de PDF en local.
+- **[ENT Studio](https://github.com/Julienlgn123/ent-studio)** — suit ton emploi du temps ENT (flux ICS) et signale ce qui a changé.
 
 100 % local, aucun serveur : Open Studio ne fait qu'interroger l'API GitHub
 publique (releases) et gérer les fichiers déjà publiés par chaque app.

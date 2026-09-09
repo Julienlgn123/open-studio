@@ -54,5 +54,18 @@ export const CATALOG: CatalogEntry[] = [
     repo: 'pdf-studio',
     fallbackEmoji: '📄',
     accent: '#ef4444'
+  },
+  {
+    id: 'ent-studio',
+    name: 'ENT Studio',
+    productName: 'ENT Studio',
+    debPackageName: 'ent-studio',
+    description:
+      "Suit ton emploi du temps ENT (flux ICS) et signale à l'ouverture ce qui a changé (cours déplacé, annulé, ajouté).",
+    category: 'Productivité',
+    owner: 'Julienlgn123',
+    repo: 'ent-studio',
+    fallbackEmoji: '🗓️',
+    accent: '#3b82f6'
   }
 ]
