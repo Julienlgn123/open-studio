@@ -55,7 +55,7 @@ export default function FilesView({ folderId }: Props): JSX.Element {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [menu, setMenu] = useState<{ x: number; y: number; file: FileMeta } | null>(null)
   const [infoFile, setInfoFile] = useState<FileMeta | null>(null)
-  const [shareFile, setShareFile] = useState<FileMeta | null>(null)
+  const [shareFiles, setShareFiles] = useState<FileMeta[] | null>(null)
   // Ids en cours de suppression (animation par ligne) + progression globale de
   // l'action groupée en cours (barre "X / Y" dans la barre d'outils).
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
@@ -295,6 +295,12 @@ export default function FilesView({ folderId }: Props): JSX.Element {
               <button className="btn btn-sm btn-secondary" onClick={() => exportSelected(true)}>
                 <FileArchive size={13} /> ZIP
               </button>
+              <button
+                className="btn btn-sm btn-secondary"
+                onClick={() => setShareFiles(rows.filter((r) => selected.has(r.id)))}
+              >
+                <Share2 size={13} /> Partager ({selected.size})
+              </button>
               <button className="btn btn-sm btn-danger" onClick={deleteSelected}>
                 <Trash2 size={13} /> Supprimer ({selected.size})
               </button>
@@ -533,7 +539,7 @@ export default function FilesView({ folderId }: Props): JSX.Element {
               icon: <Download size={14} />,
               onClick: () => download(menu.file)
             },
-            { label: 'Partager', icon: <Share2 size={14} />, onClick: () => setShareFile(menu.file) },
+            { label: 'Partager', icon: <Share2 size={14} />, onClick: () => setShareFiles([menu.file]) },
             ...folders.map((fld) => ({
               label: `Ajouter à ${fld.emoji} ${fld.name}`,
               icon: <FolderInput size={14} />,
@@ -550,7 +556,7 @@ export default function FilesView({ folderId }: Props): JSX.Element {
       )}
 
       {infoFile && <FileInfoModal file={infoFile} onClose={() => setInfoFile(null)} />}
-      {shareFile && <ShareModal file={shareFile} onClose={() => setShareFile(null)} />}
+      {shareFiles && <ShareModal files={shareFiles} onClose={() => setShareFiles(null)} />}
     </div>
   )
 }

@@ -120,6 +120,7 @@ export interface SharedLink {
   url: string
   role: ShareRole
   createdAt: number
+  expiresAt: number
 }
 
 export interface DashboardStats {

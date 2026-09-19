@@ -123,9 +123,9 @@ export function registerIpc(): void {
 
   // ─── Sharing ─────────────────────────────────────────────────────────────
   ipcMain.handle('share:create', async (_, id: string, role: ShareRole) => {
-    const url = await shareFileLink(id, role)
+    const { url, expiresAt } = await shareFileLink(id, role)
     clipboard.writeText(url)
-    return url
+    return { url, expiresAt }
   })
   ipcMain.handle('share:revoke', (_, id: string) => revokeShare(id))
   ipcMain.handle('share:list', () => db.getSharedLinks())

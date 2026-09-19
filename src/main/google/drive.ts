@@ -161,16 +161,30 @@ const ROLE_MAP: Record<ShareRole, string> = {
 export async function shareFile(
   accountId: string,
   driveFileId: string,
-  role: ShareRole
+  role: ShareRole,
+  expirationTime?: string
 ): Promise<{ permissionId: string; url: string }> {
   const drive = await driveFor(accountId)
-  const perm = await withRetry(() =>
-    drive.permissions.create({
-      fileId: driveFileId,
-      requestBody: { type: 'anyone', role: ROLE_MAP[role] },
-      fields: 'id'
-    })
-  )
+  const requestBody: drive_v3.Schema$Permission = { type: 'anyone', role: ROLE_MAP[role] }
+
+  let perm
+  try {
+    perm = await withRetry(() =>
+      drive.permissions.create({
+        fileId: driveFileId,
+        requestBody: expirationTime ? { ...requestBody, expirationTime } : requestBody,
+        fields: 'id'
+      })
+    )
+  } catch (err) {
+    // Certains comptes/rôles refusent expirationTime côté API (ex. compte grand public
+    // sur un rôle "writer") : on retente sans, la révocation applicative prend le relais.
+    if (!expirationTime) throw err
+    perm = await withRetry(() =>
+      drive.permissions.create({ fileId: driveFileId, requestBody, fields: 'id' })
+    )
+  }
+
   const meta = await withRetry(() => drive.files.get({ fileId: driveFileId, fields: 'webViewLink' }))
   return {
     permissionId: perm.data.id!,

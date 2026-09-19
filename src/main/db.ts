@@ -132,7 +132,8 @@ export function initDb(): void {
       drive_permission_id TEXT NOT NULL,
       url TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'reader',
-      created_at INTEGER NOT NULL
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE INDEX IF NOT EXISTS idx_files_account ON files_metadata(account_id);
@@ -151,6 +152,12 @@ export function initDb(): void {
     db.exec('ALTER TABLE files_metadata ADD COLUMN modified_at INTEGER NOT NULL DEFAULT 0')
   if (!fileCols.has('web_view_link'))
     db.exec('ALTER TABLE files_metadata ADD COLUMN web_view_link TEXT')
+
+  const shareCols = new Set(
+    (db.prepare('PRAGMA table_info(shared_links)').all() as { name: string }[]).map((c) => c.name)
+  )
+  if (!shareCols.has('expires_at'))
+    db.exec('ALTER TABLE shared_links ADD COLUMN expires_at INTEGER NOT NULL DEFAULT 0')
 }
 
 // ─── Accounts ──────────────────────────────────────────────────────────────
@@ -924,6 +931,7 @@ interface DbShare {
   url: string
   role: string
   created_at: number
+  expires_at: number
 }
 
 function rowToShare(row: DbShare): SharedLink {
@@ -933,7 +941,8 @@ function rowToShare(row: DbShare): SharedLink {
     drivePermissionId: row.drive_permission_id,
     url: row.url,
     role: row.role as ShareRole,
-    createdAt: row.created_at
+    createdAt: row.created_at,
+    expiresAt: row.expires_at
   }
 }
 
@@ -950,17 +959,27 @@ export function getSharedLinkForFile(fileId: string): SharedLink | null {
   return row ? rowToShare(row) : null
 }
 
+/** Liens dont l'échéance est dépassée : à révoquer côté Drive puis supprimer. */
+export function getExpiredSharedLinks(now = Date.now()): SharedLink[] {
+  return (
+    db
+      .prepare('SELECT * FROM shared_links WHERE expires_at > 0 AND expires_at <= ?')
+      .all(now) as DbShare[]
+  ).map(rowToShare)
+}
+
 export function createSharedLink(data: {
   fileId: string
   drivePermissionId: string
   url: string
   role: ShareRole
+  expiresAt: number
 }): SharedLink {
   const id = uuid()
   db.prepare(
-    `INSERT INTO shared_links (id, file_id, drive_permission_id, url, role, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(id, data.fileId, data.drivePermissionId, data.url, data.role, Date.now())
+    `INSERT INTO shared_links (id, file_id, drive_permission_id, url, role, created_at, expires_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, data.fileId, data.drivePermissionId, data.url, data.role, Date.now(), data.expiresAt)
   return rowToShare(db.prepare('SELECT * FROM shared_links WHERE id = ?').get(id) as DbShare)
 }
 

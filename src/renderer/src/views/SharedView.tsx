@@ -1,12 +1,20 @@
 import { useEffect, useState } from 'react'
-import { Copy, ExternalLink, Trash2, Link2 } from 'lucide-react'
+import { Copy, ExternalLink, Trash2, Link2, Clock } from 'lucide-react'
 import { useStore } from '../store'
-import { formatDate } from '../lib/format'
 import type { FileMeta, SharedLink } from '@shared/types'
+
+function formatCountdown(ms: number): string {
+  if (ms <= 0) return 'expiré'
+  const totalSec = Math.floor(ms / 1000)
+  const m = Math.floor(totalSec / 60)
+  const s = totalSec % 60
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
 
 export default function SharedView(): JSX.Element {
   const { files, loadFiles, toast } = useStore()
   const [links, setLinks] = useState<SharedLink[]>([])
+  const [now, setNow] = useState(Date.now())
 
   function refresh(): void {
     window.api.share.list().then(setLinks)
@@ -16,7 +24,19 @@ export default function SharedView(): JSX.Element {
     loadFiles()
   }, [])
 
+  // Rafraîchit le compte à rebours et relance la liste régulièrement (les
+  // liens expirés sont autodétruits en arrière-plan, cette page s'aligne dessus).
+  useEffect(() => {
+    const t1 = setInterval(() => setNow(Date.now()), 1000)
+    const t2 = setInterval(refresh, 15_000)
+    return () => {
+      clearInterval(t1)
+      clearInterval(t2)
+    }
+  }, [])
+
   const fileOf = (id: string): FileMeta | undefined => files.find((f) => f.id === id)
+  const active = links.filter((l) => l.expiresAt > now)
 
   async function revoke(fileId: string): Promise<void> {
     await window.api.share.revoke(fileId)
@@ -27,24 +47,25 @@ export default function SharedView(): JSX.Element {
   return (
     <div className="view-scroll">
       <div className="page-header">
-        <span className="page-header-title">Fichiers partagés</span>
+        <span className="page-header-title">Liens temporaires</span>
         <span className="muted" style={{ fontSize: 13 }}>
-          {links.length} lien{links.length !== 1 ? 's' : ''}
+          {active.length} lien{active.length !== 1 ? 's' : ''} actif{active.length !== 1 ? 's' : ''}
         </span>
       </div>
 
       <div className="view-pad">
-        {links.length === 0 ? (
+        {active.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-icon">🔗</div>
-            <div className="empty-state-title">Aucun lien de partage</div>
+            <div className="empty-state-title">Aucun lien de partage actif</div>
             <div className="empty-state-desc">
-              Depuis Fichiers, clic droit sur un fichier → Partager pour générer un lien public.
+              Depuis Fichiers, clic droit sur un fichier → Partager pour générer un lien valable 1h.
+              Il s'autodétruit ensuite automatiquement.
             </div>
           </div>
         ) : (
           <div className="col" style={{ gap: 8 }}>
-            {links.map((l) => {
+            {active.map((l) => {
               const f = fileOf(l.fileId)
               return (
                 <div key={l.id} className="card row" style={{ gap: 12, alignItems: 'center' }}>
@@ -56,8 +77,8 @@ export default function SharedView(): JSX.Element {
                     <span className="muted mono" style={{ fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {l.url}
                     </span>
-                    <span className="muted" style={{ fontSize: 11 }}>
-                      {l.role} · créé le {formatDate(l.createdAt)}
+                    <span className="muted" style={{ fontSize: 11, display: 'flex', gap: 4, alignItems: 'center' }}>
+                      {l.role} · <Clock size={11} /> expire dans {formatCountdown(l.expiresAt - now)}
                     </span>
                   </div>
                   <button

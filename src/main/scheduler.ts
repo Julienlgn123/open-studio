@@ -8,8 +8,10 @@ import {
 } from './db'
 import { runScheduledBackup, isBackupRunning } from './backup'
 import { refreshAllAccountTokens } from './google/accounts'
+import { revokeExpiredShares } from './filesvc'
 
 let timer: NodeJS.Timeout | null = null
+let shareTimer: NodeJS.Timeout | null = null
 let tickCount = 0
 
 // Un refresh de tokens toutes les 30 ticks (~30 min, ticks à 60 s) : assez
@@ -24,6 +26,12 @@ export function startScheduler(): void {
   timer = setInterval(tick, 60_000)
   // Premier passage rapide après le démarrage.
   setTimeout(tick, 10_000)
+
+  // Autodestruction des liens de partage temporaires (1h) : vérif fréquente
+  // pour que l'expiration soit effective peu après l'échéance, y compris
+  // pour les liens périmés pendant que l'app était fermée.
+  shareTimer = setInterval(shareTick, 30_000)
+  setTimeout(shareTick, 5_000)
 }
 
 export function stopScheduler(): void {
@@ -31,6 +39,14 @@ export function stopScheduler(): void {
     clearInterval(timer)
     timer = null
   }
+  if (shareTimer) {
+    clearInterval(shareTimer)
+    shareTimer = null
+  }
+}
+
+async function shareTick(): Promise<void> {
+  await revokeExpiredShares().catch(() => null)
 }
 
 async function tick(): Promise<void> {

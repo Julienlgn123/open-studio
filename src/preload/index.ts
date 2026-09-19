@@ -102,7 +102,7 @@ const api = {
     pathForFile: (file: File): string => webUtils.getPathForFile(file)
   },
   share: {
-    create: (id: string, role: ShareRole): Promise<string> =>
+    create: (id: string, role: ShareRole): Promise<{ url: string; expiresAt: number }> =>
       ipcRenderer.invoke('share:create', id, role),
     revoke: (id: string): Promise<void> => ipcRenderer.invoke('share:revoke', id),
     list: (): Promise<SharedLink[]> => ipcRenderer.invoke('share:list'),

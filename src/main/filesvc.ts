@@ -11,6 +11,7 @@ import {
   getAccount,
   getFile,
   getSharedLinkForFile,
+  getExpiredSharedLinks,
   createSharedLink,
   deleteSharedLink
 } from './db'
@@ -18,7 +19,7 @@ import { sha256File } from './checksum'
 import {
   deleteFile as driveDelete,
   downloadFile,
-  shareFile,
+  shareFile as driveShareFile,
   unshareFile,
   uploadFile
 } from './google/drive'
@@ -260,16 +261,32 @@ export async function deleteFileEverywhere(fileId: string): Promise<void> {
   await syncAccountQuota(file.accountId).catch(() => null)
 }
 
-export async function shareFileLink(fileId: string, role: ShareRole): Promise<string> {
+/** Durée de vie fixe des liens de partage temporaires. */
+export const SHARE_TTL_MS = 60 * 60 * 1000
+
+export async function shareFileLink(
+  fileId: string,
+  role: ShareRole
+): Promise<{ url: string; expiresAt: number }> {
   const file = getFile(fileId)
   if (!file) throw new Error('Fichier introuvable')
   const existing = getSharedLinkForFile(fileId)
-  if (existing) return existing.url
+  if (existing && existing.expiresAt > Date.now()) {
+    return { url: existing.url, expiresAt: existing.expiresAt }
+  }
+  // Lien précédent périmé mais pas encore nettoyé : on le révoque avant d'en recréer un.
+  if (existing) await revokeShare(fileId)
 
+  const expiresAt = Date.now() + SHARE_TTL_MS
   let permissionId: string
   let url: string
   try {
-    ;({ permissionId, url } = await shareFile(file.accountId, file.driveFileId, role))
+    ;({ permissionId, url } = await driveShareFile(
+      file.accountId,
+      file.driveFileId,
+      role,
+      new Date(expiresAt).toISOString()
+    ))
   } catch (err) {
     const msg = mapDriveError(err)
     addLog({
@@ -282,15 +299,15 @@ export async function shareFileLink(fileId: string, role: ShareRole): Promise<st
     })
     throw new Error(msg)
   }
-  createSharedLink({ fileId, drivePermissionId: permissionId, url, role })
+  createSharedLink({ fileId, drivePermissionId: permissionId, url, role, expiresAt })
   addLog({
     action: 'share',
     accountId: file.accountId,
     fileId,
     status: 'success',
-    label: `${file.originalFilename} (${role})`
+    label: `${file.originalFilename} (${role}, expire dans 1h)`
   })
-  return url
+  return { url, expiresAt }
 }
 
 export async function revokeShare(fileId: string): Promise<void> {
@@ -306,4 +323,11 @@ export async function revokeShare(fileId: string): Promise<void> {
     status: 'success',
     label: file.originalFilename
   })
+}
+
+/** Révoque tous les liens de partage dont l'échéance de 1h est dépassée. */
+export async function revokeExpiredShares(): Promise<void> {
+  for (const link of getExpiredSharedLinks()) {
+    await revokeShare(link.fileId).catch(() => null)
+  }
 }
