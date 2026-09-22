@@ -30,7 +30,7 @@ jobs:
           name: windows
           path: |
             dist-installer/*.exe
-            dist-installer/*.yml
+            dist-installer/latest*.yml
             dist-installer/*.blockmap
 
   # ─── macOS ─────────────────────────────────────────────────
@@ -63,7 +63,7 @@ jobs:
           path: |
             dist-installer/*.dmg
             dist-installer/*.zip
-            dist-installer/*.yml
+            dist-installer/latest*.yml
             dist-installer/*.blockmap
 
   # ─── Linux ─────────────────────────────────────────────────
@@ -94,7 +94,7 @@ jobs:
           path: |
             dist-installer/*.AppImage
             dist-installer/*.deb
-            dist-installer/*.yml
+            dist-installer/latest*.yml
             dist-installer/*.blockmap
 
   # ─── Create Release ─────────────────────────────────────────
