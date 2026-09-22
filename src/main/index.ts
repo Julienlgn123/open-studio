@@ -177,13 +177,18 @@ app.whenReady().then(() => {
     autoUpdater.autoInstallOnAppQuit = true
 
     autoUpdater.on('update-available', (info) => {
-      mainWindow.webContents.send('update:available', { version: info.version, releaseNotes: info.releaseNotes })
+      mainWindow.webContents.send('update:available', { version: info.version })
     })
     autoUpdater.on('update-not-available', () => {
       mainWindow.webContents.send('update:not-available')
     })
     autoUpdater.on('download-progress', (progress) => {
-      mainWindow.webContents.send('update:progress', Math.round(progress.percent))
+      mainWindow.webContents.send('update:progress', {
+        percent: progress.percent,
+        transferred: progress.transferred,
+        total: progress.total,
+        bytesPerSecond: progress.bytesPerSecond
+      })
     })
     autoUpdater.on('update-downloaded', () => {
       mainWindow.webContents.send('update:downloaded')

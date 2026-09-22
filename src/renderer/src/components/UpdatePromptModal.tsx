@@ -6,40 +6,29 @@ import { useEscapeToClose } from '../hooks/useEscapeToClose'
 const api = (window as any).api
 
 type Step = 'hidden' | 'prompt' | 'downloading' | 'downloaded' | 'error'
-type ReleaseNotes = string | { version: string; note: string | null }[] | null
 
-function notesToText(notes: ReleaseNotes): string {
-  if (!notes) return ''
-  if (typeof notes === 'string') return notes
-  return notes.map((n) => n.note ? `${n.version} :\n${n.note}` : '').filter(Boolean).join('\n\n')
-}
+interface DownloadProgress { percent: number; transferred: number; total: number; bytesPerSecond: number }
 
-// Very small markdown → plain-ish HTML, just enough to make GitHub release notes readable
-function notesToHtml(raw: string): string {
-  const escaped = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  return escaped
-    .replace(/^#{1,6}\s*(.+)$/gm, '<strong>$1</strong>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/^[-*]\s+(.+)$/gm, '• $1')
-    .replace(/\n/g, '<br>')
+function formatBytes(bytes: number): string {
+  if (!bytes || bytes < 0) return '0 Mo'
+  const mb = bytes / (1024 * 1024)
+  return mb < 1 ? `${Math.max(1, Math.round(bytes / 1024))} Ko` : `${mb.toFixed(1)} Mo`
 }
 
 export default function UpdatePromptModal() {
   const [step, setStep] = useState<Step>('hidden')
   const [version, setVersion] = useState('')
-  const [notes, setNotes] = useState<ReleaseNotes>(null)
-  const [progress, setProgress] = useState(0)
+  const [progress, setProgress] = useState<DownloadProgress>({ percent: 0, transferred: 0, total: 0, bytesPerSecond: 0 })
   const [error, setError] = useState('')
   const [dismissed, setDismissed] = useState(false)
 
   useEffect(() => {
     const cleanups = [
-      api.app.onUpdateAvailable(({ version, releaseNotes }: { version: string; releaseNotes: ReleaseNotes }) => {
+      api.app.onUpdateAvailable(({ version }: { version: string }) => {
         setVersion(version)
-        setNotes(releaseNotes)
         if (!dismissed) setStep('prompt')
       }),
-      api.app.onUpdateProgress((pct: number) => { setProgress(pct); setStep('downloading') }),
+      api.app.onUpdateProgress((p: DownloadProgress) => { setProgress(p); setStep('downloading') }),
       api.app.onUpdateDownloaded(() => setStep('downloaded')),
       api.app.onUpdateError((err: string) => { setError(err); setStep('error') })
     ]
@@ -60,7 +49,7 @@ export default function UpdatePromptModal() {
       return
     }
     setStep('downloading')
-    setProgress(0)
+    setProgress({ percent: 0, transferred: 0, total: 0, bytesPerSecond: 0 })
     api.app.downloadUpdate()
   }
 
@@ -73,7 +62,9 @@ export default function UpdatePromptModal() {
 
   if (step === 'hidden') return null
 
-  const notesText = notesToText(notes)
+  const pct = Math.min(100, Math.max(0, Math.round(progress.percent)))
+  const remainingBytes = Math.max(0, progress.total - progress.transferred)
+  const etaSeconds = progress.bytesPerSecond > 0 ? Math.round(remainingBytes / progress.bytesPerSecond) : null
 
   return (
     <div className="modal-overlay" onClick={step === 'prompt' ? declineUpdate : undefined}>
@@ -83,22 +74,9 @@ export default function UpdatePromptModal() {
             <>
               <Sparkles size={28} style={{ color: 'var(--accent)', marginBottom: 10 }} />
               <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>Nouvelle version disponible</div>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 14 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 18 }}>
                 La version {version} de Cours Studio est prête à être installée.
               </div>
-
-              {notesText && (
-                <div style={{
-                  textAlign: 'left', fontSize: 12.5, lineHeight: 1.6, color: 'var(--text-secondary)',
-                  background: 'var(--bg-overlay)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
-                  padding: '10px 14px', marginBottom: 18, maxHeight: 180, overflow: 'auto'
-                }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
-                    Quoi de neuf
-                  </div>
-                  <div dangerouslySetInnerHTML={{ __html: notesToHtml(notesText) }} />
-                </div>
-              )}
 
               <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
                 {isMac
@@ -116,12 +94,29 @@ export default function UpdatePromptModal() {
 
           {step === 'downloading' && (
             <>
-              <Download size={28} style={{ color: 'var(--accent)', marginBottom: 10 }} />
-              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 10 }}>Téléchargement...</div>
-              <div style={{ height: 6, background: 'var(--bg-overlay)', borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
-                <div style={{ height: '100%', width: `${progress}%`, background: 'var(--accent)', borderRadius: 3, transition: 'width 0.3s' }} />
+              <div className="update-download-icon">
+                <Download size={26} />
               </div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{progress}%</div>
+              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 2 }}>Téléchargement de la mise à jour</div>
+              <div style={{ fontSize: 12.5, color: 'var(--text-tertiary)', marginBottom: 20 }}>
+                Version {version} — reste sur cette fenêtre, ça ne prend que quelques instants.
+              </div>
+
+              <div style={{ fontSize: 34, fontWeight: 700, marginBottom: 12, fontVariantNumeric: 'tabular-nums' }}>
+                {pct}<span style={{ fontSize: 18, color: 'var(--text-tertiary)' }}>%</span>
+              </div>
+
+              <div className="update-progress-track">
+                <div className="update-progress-fill" style={{ width: `${pct}%` }} />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 8 }}>
+                <span>{formatBytes(progress.transferred)} / {progress.total ? formatBytes(progress.total) : '…'}</span>
+                <span>
+                  {progress.bytesPerSecond > 0 ? `${formatBytes(progress.bytesPerSecond)}/s` : 'Démarrage...'}
+                  {etaSeconds !== null && etaSeconds > 0 ? ` · ${etaSeconds} s restantes` : ''}
+                </span>
+              </div>
             </>
           )}
 

@@ -1433,3 +1433,51 @@ kbd {
   right: 0;
   transform: none;
 }
+
+/* Update download progress (UpdatePromptModal) */
+@keyframes update-icon-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 var(--accent-dim); }
+  50% { transform: scale(1.08); box-shadow: 0 0 0 8px transparent; }
+}
+
+.update-download-icon {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  color: var(--accent);
+  animation: update-icon-pulse 1.6s ease-in-out infinite;
+}
+
+.update-progress-track {
+  height: 10px;
+  background: var(--bg-overlay);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+@keyframes update-progress-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.update-progress-fill {
+  position: relative;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-light) 100%);
+  transition: width 0.25s ease-out;
+  overflow: hidden;
+}
+
+.update-progress-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  animation: update-progress-shimmer 1.3s linear infinite;
+}

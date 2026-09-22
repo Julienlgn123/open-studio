@@ -150,8 +150,8 @@ const api = {
     // macOS builds are only ad-hoc signed, so Squirrel can't self-apply an
     // update — open the Releases page for a manual download instead
     openReleases: () => ipcRenderer.invoke('update:openReleases'),
-    onUpdateAvailable: (cb: (info: { version: string; releaseNotes: string }) => void) => {
-      const handler = (_: unknown, info: { version: string; releaseNotes: string }) => cb(info)
+    onUpdateAvailable: (cb: (info: { version: string }) => void) => {
+      const handler = (_: unknown, info: { version: string }) => cb(info)
       ipcRenderer.on('update:available', handler)
       return () => ipcRenderer.removeListener('update:available', handler)
     },
@@ -159,8 +159,8 @@ const api = {
       ipcRenderer.on('update:not-available', cb)
       return () => ipcRenderer.removeListener('update:not-available', cb)
     },
-    onUpdateProgress: (cb: (pct: number) => void) => {
-      const handler = (_: unknown, pct: number) => cb(pct)
+    onUpdateProgress: (cb: (progress: { percent: number; transferred: number; total: number; bytesPerSecond: number }) => void) => {
+      const handler = (_: unknown, progress: { percent: number; transferred: number; total: number; bytesPerSecond: number }) => cb(progress)
       ipcRenderer.on('update:progress', handler)
       return () => ipcRenderer.removeListener('update:progress', handler)
     },
