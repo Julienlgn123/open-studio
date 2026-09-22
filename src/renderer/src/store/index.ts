@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Subject, Course, CourseVersion, Tag } from '../../../shared/types'
+import { mainTourSteps, editorTourSteps } from '../tour/tourSteps'
 
 // Kept outside the store state on purpose: showToast can be called again before an
 // earlier toast's timer has fired (e.g. two validation errors in a row). Without
@@ -32,9 +33,20 @@ interface AppStore {
   flashcardsWantAll: boolean
   pomodoroOpen: boolean
   focusMode: boolean
-  settings: { mistralApiKey?: string; mistralModel?: string; theme?: 'dark' | 'light'; numberedHeadings?: boolean }
+  settings: {
+    mistralApiKey?: string
+    mistralModel?: string
+    theme?: 'dark' | 'light'
+    numberedHeadings?: boolean
+    tourCompleted?: boolean
+    editorTourCompleted?: boolean
+  }
 
   toast: { message: string; type: 'success' | 'error' | 'info' } | null
+
+  // Guided tour: which one is showing (if any) and which step it's on
+  activeTour: 'main' | 'editor' | null
+  tourStep: number
 
   // Global AI task banner
   aiTask: AITask | null
@@ -65,6 +77,14 @@ interface AppStore {
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void
   hideToast: () => void
 
+  startTour: (name: 'main' | 'editor') => void
+  nextTourStep: () => void
+  prevTourStep: () => void
+  // Any way of leaving the tour (Suivant on the last step, Passer, ✕, clicking the
+  // backdrop) counts as "seen" — it won't auto-start again, but stays replayable
+  // from Paramètres / the editor toolbar.
+  closeTour: () => void
+
   // AI task banner
   startAITask: (task: Omit<AITask, 'status'>) => void
   completeAITask: (result: string) => void
@@ -90,6 +110,8 @@ export const useStore = create<AppStore>((set, get) => ({
   settings: {},
   toast: null,
   aiTask: null,
+  activeTour: null,
+  tourStep: 0,
 
   loadSubjects: async () => {
     const subjects = await api.subjects.get()
@@ -184,6 +206,26 @@ export const useStore = create<AppStore>((set, get) => ({
     toastTimer = setTimeout(() => get().hideToast(), 3000)
   },
   hideToast: () => { if (toastTimer) { clearTimeout(toastTimer); toastTimer = null }; set({ toast: null }) },
+
+  // The main tour points at Home-only elements (search bar, "Nouveau cours") alongside
+  // the always-visible sidebar/top bar, so it always starts from Home regardless of
+  // which view it was triggered from (e.g. replayed from Paramètres mid-course).
+  startTour: (name) => set({ activeTour: name, tourStep: 0, ...(name === 'main' ? { view: 'home' } : {}) }),
+  nextTourStep: () => {
+    const s = get()
+    const steps = s.activeTour === 'editor' ? editorTourSteps : mainTourSteps
+    if (s.tourStep + 1 >= steps.length) { get().closeTour(); return }
+    set({ tourStep: s.tourStep + 1 })
+  },
+  prevTourStep: () => set((s) => ({ tourStep: Math.max(0, s.tourStep - 1) })),
+  closeTour: () => {
+    const s = get()
+    if (s.activeTour) {
+      const key = s.activeTour === 'editor' ? 'editorTourCompleted' : 'tourCompleted'
+      if (!s.settings[key]) get().saveSettings({ ...s.settings, [key]: true })
+    }
+    set({ activeTour: null, tourStep: 0 })
+  },
 
   startAITask: (task) => set({ aiTask: { ...task, status: 'running' } }),
   completeAITask: (result) => set((s) => s.aiTask ? { aiTask: { ...s.aiTask, status: 'done', result } } : {}),

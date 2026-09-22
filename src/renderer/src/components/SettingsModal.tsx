@@ -15,7 +15,7 @@ interface Props {
 type UpdateState = 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
 
 export default function SettingsModal({ onClose }: Props) {
-  const { settings, saveSettings, showToast } = useStore()
+  const { settings, saveSettings, showToast, startTour } = useStore()
   const [apiKey, setApiKey] = useState(settings.mistralApiKey ?? '')
   const [model, setModel] = useState(settings.mistralModel ?? 'open-mistral-7b')
   const [showKey, setShowKey] = useState(false)
@@ -166,6 +166,17 @@ export default function SettingsModal({ onClose }: Props) {
                 <Sun size={13} /> Clair
               </button>
             </div>
+          </div>
+
+          {/* Help section */}
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 4 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 2 }}>Aide</div>
+            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10 }}>
+              La visite guidée qui explique les boutons de l'app.
+            </div>
+            <button className="btn btn-secondary btn-sm" onClick={() => { onClose(); startTour('main') }}>
+              Revoir la visite guidée
+            </button>
           </div>
 
           {/* Backup section */}

@@ -64,14 +64,14 @@ export default function HomeView() {
               {courses.length} cours · {subjects.length} matière{subjects.length !== 1 ? 's' : ''}
             </p>
           </div>
-          <button className="btn btn-primary" onClick={() => setShowNew(true)}>
+          <button className="btn btn-primary" onClick={() => setShowNew(true)} data-tour="new-course-btn">
             <Plus size={15} />
             Nouveau cours
           </button>
         </div>
 
         {/* Search */}
-        <div className="search-bar">
+        <div className="search-bar" data-tour="home-search">
           <Search size={14} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
           <input
             value={searchQuery}

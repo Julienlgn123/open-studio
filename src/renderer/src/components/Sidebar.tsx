@@ -57,6 +57,7 @@ export default function Sidebar() {
             className={`sidebar-item ${view === 'home' && !activeSubjectId ? 'active' : ''}`}
             style={{ width: '100%' }}
             onClick={() => { setActiveSubject(null); setView('home') }}
+            data-tour="nav-home"
           >
             <Home size={15} />
             <span className="sidebar-item-name">Accueil</span>

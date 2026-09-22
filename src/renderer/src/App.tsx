@@ -16,18 +16,25 @@ import ErrorBoundary from './components/ErrorBoundary'
 import PomodoroWidget from './components/PomodoroWidget'
 import UpdatePromptModal from './components/UpdatePromptModal'
 import GlobalSearchModal from './components/GlobalSearchModal'
+import TourOverlay from './tour/TourOverlay'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const api = (window as any).api
 
 export default function App() {
-  const { view, toast, loadSubjects, loadSettings, loadTags, settings, openGlobalReview, setView, focusMode, setFocusMode } = useStore()
+  const { view, toast, loadSubjects, loadSettings, loadTags, settings, openGlobalReview, setView, focusMode, setFocusMode, startTour } = useStore()
   const [showSearch, setShowSearch] = useState(false)
 
   useEffect(() => {
     loadSubjects()
-    loadSettings()
     loadTags()
+    loadSettings().then(() => {
+      // Small delay so the tour's spotlight appears after the initial view has
+      // settled in, not layered under its own fade-in animation.
+      if (!useStore.getState().settings.tourCompleted) {
+        setTimeout(() => startTour('main'), 700)
+      }
+    })
   }, [])
 
   useEffect(() => {
@@ -121,6 +128,7 @@ export default function App() {
       <UpdatePromptModal />
       <PomodoroWidget />
       {showSearch && <GlobalSearchModal onClose={() => setShowSearch(false)} />}
+      <TourOverlay />
     </div>
   )
 }

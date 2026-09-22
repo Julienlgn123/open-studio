@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { ArrowLeft, Save, History, Mic, Check, Trash2, FileUp, FileDown, FileText, List, BookOpen, Hash, Maximize2, Minimize2, ImagePlus, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Save, History, Mic, Check, Trash2, FileUp, FileDown, FileText, List, BookOpen, Hash, Maximize2, Minimize2, ImagePlus, ChevronLeft, ChevronRight, Compass } from 'lucide-react'
 import type { Attachment } from '../../../shared/types'
 import { getPdfPageCount, renderPdfPageToDataUrl } from '../lib/pdfPage'
 
@@ -15,7 +15,7 @@ import AttachmentsPanel from './AttachmentsPanel'
 
 export default function EditorView() {
   const { courses, subjects, activeCourseId, setView, setActiveCourse, updateCourse, deleteCourse, showToast,
-    focusMode, setFocusMode, settings, saveSettings } = useStore()
+    focusMode, setFocusMode, settings, saveSettings, startTour } = useStore()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const course = courses.find((c) => c.id === activeCourseId)
   const subject = course ? subjects.find((s) => s.id === course.subjectId) : undefined
@@ -42,6 +42,18 @@ export default function EditorView() {
 
   const numberedHeadings = !!settings.numberedHeadings
   const readingMin = Math.max(1, Math.round(stats.words / 200))
+
+  // Runs once per mount of the editor (not per course switch, since EditorView stays
+  // mounted while navigating between courses) — offers the toolbar tour the first
+  // time someone actually opens a course, rather than forcing it on every session.
+  useEffect(() => {
+    if (!useStore.getState().settings.editorTourCompleted) {
+      const t = setTimeout(() => startTour('editor'), 700)
+      return () => clearTimeout(t)
+    }
+    return undefined
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const headings = useMemo(() => {
     try {
@@ -322,6 +334,9 @@ export default function EditorView() {
           </button>
           <button className="icon-btn" onClick={exportMarkdown} data-tooltip="Exporter en Markdown" data-tooltip-dir="left-down">
             <FileText size={15} />
+          </button>
+          <button className="icon-btn" onClick={() => startTour('editor')} data-tooltip="Revoir la visite guidée de l'éditeur" data-tooltip-dir="left-down">
+            <Compass size={15} />
           </button>
           <button className="icon-btn" onClick={() => setShowDeleteConfirm(true)} data-tooltip="Supprimer ce cours" data-tooltip-dir="left-down" style={{ color: 'var(--danger, #ef4444)' }}>
             <Trash2 size={15} />
