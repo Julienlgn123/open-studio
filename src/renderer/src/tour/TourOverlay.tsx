@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { useStore } from '../store'
 import { mainTourSteps, editorTourSteps } from './tourSteps'
@@ -6,6 +6,44 @@ import { mainTourSteps, editorTourSteps } from './tourSteps'
 const PADDING = 8
 const POPOVER_WIDTH = 320
 const GAP = 14
+const MARGIN = 16
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), Math.max(min, max))
+}
+
+// Tries below/above/right/left of the target, in whichever order actually leaves
+// room for a box of this size; a target that leaves no clean side at all (one tall
+// enough to span most of the sidebar, say) falls back to a viewport-clamped
+// position instead of running the popover off-screen.
+function placePopover(rect: DOMRect, popoverW: number, popoverH: number): { top: number; left: number } {
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const spaceBelow = vh - rect.bottom
+  const spaceAbove = rect.top
+  const spaceRight = vw - rect.right
+  const spaceLeft = rect.left
+  const need = popoverH + GAP
+
+  if (spaceBelow >= need) {
+    return { top: rect.bottom + GAP, left: clamp(rect.left, MARGIN, vw - popoverW - MARGIN) }
+  }
+  if (spaceAbove >= need) {
+    return { top: rect.top - GAP - popoverH, left: clamp(rect.left, MARGIN, vw - popoverW - MARGIN) }
+  }
+  if (spaceRight >= popoverW + GAP) {
+    return { top: clamp(rect.top, MARGIN, vh - popoverH - MARGIN), left: rect.right + GAP }
+  }
+  if (spaceLeft >= popoverW + GAP) {
+    return { top: clamp(rect.top, MARGIN, vh - popoverH - MARGIN), left: rect.left - GAP - popoverW }
+  }
+  // Nothing fits cleanly around a target this size — center over everything instead
+  // of picking a side and clipping off the edge of the window.
+  return {
+    top: clamp(vh / 2 - popoverH / 2, MARGIN, vh - popoverH - MARGIN),
+    left: clamp(vw / 2 - popoverW / 2, MARGIN, vw - popoverW - MARGIN)
+  }
+}
 
 function unionRect(rects: DOMRect[]): DOMRect {
   const top = Math.min(...rects.map((r) => r.top))
@@ -60,6 +98,8 @@ export default function TourOverlay() {
   const step = steps?.[tourStep]
 
   const rect = useTargetRect(step?.selectors ?? [])
+  const popoverRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
 
   // Skip a step whose target isn't on screen (e.g. a course-only button while none
   // exists) instead of showing a spotlight pointing at nothing.
@@ -67,13 +107,18 @@ export default function TourOverlay() {
     if (rect === 'not-found') nextTourStep()
   }, [rect, nextTourStep])
 
+  // The popover's height depends on its text (title/body length varies per step), so
+  // it's measured after render rather than estimated — a fixed guess either wastes
+  // space or (worse) still runs off-screen for a longer step. Rendered hidden-but-laid-out
+  // on the frame where we don't have a position yet, so there's nothing to flash.
+  useLayoutEffect(() => {
+    if (!rect || rect === 'not-found' || !popoverRef.current) { setPos(null); return }
+    setPos(placePopover(rect, POPOVER_WIDTH, popoverRef.current.offsetHeight))
+  }, [rect, step])
+
   if (!activeTour || !steps || !step || !rect || rect === 'not-found') return null
 
   const isLast = tourStep === steps.length - 1
-  const spaceBelow = window.innerHeight - rect.bottom
-  const placeAbove = spaceBelow < 200 && rect.top > 200
-  const popoverTop = placeAbove ? Math.max(16, rect.top - GAP) : rect.bottom + GAP
-  const popoverLeft = Math.min(Math.max(16, rect.left), window.innerWidth - POPOVER_WIDTH - 16)
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 5000 }}>
@@ -96,12 +141,13 @@ export default function TourOverlay() {
       <div style={{ position: 'fixed', inset: 0 }} onClick={() => closeTour()} />
 
       <div
-        className="fade-in"
+        ref={popoverRef}
+        className={pos ? 'fade-in' : undefined}
         style={{
           position: 'fixed',
-          top: placeAbove ? undefined : popoverTop,
-          bottom: placeAbove ? window.innerHeight - popoverTop : undefined,
-          left: popoverLeft,
+          top: pos?.top ?? 0,
+          left: pos?.left ?? 0,
+          visibility: pos ? 'visible' : 'hidden',
           width: POPOVER_WIDTH,
           background: 'var(--bg-secondary)',
           border: '1px solid var(--border)',
