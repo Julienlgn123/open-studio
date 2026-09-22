@@ -37,7 +37,9 @@ export function initDb(): void {
       name TEXT NOT NULL,
       emoji TEXT NOT NULL DEFAULT '📚',
       color TEXT NOT NULL DEFAULT '#6366f1',
-      created_at INTEGER NOT NULL
+      created_at INTEGER NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      deleted_at INTEGER
     );
 
     CREATE TABLE IF NOT EXISTS courses (
@@ -49,7 +51,8 @@ export function initDb(): void {
       audio_path TEXT,
       video_path TEXT,
       created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
+      updated_at INTEGER NOT NULL,
+      deleted_at INTEGER
     );
 
     CREATE TABLE IF NOT EXISTS course_versions (
@@ -115,24 +118,45 @@ export function initDb(): void {
   `)
 
   // Migration: add emoji column to courses if it doesn't exist yet
-  const cols = db.prepare("PRAGMA table_info(courses)").all() as Array<{ name: string }>
-  if (!cols.find((c) => c.name === 'emoji')) {
+  const courseCols = db.prepare("PRAGMA table_info(courses)").all() as Array<{ name: string }>
+  if (!courseCols.find((c) => c.name === 'emoji')) {
     db.exec("ALTER TABLE courses ADD COLUMN emoji TEXT NOT NULL DEFAULT '📝'")
   }
+  if (!courseCols.find((c) => c.name === 'deleted_at')) {
+    db.exec('ALTER TABLE courses ADD COLUMN deleted_at INTEGER')
+  }
+
+  // Migration: reorderable sidebar + trash, for databases created before either existed
+  const subjectCols = db.prepare("PRAGMA table_info(subjects)").all() as Array<{ name: string }>
+  if (!subjectCols.find((c) => c.name === 'sort_order')) {
+    db.exec('ALTER TABLE subjects ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0')
+  }
+  if (!subjectCols.find((c) => c.name === 'deleted_at')) {
+    db.exec('ALTER TABLE subjects ADD COLUMN deleted_at INTEGER')
+  }
 }
+
+// How long a soft-deleted subject/course stays recoverable before purgeOldTrash() removes
+// it for good.
+const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
 
 // ─── Subjects ──────────────────────────────────────────────────────────────
 
 export function getSubjects(): Subject[] {
-  return (db.prepare('SELECT * FROM subjects ORDER BY created_at DESC').all() as DbSubject[]).map(rowToSubject)
+  return (db.prepare('SELECT * FROM subjects WHERE deleted_at IS NULL ORDER BY sort_order ASC, created_at DESC').all() as DbSubject[])
+    .map(rowToSubject)
 }
 
-export function createSubject(data: Omit<Subject, 'id' | 'createdAt'>): Subject {
+export function createSubject(data: Omit<Subject, 'id' | 'createdAt' | 'sortOrder'>): Subject {
   const id = generateId()
   const now = Date.now()
-  db.prepare('INSERT INTO subjects (id, name, emoji, color, created_at) VALUES (?, ?, ?, ?, ?)')
-    .run(id, data.name, data.emoji, data.color, now)
-  return { id, ...data, createdAt: now }
+  // New subjects should surface at the top of the (sort_order ASC) list, same spot
+  // "most recent first" put them before drag-to-reorder existed.
+  const { min } = db.prepare('SELECT MIN(sort_order) AS min FROM subjects').get() as { min: number | null }
+  const sortOrder = (min ?? 0) - 1
+  db.prepare('INSERT INTO subjects (id, name, emoji, color, created_at, sort_order) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(id, data.name, data.emoji, data.color, now, sortOrder)
+  return { id, ...data, createdAt: now, sortOrder }
 }
 
 export function updateSubject(id: string, data: Partial<Omit<Subject, 'id' | 'createdAt'>>): void {
@@ -146,36 +170,85 @@ export function updateSubject(id: string, data: Partial<Omit<Subject, 'id' | 'cr
   db.prepare(`UPDATE subjects SET ${fields.join(', ')} WHERE id = ?`).run(...values)
 }
 
+// Re-indexes every subject's sort_order to match this exact order (drag-and-drop in the
+// sidebar hands back the full list every time, so a full re-index is simplest and can't
+// drift). Spaced by 10 rather than 1 — harmless, just leaves room if we ever want to
+// insert a computed position between two rows without renumbering everything again.
+export function reorderSubjects(orderedIds: string[]): void {
+  const tx = db.transaction(() => {
+    orderedIds.forEach((id, i) => {
+      db.prepare('UPDATE subjects SET sort_order = ? WHERE id = ?').run(i * 10, id)
+    })
+  })
+  tx()
+}
+
+// Moves a subject (and, cascading, the courses it had at that moment) to the trash instead
+// of deleting rows outright — recoverable for TRASH_RETENTION_MS via restoreSubject().
+export function softDeleteSubject(id: string): void {
+  const now = Date.now()
+  const tx = db.transaction(() => {
+    db.prepare('UPDATE subjects SET deleted_at = ? WHERE id = ?').run(now, id)
+    db.prepare('UPDATE courses SET deleted_at = ? WHERE subject_id = ? AND deleted_at IS NULL').run(now, id)
+  })
+  tx()
+}
+
+// Only restores the courses that were trashed AT THE SAME TIME as the subject (same
+// deleted_at) — a course the user had already individually trashed earlier stays trashed
+// on its own, rather than resurfacing as a side effect of restoring its subject.
+export function restoreSubject(id: string): void {
+  const row = db.prepare('SELECT deleted_at FROM subjects WHERE id = ?').get(id) as { deleted_at: number | null } | undefined
+  if (!row || row.deleted_at == null) return
+  const deletedAt = row.deleted_at
+  const tx = db.transaction(() => {
+    db.prepare('UPDATE subjects SET deleted_at = NULL WHERE id = ?').run(id)
+    db.prepare('UPDATE courses SET deleted_at = NULL WHERE subject_id = ? AND deleted_at = ?').run(id, deletedAt)
+  })
+  tx()
+}
+
+export interface TrashedSubject extends Subject { courseCount: number }
+
+export function getTrashedSubjects(): TrashedSubject[] {
+  const rows = db.prepare('SELECT * FROM subjects WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC').all() as DbSubject[]
+  return rows.map((r) => {
+    const { n } = db.prepare('SELECT COUNT(*) AS n FROM courses WHERE subject_id = ?').get(r.id) as { n: number }
+    return { ...rowToSubject(r), courseCount: n }
+  })
+}
+
 // Deletes the courses (and their versions/tags/attachments/flashcards rows) by hand rather
 // than relying on the schema's ON DELETE CASCADE: a db file created before that clause existed
 // keeps its original table definition forever (SQLite doesn't retrofit constraints), so this
 // stays correct regardless of when the user's local database was first created.
-export function deleteSubject(id: string): void {
-  const tx = db.transaction((subjectId: string) => {
-    const courseIds = (db.prepare('SELECT id FROM courses WHERE subject_id = ?').all(subjectId) as Array<{ id: string }>)
-      .map((r) => r.id)
-    for (const courseId of courseIds) {
-      db.prepare('DELETE FROM course_versions WHERE course_id = ?').run(courseId)
-      db.prepare('DELETE FROM course_tags WHERE course_id = ?').run(courseId)
-      db.prepare('DELETE FROM attachments WHERE course_id = ?').run(courseId)
-      db.prepare('DELETE FROM flashcards WHERE course_id = ?').run(courseId)
-      db.prepare('UPDATE quiz_results SET course_id = NULL WHERE course_id = ?').run(courseId)
+// Returns the deleted courses so the caller can clean up their files on disk.
+export function permanentlyDeleteSubject(id: string): Course[] {
+  const courses = (db.prepare('SELECT * FROM courses WHERE subject_id = ?').all(id) as DbCourse[]).map(rowToCourse)
+  const tx = db.transaction(() => {
+    for (const c of courses) {
+      db.prepare('DELETE FROM course_versions WHERE course_id = ?').run(c.id)
+      db.prepare('DELETE FROM course_tags WHERE course_id = ?').run(c.id)
+      db.prepare('DELETE FROM attachments WHERE course_id = ?').run(c.id)
+      db.prepare('DELETE FROM flashcards WHERE course_id = ?').run(c.id)
+      db.prepare('UPDATE quiz_results SET course_id = NULL WHERE course_id = ?').run(c.id)
     }
-    db.prepare('DELETE FROM courses WHERE subject_id = ?').run(subjectId)
-    db.prepare('DELETE FROM subjects WHERE id = ?').run(subjectId)
+    db.prepare('DELETE FROM courses WHERE subject_id = ?').run(id)
+    db.prepare('DELETE FROM subjects WHERE id = ?').run(id)
   })
-  tx(id)
+  tx()
+  return courses
 }
 
 // ─── Courses ───────────────────────────────────────────────────────────────
 
 export function getCoursesBySubject(subjectId: string): Course[] {
-  return (db.prepare('SELECT * FROM courses WHERE subject_id = ? ORDER BY created_at DESC').all(subjectId) as DbCourse[])
+  return (db.prepare('SELECT * FROM courses WHERE subject_id = ? AND deleted_at IS NULL ORDER BY created_at DESC').all(subjectId) as DbCourse[])
     .map(rowToCourse)
 }
 
 export function getCourse(id: string): Course | null {
-  const row = db.prepare('SELECT * FROM courses WHERE id = ?').get(id) as DbCourse | undefined
+  const row = db.prepare('SELECT * FROM courses WHERE id = ? AND deleted_at IS NULL').get(id) as DbCourse | undefined
   return row ? rowToCourse(row) : null
 }
 
@@ -203,12 +276,65 @@ export function updateCourse(id: string, data: Partial<{ title: string; emoji: s
   db.prepare(`UPDATE courses SET ${fields.join(', ')} WHERE id = ?`).run(...values)
 }
 
-export function deleteCourse(id: string): void {
-  db.prepare('DELETE FROM courses WHERE id = ?').run(id)
+export function softDeleteCourse(id: string): void {
+  db.prepare('UPDATE courses SET deleted_at = ? WHERE id = ?').run(Date.now(), id)
+}
+
+export function restoreCourse(id: string): void {
+  db.prepare('UPDATE courses SET deleted_at = NULL WHERE id = ?').run(id)
+}
+
+// Individually-trashed courses whose subject is still active — a course trashed as part of
+// a whole subject going to the trash is shown (and restored) under that subject instead.
+export function getTrashedCourses(): Course[] {
+  const rows = db.prepare(`
+    SELECT c.* FROM courses c
+    JOIN subjects s ON s.id = c.subject_id
+    WHERE c.deleted_at IS NOT NULL AND s.deleted_at IS NULL
+    ORDER BY c.deleted_at DESC
+  `).all() as DbCourse[]
+  return rows.map(rowToCourse)
+}
+
+export function permanentlyDeleteCourse(id: string): Course | null {
+  const row = db.prepare('SELECT * FROM courses WHERE id = ?').get(id) as DbCourse | undefined
+  if (!row) return null
+  const course = rowToCourse(row)
+  const tx = db.transaction(() => {
+    db.prepare('DELETE FROM course_versions WHERE course_id = ?').run(id)
+    db.prepare('DELETE FROM course_tags WHERE course_id = ?').run(id)
+    db.prepare('DELETE FROM attachments WHERE course_id = ?').run(id)
+    db.prepare('DELETE FROM flashcards WHERE course_id = ?').run(id)
+    db.prepare('UPDATE quiz_results SET course_id = NULL WHERE course_id = ?').run(id)
+    db.prepare('DELETE FROM courses WHERE id = ?').run(id)
+  })
+  tx()
+  return course
+}
+
+// Everything currently in the trash, regardless of age ("Vider la corbeille").
+export function emptyTrash(): Course[] {
+  const purged: Course[] = []
+  const subjectIds = (db.prepare('SELECT id FROM subjects WHERE deleted_at IS NOT NULL').all() as Array<{ id: string }>).map((r) => r.id)
+  for (const id of subjectIds) purged.push(...permanentlyDeleteSubject(id))
+  const courseIds = (db.prepare('SELECT id FROM courses WHERE deleted_at IS NOT NULL').all() as Array<{ id: string }>).map((r) => r.id)
+  for (const id of courseIds) { const c = permanentlyDeleteCourse(id); if (c) purged.push(c) }
+  return purged
+}
+
+// Only what's past TRASH_RETENTION_MS ("app startup housekeeping", not user-initiated).
+export function purgeOldTrash(): Course[] {
+  const cutoff = Date.now() - TRASH_RETENTION_MS
+  const purged: Course[] = []
+  const subjectIds = (db.prepare('SELECT id FROM subjects WHERE deleted_at IS NOT NULL AND deleted_at < ?').all(cutoff) as Array<{ id: string }>).map((r) => r.id)
+  for (const id of subjectIds) purged.push(...permanentlyDeleteSubject(id))
+  const courseIds = (db.prepare('SELECT id FROM courses WHERE deleted_at IS NOT NULL AND deleted_at < ?').all(cutoff) as Array<{ id: string }>).map((r) => r.id)
+  for (const id of courseIds) { const c = permanentlyDeleteCourse(id); if (c) purged.push(c) }
+  return purged
 }
 
 export function getAllCourses(): Course[] {
-  return (db.prepare('SELECT * FROM courses ORDER BY created_at DESC').all() as DbCourse[]).map(rowToCourse)
+  return (db.prepare('SELECT * FROM courses WHERE deleted_at IS NULL ORDER BY created_at DESC').all() as DbCourse[]).map(rowToCourse)
 }
 
 // ─── Versions ──────────────────────────────────────────────────────────────
@@ -377,6 +503,44 @@ export function logStudySession(subjectId: string | null, seconds: number): void
     .run(generateId(), subjectId ?? null, Math.round(seconds), Date.now())
 }
 
+export interface StudyStreak { current: number; longest: number }
+
+// A "day counts" if the user ran a Pomodoro, edited a course, or took a quiz that day —
+// not just Pomodoro, since most study time in this app is just writing notes.
+export function getStudyStreak(): StudyStreak {
+  const days = new Set<string>()
+  const toDayKey = (t: number): string => new Date(t).toISOString().slice(0, 10)
+  for (const r of db.prepare('SELECT created_at AS t FROM study_sessions').all() as Array<{ t: number }>) days.add(toDayKey(r.t))
+  for (const r of db.prepare('SELECT updated_at AS t FROM courses WHERE deleted_at IS NULL').all() as Array<{ t: number }>) days.add(toDayKey(r.t))
+  for (const r of db.prepare('SELECT created_at AS t FROM quiz_results').all() as Array<{ t: number }>) days.add(toDayKey(r.t))
+
+  if (days.size === 0) return { current: 0, longest: 0 }
+
+  // ISO 'YYYY-MM-DD' keys sort correctly as plain strings.
+  const sorted = Array.from(days).sort()
+  let longest = 1
+  let run = 1
+  for (let i = 1; i < sorted.length; i++) {
+    const diffDays = Math.round((Date.parse(sorted[i]) - Date.parse(sorted[i - 1])) / 86_400_000)
+    run = diffDays === 1 ? run + 1 : 1
+    longest = Math.max(longest, run)
+  }
+
+  // A streak stays "alive" through today even if nothing's logged yet today, as long as
+  // yesterday had activity — it only breaks once a full day passes with nothing at all.
+  const today = toDayKey(Date.now())
+  const yesterday = toDayKey(Date.now() - 86_400_000)
+  let current = 0
+  if (days.has(today) || days.has(yesterday)) {
+    let cursor = days.has(today) ? Date.now() : Date.now() - 86_400_000
+    while (days.has(toDayKey(cursor))) {
+      current++
+      cursor -= 86_400_000
+    }
+  }
+  return { current, longest }
+}
+
 export interface StudyStats {
   total: number
   week: number
@@ -416,8 +580,8 @@ export function getStudyStats(): StudyStats {
 
 // ─── Row types & mappers ────────────────────────────────────────────────────
 
-interface DbSubject { id: string; name: string; emoji: string; color: string; created_at: number }
-interface DbCourse  { id: string; subject_id: string; title: string; emoji: string; content: string; audio_path: string | null; video_path: string | null; created_at: number; updated_at: number }
+interface DbSubject { id: string; name: string; emoji: string; color: string; created_at: number; sort_order: number; deleted_at: number | null }
+interface DbCourse  { id: string; subject_id: string; title: string; emoji: string; content: string; audio_path: string | null; video_path: string | null; created_at: number; updated_at: number; deleted_at: number | null }
 interface DbVersion { id: string; course_id: string; content: string; label: string; source: string; ai_action: string | null; created_at: number }
 interface DbTag { id: string; name: string; emoji: string; color: string; created_at: number }
 interface DbAttachment { id: string; course_id: string; file_name: string; file_path: string; size: number; created_at: number }
@@ -441,13 +605,13 @@ function rowToAttachment(row: DbAttachment): Attachment {
 }
 
 function rowToSubject(row: DbSubject): Subject {
-  return { id: row.id, name: row.name, emoji: row.emoji, color: row.color, createdAt: row.created_at }
+  return { id: row.id, name: row.name, emoji: row.emoji, color: row.color, createdAt: row.created_at, sortOrder: row.sort_order, deletedAt: row.deleted_at ?? undefined }
 }
 
 function rowToCourse(row: DbCourse): Course {
   const versions = (db.prepare('SELECT * FROM course_versions WHERE course_id = ? ORDER BY created_at DESC').all(row.id) as DbVersion[]).map(rowToVersion)
   const tagIds = getTagIdsForCourse(row.id)
-  return { id: row.id, subjectId: row.subject_id, title: row.title, emoji: row.emoji ?? '📝', content: row.content, audioPath: row.audio_path ?? undefined, videoPath: row.video_path ?? undefined, tagIds, versions, createdAt: row.created_at, updatedAt: row.updated_at }
+  return { id: row.id, subjectId: row.subject_id, title: row.title, emoji: row.emoji ?? '📝', content: row.content, audioPath: row.audio_path ?? undefined, videoPath: row.video_path ?? undefined, tagIds, versions, createdAt: row.created_at, updatedAt: row.updated_at, deletedAt: row.deleted_at ?? undefined }
 }
 
 function rowToVersion(row: DbVersion): CourseVersion {

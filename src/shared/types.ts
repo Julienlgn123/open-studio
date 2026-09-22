@@ -4,6 +4,8 @@ export interface Subject {
   emoji: string
   color: string
   createdAt: number
+  sortOrder: number
+  deletedAt?: number
 }
 
 export interface CourseVersion {
@@ -28,6 +30,7 @@ export interface Course {
   versions: CourseVersion[]
   createdAt: number
   updatedAt: number
+  deletedAt?: number
 }
 
 export interface Tag {

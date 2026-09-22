@@ -10,6 +10,7 @@ import AIStudio from './components/AIStudio'
 import QuizStudio from './components/QuizStudio'
 import FlashcardStudio from './components/FlashcardStudio'
 import StatsView from './components/StatsView'
+import TrashView from './components/TrashView'
 import Toast from './components/Toast'
 import AIBanner from './components/AIBanner'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -17,13 +18,25 @@ import PomodoroWidget from './components/PomodoroWidget'
 import UpdatePromptModal from './components/UpdatePromptModal'
 import GlobalSearchModal from './components/GlobalSearchModal'
 import TourOverlay from './tour/TourOverlay'
+import { useAccessibleTooltips } from './hooks/useAccessibleTooltips'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const api = (window as any).api
 
 export default function App() {
-  const { view, toast, loadSubjects, loadSettings, loadTags, settings, openGlobalReview, setView, focusMode, setFocusMode, startTour } = useStore()
+  const { view, toast, loadSubjects, loadSettings, loadTags, settings, openGlobalReview, setView, focusMode, setFocusMode, startTour, activeTour, closeTour } = useStore()
   const [showSearch, setShowSearch] = useState(false)
+
+  useAccessibleTooltips()
+
+  // EditorView fully unmounts when navigating away from it (App only renders it while
+  // view === 'editor'), so if its tour is still running (e.g. the user hits "Retour"
+  // mid-tour) every remaining step's target is gone. Without this, TourOverlay would
+  // spend up to ~1.5s per step polling for elements that will never appear, all while
+  // its full-screen backdrop keeps blocking clicks on whatever view is now showing.
+  useEffect(() => {
+    if (activeTour === 'editor' && view !== 'editor') closeTour()
+  }, [view, activeTour, closeTour])
 
   useEffect(() => {
     loadSubjects()
@@ -116,6 +129,12 @@ export default function App() {
               <motion.div key="stats" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
                 initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
                 <StatsView />
+              </motion.div>
+            )}
+            {view === 'trash' && (
+              <motion.div key="trash" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+                initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+                <TrashView />
               </motion.div>
             )}
           </AnimatePresence>

@@ -5,14 +5,16 @@ import { useStore } from '../store'
 export default function GlobalSearchModal({ onClose }: { onClose: () => void }) {
   const { courses, subjects, tags, setActiveCourse, setView } = useStore()
   const [query, setQuery] = useState('')
+  const [subjectFilter, setSubjectFilter] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { inputRef.current?.focus() }, [])
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return courses.slice(0, 15)
-    return courses.filter((c) => {
+    let base = subjectFilter ? courses.filter((c) => c.subjectId === subjectFilter) : courses
+    if (!q) return base.slice(0, 15)
+    return base.filter((c) => {
       const courseTags = tags.filter((t) => c.tagIds?.includes(t.id)).map((t) => t.name.toLowerCase())
       return (
         c.title.toLowerCase().includes(q) ||
@@ -20,7 +22,7 @@ export default function GlobalSearchModal({ onClose }: { onClose: () => void }) 
         courseTags.some((t) => t.includes(q))
       )
     }).slice(0, 30)
-  }, [courses, tags, query])
+  }, [courses, tags, query, subjectFilter])
 
   function openCourse(id: string) {
     setActiveCourse(id)
@@ -43,6 +45,28 @@ export default function GlobalSearchModal({ onClose }: { onClose: () => void }) 
           />
           <button className="icon-btn" onClick={onClose}><X size={15} /></button>
         </div>
+
+        {subjects.length > 0 && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '10px 16px 0' }}>
+            <button
+              className="btn btn-sm"
+              onClick={() => setSubjectFilter('')}
+              style={{ background: !subjectFilter ? 'var(--accent-dim)' : 'var(--bg-overlay)', color: !subjectFilter ? 'var(--accent-light)' : 'var(--text-secondary)', border: `1px solid ${!subjectFilter ? 'var(--accent)' : 'var(--border)'}` }}
+            >
+              Toutes les matières
+            </button>
+            {subjects.map((s) => (
+              <button
+                key={s.id}
+                className="btn btn-sm"
+                onClick={() => setSubjectFilter(subjectFilter === s.id ? '' : s.id)}
+                style={{ background: subjectFilter === s.id ? `${s.color}22` : 'var(--bg-overlay)', color: subjectFilter === s.id ? s.color : 'var(--text-secondary)', border: `1px solid ${subjectFilter === s.id ? s.color : 'var(--border)'}` }}
+              >
+                {s.emoji} {s.name}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div style={{ flex: 1, overflow: 'auto', padding: 8 }}>
           {results.length === 0 && (

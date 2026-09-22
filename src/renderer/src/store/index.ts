@@ -8,6 +8,8 @@ import { mainTourSteps, editorTourSteps } from '../tour/tourSteps'
 // 3s mark, cutting the newer message's display time short or hiding it immediately.
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 
+export interface TrashedSubjectView extends Subject { courseCount: number }
+
 export interface AITask {
   courseId: string
   courseTitle: string
@@ -26,9 +28,16 @@ interface AppStore {
   activeCourseId: string | null
   activeSubjectId: string | null
 
-  view: 'home' | 'subject' | 'editor' | 'ai' | 'quiz' | 'flashcards' | 'stats'
+  view: 'home' | 'subject' | 'editor' | 'ai' | 'quiz' | 'flashcards' | 'stats' | 'trash'
   sidebarCollapsed: boolean
   searchQuery: string
+  // Multi-select for bulk actions (move/tag/delete several courses at once)
+  selectedCourseIds: string[]
+
+  trashedSubjects: TrashedSubjectView[]
+  trashedCourses: Course[]
+
+  streak: { current: number; longest: number }
   // When true, the Flashcards view opens straight into the global review session
   flashcardsWantAll: boolean
   pomodoroOpen: boolean
@@ -40,6 +49,7 @@ interface AppStore {
     numberedHeadings?: boolean
     tourCompleted?: boolean
     editorTourCompleted?: boolean
+    autoBackupFolder?: string
   }
 
   toast: { message: string; type: 'success' | 'error' | 'info' } | null
@@ -53,9 +63,10 @@ interface AppStore {
 
   loadSubjects: () => Promise<void>
   loadCourses: (subjectId?: string) => Promise<void>
-  createSubject: (data: Omit<Subject, 'id' | 'createdAt'>) => Promise<Subject>
+  createSubject: (data: Omit<Subject, 'id' | 'createdAt' | 'sortOrder'>) => Promise<Subject>
   updateSubject: (id: string, data: Partial<Omit<Subject, 'id' | 'createdAt'>>) => Promise<void>
   deleteSubject: (id: string) => Promise<void>
+  reorderSubjects: (ids: string[]) => Promise<void>
   createCourse: (data: { subjectId: string; title?: string; emoji?: string; content?: string; audioPath?: string; videoPath?: string }) => Promise<Course>
   updateCourse: (id: string, data: Partial<{ title: string; emoji: string; content: string; subjectId: string; audioPath: string; videoPath: string }>) => Promise<void>
   deleteCourse: (id: string) => Promise<void>
@@ -64,6 +75,25 @@ interface AppStore {
   updateTag: (id: string, data: Partial<{ name: string; emoji: string; color: string }>) => Promise<void>
   deleteTag: (id: string) => Promise<void>
   setCourseTags: (courseId: string, tagIds: string[]) => Promise<void>
+
+  // Trash
+  loadTrash: () => Promise<void>
+  restoreSubjectFromTrash: (id: string) => Promise<void>
+  restoreCourseFromTrash: (id: string) => Promise<void>
+  purgeSubjectForever: (id: string) => Promise<void>
+  purgeCourseForever: (id: string) => Promise<void>
+  emptyTrash: () => Promise<void>
+
+  loadStreak: () => Promise<void>
+
+  // Bulk selection
+  toggleCourseSelected: (id: string) => void
+  selectCourses: (ids: string[]) => void
+  clearCourseSelection: () => void
+  bulkMoveCourses: (ids: string[], subjectId: string) => Promise<void>
+  bulkDeleteCourses: (ids: string[]) => Promise<void>
+  bulkAddTag: (ids: string[], tagId: string) => Promise<void>
+
   setActiveCourse: (id: string | null) => void
   setActiveSubject: (id: string | null) => void
   setView: (view: AppStore['view']) => void
@@ -104,6 +134,10 @@ export const useStore = create<AppStore>((set, get) => ({
   view: 'home',
   sidebarCollapsed: false,
   searchQuery: '',
+  selectedCourseIds: [],
+  trashedSubjects: [],
+  trashedCourses: [],
+  streak: { current: 0, longest: 0 },
   flashcardsWantAll: false,
   pomodoroOpen: false,
   focusMode: false,
@@ -146,6 +180,15 @@ export const useStore = create<AppStore>((set, get) => ({
     }))
   },
 
+  // Applied optimistically — the sidebar hands back the full post-drop order, and
+  // waiting on the round-trip before reflecting it would make the drag feel laggy.
+  reorderSubjects: async (ids) => {
+    set((s) => ({
+      subjects: ids.map((id) => s.subjects.find((sub) => sub.id === id)).filter((s): s is Subject => !!s)
+    }))
+    await api.subjects.reorder(ids)
+  },
+
   createCourse: async (data) => {
     const course = await api.courses.create(data)
     set((s) => ({ courses: [course, ...s.courses] }))
@@ -186,6 +229,64 @@ export const useStore = create<AppStore>((set, get) => ({
   setCourseTags: async (courseId, tagIds) => {
     await api.tags.setForCourse(courseId, tagIds)
     set((s) => ({ courses: s.courses.map((c) => c.id === courseId ? { ...c, tagIds } : c) }))
+  },
+
+  loadTrash: async () => {
+    const [trashedSubjects, trashedCourses] = await Promise.all([api.trash.subjects(), api.trash.courses()])
+    set({ trashedSubjects, trashedCourses })
+  },
+  restoreSubjectFromTrash: async (id) => {
+    await api.trash.restoreSubject(id)
+    await Promise.all([get().loadTrash(), get().loadSubjects()])
+  },
+  restoreCourseFromTrash: async (id) => {
+    await api.trash.restoreCourse(id)
+    await Promise.all([get().loadTrash(), get().loadCourses(get().activeSubjectId ?? undefined)])
+  },
+  purgeSubjectForever: async (id) => {
+    await api.trash.purgeSubject(id)
+    set((s) => ({ trashedSubjects: s.trashedSubjects.filter((sub) => sub.id !== id) }))
+  },
+  purgeCourseForever: async (id) => {
+    await api.trash.purgeCourse(id)
+    set((s) => ({ trashedCourses: s.trashedCourses.filter((c) => c.id !== id) }))
+  },
+  emptyTrash: async () => {
+    await api.trash.empty()
+    set({ trashedSubjects: [], trashedCourses: [] })
+  },
+
+  loadStreak: async () => { const streak = await api.study.streak(); set({ streak }) },
+
+  toggleCourseSelected: (id) => set((s) => ({
+    selectedCourseIds: s.selectedCourseIds.includes(id)
+      ? s.selectedCourseIds.filter((x) => x !== id)
+      : [...s.selectedCourseIds, id]
+  })),
+  selectCourses: (ids) => set({ selectedCourseIds: ids }),
+  clearCourseSelection: () => set({ selectedCourseIds: [] }),
+
+  bulkMoveCourses: async (ids, subjectId) => {
+    for (const id of ids) await api.courses.update(id, { subjectId })
+    set((s) => ({
+      courses: s.courses.map((c) => ids.includes(c.id) ? { ...c, subjectId, updatedAt: Date.now() } : c),
+      selectedCourseIds: []
+    }))
+  },
+  bulkDeleteCourses: async (ids) => {
+    for (const id of ids) await api.courses.delete(id)
+    set((s) => ({ courses: s.courses.filter((c) => !ids.includes(c.id)), selectedCourseIds: [] }))
+  },
+  bulkAddTag: async (ids, tagId) => {
+    for (const id of ids) {
+      const course = get().courses.find((c) => c.id === id)
+      if (!course || course.tagIds.includes(tagId)) continue
+      await api.tags.setForCourse(id, [...course.tagIds, tagId])
+    }
+    set((s) => ({
+      courses: s.courses.map((c) => ids.includes(c.id) && !c.tagIds.includes(tagId) ? { ...c, tagIds: [...c.tagIds, tagId] } : c),
+      selectedCourseIds: []
+    }))
   },
 
   setActiveCourse: (id) => set({ activeCourseId: id }),

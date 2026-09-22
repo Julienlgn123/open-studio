@@ -363,7 +363,7 @@ export default function EditorView() {
           <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 24, minWidth: 320, maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
             <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Supprimer le cours ?</div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
-              « {course?.title} » sera définitivement supprimé. Cette action est irréversible.
+              « {course?.title} » sera déplacé dans la corbeille — récupérable pendant 30 jours.
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button className="btn btn-secondary" onClick={() => setShowDeleteConfirm(false)}>Annuler</button>
@@ -371,7 +371,7 @@ export default function EditorView() {
                 if (!activeCourseId) return
                 await deleteCourse(activeCourseId)
                 setView(subject ? 'subject' : 'home')
-                showToast('Cours supprimé', 'success')
+                showToast('Cours déplacé dans la corbeille', 'success')
               }}>Supprimer</button>
             </div>
           </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Paperclip, FolderOpen, ExternalLink, Trash2, UploadCloud } from 'lucide-react'
+import { Paperclip, FolderOpen, ExternalLink, Trash2, UploadCloud, Eye, EyeOff } from 'lucide-react'
 import type { Attachment } from '../../../shared/types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -11,16 +11,39 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`
 }
 
+const isImage = (name: string): boolean => /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(name)
+const isPdf = (name: string): boolean => /\.pdf$/i.test(name)
+
 export default function AttachmentsPanel({ courseId }: { courseId: string }) {
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [dragOver, setDragOver] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({})
+  const [expandedPdf, setExpandedPdf] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setAttachments(await api.attachments.get(courseId))
   }, [courseId])
 
   useEffect(() => { load() }, [load])
+
+  // Thumbnails for images load right away; a PDF's iframe only loads once expanded.
+  useEffect(() => {
+    for (const a of attachments) {
+      if (isImage(a.fileName) && !previewUrls[a.id]) {
+        api.media.url(a.filePath).then((url: string) => setPreviewUrls((p) => ({ ...p, [a.id]: url })))
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachments])
+
+  function togglePdfPreview(a: Attachment): void {
+    if (expandedPdf === a.id) { setExpandedPdf(null); return }
+    if (!previewUrls[a.id]) {
+      api.media.url(a.filePath).then((url: string) => setPreviewUrls((p) => ({ ...p, [a.id]: url })))
+    }
+    setExpandedPdf(a.id)
+  }
 
   async function addFiles(paths: string[]) {
     if (paths.length === 0) return
@@ -87,21 +110,35 @@ export default function AttachmentsPanel({ courseId }: { courseId: string }) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {attachments.map((a) => (
-              <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
-                <Paperclip size={14} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.fileName}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{formatSize(a.size)}</div>
+              <div key={a.id} style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px' }}>
+                  {isImage(a.fileName) && previewUrls[a.id] ? (
+                    <img src={previewUrls[a.id]} alt="" style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 'var(--radius-sm)', flexShrink: 0 }} />
+                  ) : (
+                    <Paperclip size={14} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.fileName}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{formatSize(a.size)}</div>
+                  </div>
+                  {isPdf(a.fileName) && (
+                    <button className="icon-btn" title={expandedPdf === a.id ? 'Masquer l\'aperçu' : 'Aperçu'} onClick={() => togglePdfPreview(a)}>
+                      {expandedPdf === a.id ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  )}
+                  <button className="icon-btn" title="Ouvrir" onClick={() => api.attachments.open(a.filePath)}>
+                    <ExternalLink size={14} />
+                  </button>
+                  <button className="icon-btn" title="Afficher dans le dossier" onClick={() => api.attachments.reveal(a.filePath)}>
+                    <FolderOpen size={14} />
+                  </button>
+                  <button className="icon-btn" title="Supprimer" style={{ color: 'var(--danger)' }} onClick={() => handleDelete(a.id)}>
+                    <Trash2 size={14} />
+                  </button>
                 </div>
-                <button className="icon-btn" title="Ouvrir" onClick={() => api.attachments.open(a.filePath)}>
-                  <ExternalLink size={14} />
-                </button>
-                <button className="icon-btn" title="Afficher dans le dossier" onClick={() => api.attachments.reveal(a.filePath)}>
-                  <FolderOpen size={14} />
-                </button>
-                <button className="icon-btn" title="Supprimer" style={{ color: 'var(--danger)' }} onClick={() => handleDelete(a.id)}>
-                  <Trash2 size={14} />
-                </button>
+                {isPdf(a.fileName) && expandedPdf === a.id && previewUrls[a.id] && (
+                  <iframe title={a.fileName} src={previewUrls[a.id]} style={{ width: '100%', height: 420, border: 'none', borderTop: '1px solid var(--border)', background: '#fff' }} />
+                )}
               </div>
             ))}
           </div>

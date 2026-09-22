@@ -124,6 +124,49 @@ export async function importBackup(window: BrowserWindow): Promise<boolean> {
   return true
 }
 
+// ─── Auto-backup to a user-chosen folder (e.g. a Google Drive/Dropbox sync folder) ──
+// A real Drive/cloud API integration is a lot more machinery (OAuth, a live network
+// dependency) than "let the user point this at a folder their cloud client already
+// syncs" — same end result, none of the extra failure modes, and it works with
+// whatever sync tool the user already has instead of locking them into one.
+
+export async function chooseAutoBackupFolder(window: BrowserWindow): Promise<string | null> {
+  const { canceled, filePaths } = await dialog.showOpenDialog(window, {
+    title: 'Choisir un dossier de sauvegarde automatique',
+    properties: ['openDirectory', 'createDirectory']
+  })
+  if (canceled || filePaths.length === 0) return null
+  return filePaths[0]
+}
+
+// Writes a full .zip straight into the given folder — no dialog, meant to run
+// unattended on launch. Silent failure (e.g. folder got deleted/unmounted, like an
+// unplugged drive or a signed-out cloud client) since this must never block startup.
+export function runAutoBackupToFolder(folderPath: string): void {
+  try {
+    if (!existsSync(folderPath)) return
+    checkpointDb()
+    const zip = new JSZip()
+    zip.file('cours-studio-backup.json', JSON.stringify({
+      app: 'cours-studio', version: app.getVersion(), createdAt: Date.now()
+    }, null, 2))
+    for (const entry of DATA_ENTRIES) {
+      const abs = join(userData(), entry)
+      if (existsSync(abs)) addPathToZip(zip, abs, entry)
+    }
+    zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } })
+      .then((buffer: Buffer) => {
+        const stamp = new Date().toISOString().slice(0, 10)
+        writeFileSync(join(folderPath, `cours-studio-sauvegarde-${stamp}.zip`), buffer)
+        // Keep only the most recent one in that folder — it's meant to always
+        // reflect "now", not to be a second version history on top of the local one.
+        const olds = readdirSync(folderPath).filter((f) => /^cours-studio-sauvegarde-\d{4}-\d{2}-\d{2}\.zip$/.test(f) && f !== `cours-studio-sauvegarde-${stamp}.zip`)
+        for (const f of olds) { try { rmSync(join(folderPath, f)) } catch { /* ok */ } }
+      })
+      .catch(() => { /* never block startup on a failed cloud-folder write */ })
+  } catch { /* ok */ }
+}
+
 // ─── Auto-backup: cheap db-only copy on every launch, keep the last N ────────
 const AUTO_KEEP = 7
 

@@ -11,6 +11,7 @@ const api = {
     get: () => ipcRenderer.invoke('subjects:get'),
     create: (data: unknown) => ipcRenderer.invoke('subjects:create', data),
     update: (id: string, data: unknown) => ipcRenderer.invoke('subjects:update', id, data),
+    reorder: (ids: string[]) => ipcRenderer.invoke('subjects:reorder', ids),
     delete: (id: string) => ipcRenderer.invoke('subjects:delete', id)
   },
   courses: {
@@ -48,7 +49,8 @@ const api = {
     import: (): Promise<boolean> => ipcRenderer.invoke('backup:import'),
     openFolder: (): Promise<boolean> => ipcRenderer.invoke('backup:openFolder'),
     latest: (): Promise<{ name: string; at: number } | null> => ipcRenderer.invoke('backup:latest'),
-    resetAll: (): Promise<boolean> => ipcRenderer.invoke('backup:resetAll')
+    resetAll: (): Promise<boolean> => ipcRenderer.invoke('backup:resetAll'),
+    chooseAutoFolder: (): Promise<string | null> => ipcRenderer.invoke('backup:chooseAutoFolder')
   },
   quizResults: {
     get: () => ipcRenderer.invoke('quizResults:get'),
@@ -68,6 +70,15 @@ const api = {
   },
   review: {
     stats: (): Promise<{ streak: number; today: number; total: number; last14: Array<{ day: string; count: number }> }> => ipcRenderer.invoke('review:stats')
+  },
+  trash: {
+    subjects: () => ipcRenderer.invoke('trash:subjects'),
+    courses: () => ipcRenderer.invoke('trash:courses'),
+    restoreSubject: (id: string) => ipcRenderer.invoke('trash:restoreSubject', id),
+    restoreCourse: (id: string) => ipcRenderer.invoke('trash:restoreCourse', id),
+    purgeSubject: (id: string) => ipcRenderer.invoke('trash:purgeSubject', id),
+    purgeCourse: (id: string) => ipcRenderer.invoke('trash:purgeCourse', id),
+    empty: () => ipcRenderer.invoke('trash:empty')
   },
   transcribe: (data: { apiKey: string; filePath: string }): Promise<string> => ipcRenderer.invoke('ai:transcribe', data),
   recording: {
@@ -117,7 +128,8 @@ const api = {
       total: number; week: number; today: number
       bySubject: Array<{ subjectId: string | null; seconds: number }>
       byDay: Array<{ day: string; seconds: number }>
-    }> => ipcRenderer.invoke('study:stats')
+    }> => ipcRenderer.invoke('study:stats'),
+    streak: (): Promise<{ current: number; longest: number }> => ipcRenderer.invoke('study:streak')
   },
   images: {
     // Opens a native file picker for images and returns base64 data URLs

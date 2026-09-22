@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Plus, Search, ArrowLeft, Clock, Mic, Monitor, Edit2, Trash2, FileDown } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Plus, Search, ArrowLeft, Clock, Mic, Monitor, Edit2, Trash2, FileDown, X } from 'lucide-react'
 import { useStore } from '../store'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
@@ -12,11 +12,17 @@ import type { Course } from '../../../shared/types'
 const api = (window as any).api
 
 export default function SubjectView() {
-  const { subjects, courses, tags, activeSubjectId, setView, setActiveCourse, setActiveSubject, loadCourses, deleteCourse, searchQuery, setSearchQuery, showToast } = useStore()
+  const {
+    subjects, courses, tags, activeSubjectId, setView, setActiveCourse, setActiveSubject, loadCourses, deleteCourse, searchQuery, setSearchQuery, showToast,
+    selectedCourseIds, toggleCourseSelected, clearCourseSelection, bulkMoveCourses, bulkDeleteCourses, bulkAddTag
+  } = useStore()
   const [showNew, setShowNew] = useState(false)
   const [editCourse, setEditCourse] = useState<Course | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; course: Course } | null>(null)
   const [tagFilter, setTagFilter] = useState<string | null>(null)
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
+
+  useEffect(() => { clearCourseSelection() }, [activeSubjectId])
 
   const subject = subjects.find((s) => s.id === activeSubjectId)
   const usedTags = useMemo(() => {
@@ -49,7 +55,7 @@ export default function SubjectView() {
   async function handleDelete(id: string) {
     await deleteCourse(id)
     setContextMenu(null)
-    showToast('Cours supprimé', 'success')
+    showToast('Cours déplacé dans la corbeille', 'success')
   }
 
   if (!subject) return null
@@ -128,14 +134,77 @@ export default function SubjectView() {
                 key={c.id}
                 course={c}
                 subject={subject}
+                selected={selectedCourseIds.includes(c.id)}
                 onClick={() => openCourse(c.id)}
                 onEdit={() => setEditCourse(c)}
+                onToggleSelect={() => toggleCourseSelected(c.id)}
                 onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, course: c }) }}
               />
             ))}
           </div>
         )}
       </div>
+
+      {selectedCourseIds.length > 0 && (
+        <div style={{
+          position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 150,
+          display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+          background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)',
+          boxShadow: '0 8px 30px rgba(0,0,0,0.4)'
+        }}>
+          <span style={{ fontSize: 12.5, fontWeight: 600 }}>{selectedCourseIds.length} sélectionné{selectedCourseIds.length > 1 ? 's' : ''}</span>
+
+          <select
+            className="field-input"
+            style={{ fontSize: 12, padding: '4px 8px', width: 'auto' }}
+            value=""
+            onChange={(e) => { if (e.target.value) bulkMoveCourses(selectedCourseIds, e.target.value) }}
+          >
+            <option value="" disabled>Déplacer vers...</option>
+            {subjects.filter((s) => s.id !== activeSubjectId).map((s) => (
+              <option key={s.id} value={s.id}>{s.emoji} {s.name}</option>
+            ))}
+          </select>
+
+          {tags.length > 0 && (
+            <select
+              className="field-input"
+              style={{ fontSize: 12, padding: '4px 8px', width: 'auto' }}
+              value=""
+              onChange={(e) => { if (e.target.value) bulkAddTag(selectedCourseIds, e.target.value) }}
+            >
+              <option value="" disabled>Ajouter le tag...</option>
+              {tags.map((t) => (
+                <option key={t.id} value={t.id}>{t.emoji} {t.name}</option>
+              ))}
+            </select>
+          )}
+
+          <button className="btn btn-sm" style={{ color: 'var(--danger, #ef4444)' }} onClick={() => setConfirmBulkDelete(true)}>
+            <Trash2 size={13} /> Supprimer
+          </button>
+          <button className="icon-btn" onClick={clearCourseSelection}><X size={14} /></button>
+        </div>
+      )}
+
+      {confirmBulkDelete && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }} onClick={() => setConfirmBulkDelete(false)}>
+          <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 24, minWidth: 320, maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Supprimer {selectedCourseIds.length} cours ?</div>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
+              Ils seront déplacés dans la corbeille — récupérables pendant 30 jours.
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={() => setConfirmBulkDelete(false)}>Annuler</button>
+              <button className="btn" style={{ background: 'var(--danger, #ef4444)', color: '#fff' }} onClick={async () => {
+                await bulkDeleteCourses(selectedCourseIds)
+                setConfirmBulkDelete(false)
+                showToast('Cours déplacés dans la corbeille', 'success')
+              }}>Supprimer</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showNew && <NewCourseModal subjectId={activeSubjectId!} onClose={() => setShowNew(false)} />}
       {editCourse && <CourseEditModal course={editCourse} onClose={() => setEditCourse(null)} />}
@@ -156,11 +225,13 @@ export default function SubjectView() {
   )
 }
 
-function CourseCard({ course, subject, onClick, onEdit, onContextMenu }: {
+function CourseCard({ course, subject, selected, onClick, onEdit, onToggleSelect, onContextMenu }: {
   course: Course
   subject: import('../../../shared/types').Subject
+  selected: boolean
   onClick: () => void
   onEdit: () => void
+  onToggleSelect: () => void
   onContextMenu: (e: React.MouseEvent) => void
 }) {
   const [hover, setHover] = useState(false)
@@ -175,8 +246,17 @@ function CourseCard({ course, subject, onClick, onEdit, onContextMenu }: {
       onContextMenu={onContextMenu}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      style={{ position: 'relative' }}
+      style={{ position: 'relative', outline: selected ? '2px solid var(--accent)' : undefined }}
     >
+      {(hover || selected) && (
+        <input
+          type="checkbox"
+          checked={selected}
+          onClick={(e) => e.stopPropagation()}
+          onChange={onToggleSelect}
+          style={{ position: 'absolute', top: 10, left: 10, zIndex: 1, width: 15, height: 15, cursor: 'pointer' }}
+        />
+      )}
       {/* Edit button on hover */}
       {hover && (
         <button

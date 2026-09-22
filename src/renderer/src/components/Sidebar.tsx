@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Home, BookOpen, MoreHorizontal } from 'lucide-react'
+import { Plus, Home, BookOpen, MoreHorizontal, Trash2 } from 'lucide-react'
 import { useStore } from '../store'
 import SubjectModal from './SubjectModal'
 import ContextMenu from './ContextMenu'
@@ -9,12 +9,14 @@ import { useEscapeToClose } from '../hooks/useEscapeToClose'
 const api = (window as any).api
 
 export default function Sidebar() {
-  const { subjects, activeSubjectId, view, setActiveSubject, setView, loadCourses, deleteSubject, showToast } = useStore()
+  const { subjects, activeSubjectId, view, setActiveSubject, setView, loadCourses, deleteSubject, reorderSubjects, showToast } = useStore()
   const [showCreate, setShowCreate] = useState(false)
   const [editSubject, setEditSubject] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; subjectId: string } | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [deleteConfirmCount, setDeleteConfirmCount] = useState(0)
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
 
   useEscapeToClose(deleteConfirm ? () => setDeleteConfirm(null) : undefined)
 
@@ -43,7 +45,19 @@ export default function Sidebar() {
   async function handleDelete(id: string) {
     await deleteSubject(id)
     setDeleteConfirm(null)
-    showToast('Matière supprimée', 'success')
+    showToast('Matière déplacée dans la corbeille', 'success')
+  }
+
+  function handleDrop(targetId: string) {
+    if (!dragId || dragId === targetId) { setDragId(null); setDragOverId(null); return }
+    const ids = subjects.map((s) => s.id)
+    const from = ids.indexOf(dragId)
+    const to = ids.indexOf(targetId)
+    ids.splice(from, 1)
+    ids.splice(to, 0, dragId)
+    reorderSubjects(ids)
+    setDragId(null)
+    setDragOverId(null)
   }
 
   const subject = editSubject ? subjects.find((s) => s.id === editSubject) : undefined
@@ -85,6 +99,16 @@ export default function Sidebar() {
               className={`sidebar-item ${activeSubjectId === sub.id && view === 'subject' ? 'active' : ''}`}
               onClick={() => openSubject(sub.id)}
               onContextMenu={(e) => handleContextMenu(e, sub.id)}
+              draggable
+              onDragStart={() => setDragId(sub.id)}
+              onDragOver={(e) => { e.preventDefault(); if (dragId && dragId !== sub.id) setDragOverId(sub.id) }}
+              onDragLeave={() => setDragOverId((cur) => cur === sub.id ? null : cur)}
+              onDrop={(e) => { e.preventDefault(); handleDrop(sub.id) }}
+              onDragEnd={() => { setDragId(null); setDragOverId(null) }}
+              style={{
+                opacity: dragId === sub.id ? 0.4 : 1,
+                boxShadow: dragOverId === sub.id ? 'inset 0 2px 0 var(--accent)' : undefined
+              }}
             >
               {activeSubjectId === sub.id && view === 'subject' && (
                 <div className="sidebar-item-dot" style={{ background: sub.color }} />
@@ -96,6 +120,18 @@ export default function Sidebar() {
               />
             </div>
           ))}
+        </div>
+
+        <div className="divider" style={{ margin: '4px 12px' }} />
+        <div style={{ padding: '4px 8px' }}>
+          <button
+            className={`sidebar-item ${view === 'trash' ? 'active' : ''}`}
+            style={{ width: '100%' }}
+            onClick={() => setView('trash')}
+          >
+            <Trash2 size={15} />
+            <span className="sidebar-item-name">Corbeille</span>
+          </button>
         </div>
 
         <div className="sidebar-footer">
@@ -143,8 +179,8 @@ export default function Sidebar() {
             <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Supprimer « {subjectToDelete.emoji} {subjectToDelete.name} » ?</div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
               {deleteConfirmCount > 0
-                ? `Cette matière et ${deleteConfirmCount === 1 ? 'son cours' : `ses ${deleteConfirmCount} cours`} seront définitivement supprimés. Cette action est irréversible.`
-                : 'Cette matière sera définitivement supprimée. Cette action est irréversible.'}
+                ? `Cette matière et ${deleteConfirmCount === 1 ? 'son cours' : `ses ${deleteConfirmCount} cours`} seront déplacés dans la corbeille.`
+                : 'Cette matière sera déplacée dans la corbeille.'} Récupérable pendant 30 jours.
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button className="btn btn-secondary" onClick={() => setDeleteConfirm(null)}>Annuler</button>

@@ -201,6 +201,31 @@ export default function SettingsModal({ onClose }: Props) {
                 <FolderOpen size={13} /> Dossier
               </button>
             </div>
+
+            <div style={{ borderTop: '1px solid var(--border)', marginTop: 14, paddingTop: 14 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 500, marginBottom: 2 }}>Sauvegarde automatique</div>
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10 }}>
+                {settings.autoBackupFolder
+                  ? <>Une copie est écrite ici à chaque lancement : <strong style={{ wordBreak: 'break-all' }}>{settings.autoBackupFolder}</strong>. Pointe ce dossier vers ton client Google Drive/Dropbox/OneDrive pour une sauvegarde cloud automatique.</>
+                  : "Choisis un dossier synchronisé par Google Drive, Dropbox... et une copie y sera écrite à chaque lancement."}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-secondary btn-sm" onClick={async () => {
+                  const folder = await api.backup.chooseAutoFolder()
+                  if (folder) { await saveSettings({ ...settings, autoBackupFolder: folder }); showToast('Sauvegarde automatique activée', 'success') }
+                }}>
+                  <FolderOpen size={13} /> {settings.autoBackupFolder ? 'Changer le dossier' : 'Choisir un dossier'}
+                </button>
+                {settings.autoBackupFolder && (
+                  <button className="btn btn-ghost btn-sm" onClick={async () => {
+                    await saveSettings({ ...settings, autoBackupFolder: undefined })
+                    showToast('Sauvegarde automatique désactivée', 'info')
+                  }}>
+                    Désactiver
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Update section */}

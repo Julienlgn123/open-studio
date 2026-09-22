@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, BarChart3, Clock, Layers, BookOpen, Target } from 'lucide-react'
+import { ArrowLeft, BarChart3, Clock, Layers, BookOpen, Target, Flame } from 'lucide-react'
 import { useStore } from '../store'
 import type { QuizResult } from '../../../shared/types'
 
@@ -24,11 +24,13 @@ export default function StatsView() {
   const [study, setStudy] = useState<StudyStats | null>(null)
   const [quizzes, setQuizzes] = useState<QuizResult[]>([])
   const [due, setDue] = useState(0)
+  const [streak, setStreak] = useState({ current: 0, longest: 0 })
 
   useEffect(() => {
     api.study.stats().then(setStudy).catch(() => setStudy(null))
     api.quizResults.get().then(setQuizzes).catch(() => setQuizzes([]))
     api.flashcards.dueAll().then((c: unknown[]) => setDue(c.length)).catch(() => setDue(0))
+    api.study.streak().then(setStreak).catch(() => setStreak({ current: 0, longest: 0 }))
   }, [])
 
   const quizAvg = quizzes.length
@@ -39,6 +41,7 @@ export default function StatsView() {
   const maxDaySeconds = Math.max(1, ...(study?.byDay.map((d) => d.seconds) ?? [1]))
 
   const tiles = [
+    { icon: <Flame size={15} />, label: 'Série en cours', value: `${streak.current} j${streak.current !== 1 ? 'ours' : 'our'}` },
     { icon: <Clock size={15} />, label: 'Cette semaine', value: study ? fmtDuration(study.week) : '—' },
     { icon: <Target size={15} />, label: "Aujourd'hui", value: study ? fmtDuration(study.today) : '—' },
     { icon: <BookOpen size={15} />, label: 'Cours', value: String(courses.length) },
@@ -66,6 +69,11 @@ export default function StatsView() {
             </div>
           ))}
         </div>
+        {streak.longest > streak.current && (
+          <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: -18, marginBottom: 28 }}>
+            Record : {streak.longest} jour{streak.longest !== 1 ? 's' : ''} d'affilée
+          </p>
+        )}
 
         <section style={{ marginBottom: 28 }}>
           <h2 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 14 }}>

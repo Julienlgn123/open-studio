@@ -4,19 +4,22 @@ import { pathToFileURL } from 'url'
 import { tmpdir } from 'os'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
-import { initDb, getSubjects, createSubject, updateSubject, deleteSubject,
-  getCoursesBySubject, getCourse, createCourse, updateCourse, deleteCourse,
+import { initDb, getSubjects, createSubject, updateSubject, reorderSubjects,
+  softDeleteSubject, restoreSubject, getTrashedSubjects, permanentlyDeleteSubject,
+  getCoursesBySubject, getCourse, createCourse, updateCourse,
+  softDeleteCourse, restoreCourse, getTrashedCourses, permanentlyDeleteCourse,
+  emptyTrash, purgeOldTrash,
   getAllCourses, getVersions, createVersion,
   getTags, createTag, updateTag, deleteTag, setCourseTags,
   getAttachments, createAttachment, deleteAttachment,
   getQuizResults, createQuizResult,
   getFlashcards, getDueFlashcards, getAllDueFlashcards, countAllDueFlashcards,
   getFlashcardsForExport, createFlashcards, reviewFlashcard, deleteFlashcard,
-  logStudySession, getStudyStats } from './db'
+  logStudySession, getStudyStats, getStudyStreak } from './db'
 import { existsSync, mkdirSync, writeFileSync, unlinkSync, readFileSync, chmodSync, copyFileSync, statSync, rmSync } from 'fs'
 import ffmpeg from 'fluent-ffmpeg'
 import { pickAndExtractDocument, extractArticleFromUrl } from './documents'
-import { exportBackup, importBackup, autoBackup, openBackupsFolder, latestBackupInfo, resetAllData } from './backup'
+import { exportBackup, importBackup, autoBackup, openBackupsFolder, latestBackupInfo, resetAllData, chooseAutoBackupFolder, runAutoBackupToFolder } from './backup'
 import { htmlToMarkdown } from './markdown'
 
 const RELEASES_URL = 'https://github.com/Julienlgn123/cours-studio/releases/latest'
@@ -141,6 +144,14 @@ app.whenReady().then(() => {
 
   initDb()
   autoBackup()
+  // Anything trashed more than TRASH_RETENTION_MS ago is gone for good now — the DB rows
+  // are already removed by purgeOldTrash(), this just mops up the files that go with them.
+  for (const course of purgeOldTrash()) deleteCourseFiles(course)
+  try {
+    const settingsPath = join(app.getPath('userData'), 'settings.json')
+    const settings = JSON.parse(readFileSync(settingsPath, 'utf-8'))
+    if (settings.autoBackupFolder) runAutoBackupToFolder(settings.autoBackupFolder)
+  } catch { /* no settings file yet, or it's unreadable — nothing to back up to */ }
   registerIpc()
   createWindow()
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
@@ -225,24 +236,38 @@ function registerIpc(): void {
   ipcMain.handle('subjects:get', () => getSubjects())
   ipcMain.handle('subjects:create', (_, d) => createSubject(d))
   ipcMain.handle('subjects:update', (_, id, d) => { updateSubject(id, d); return true })
-  ipcMain.handle('subjects:delete', (_, id) => {
-    const courses = getCoursesBySubject(id)
-    deleteSubject(id)
-    for (const c of courses) deleteCourseFiles(c)
-    return true
-  })
+  ipcMain.handle('subjects:reorder', (_, ids: string[]) => { reorderSubjects(ids); return true })
+  // Moves to the trash — rows and files stay put until restored or purged (manually or
+  // automatically after TRASH_RETENTION_MS).
+  ipcMain.handle('subjects:delete', (_, id) => { softDeleteSubject(id); return true })
 
   ipcMain.handle('courses:bySubject', (_, id) => getCoursesBySubject(id))
   ipcMain.handle('courses:get', (_, id) => getCourse(id))
   ipcMain.handle('courses:create', (_, d) => createCourse(d))
   ipcMain.handle('courses:update', (_, id, d) => { updateCourse(id, d); return true })
-  ipcMain.handle('courses:delete', (_, id) => {
-    const course = getCourse(id)
-    deleteCourse(id)
-    if (course) deleteCourseFiles(course)
+  ipcMain.handle('courses:delete', (_, id) => { softDeleteCourse(id); return true })
+  ipcMain.handle('courses:all', () => getAllCourses())
+
+  // ─── Trash ───────────────────────────────────────────────────────────────
+  ipcMain.handle('trash:subjects', () => getTrashedSubjects())
+  ipcMain.handle('trash:courses', () => getTrashedCourses())
+  ipcMain.handle('trash:restoreSubject', (_, id) => { restoreSubject(id); return true })
+  ipcMain.handle('trash:restoreCourse', (_, id) => { restoreCourse(id); return true })
+  ipcMain.handle('trash:purgeSubject', (_, id) => {
+    for (const c of permanentlyDeleteSubject(id)) deleteCourseFiles(c)
     return true
   })
-  ipcMain.handle('courses:all', () => getAllCourses())
+  ipcMain.handle('trash:purgeCourse', (_, id) => {
+    const c = permanentlyDeleteCourse(id)
+    if (c) deleteCourseFiles(c)
+    return true
+  })
+  ipcMain.handle('trash:empty', () => {
+    for (const c of emptyTrash()) deleteCourseFiles(c)
+    return true
+  })
+
+  ipcMain.handle('study:streak', () => getStudyStreak())
 
   ipcMain.handle('versions:get', (_, id) => getVersions(id))
   ipcMain.handle('versions:create', (_, d) => createVersion(d))
@@ -531,6 +556,7 @@ function registerIpc(): void {
   ipcMain.handle('backup:openFolder', () => { openBackupsFolder(); return true })
   ipcMain.handle('backup:latest', () => latestBackupInfo())
   ipcMain.handle('backup:resetAll', () => resetAllData(mainWindow))
+  ipcMain.handle('backup:chooseAutoFolder', () => chooseAutoBackupFolder(mainWindow))
 
   // Document import: pick a file (pdf/docx/odt/txt) and extract its plain text
   ipcMain.handle('documents:import', async () => {
