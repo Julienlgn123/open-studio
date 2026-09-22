@@ -162,7 +162,11 @@ export default function HomeView() {
               <div className="empty-state" style={{ marginTop: 40 }}>
                 <div className="empty-state-icon">📓</div>
                 <div className="empty-state-title">Aucun cours pour l'instant</div>
-                <div className="empty-state-desc">Crée ta première matière dans la barre latérale, puis commence un cours.</div>
+                <div className="empty-state-desc">
+                  {subjects.length === 0
+                    ? "Crée ta première matière dans la barre latérale, puis commence un cours."
+                    : 'Clique sur « Nouveau cours » pour commencer à prendre des notes.'}
+                </div>
                 <button className="btn btn-primary" onClick={() => setShowNew(true)} style={{ marginTop: 8 }}>
                   <Plus size={14} /> Nouveau cours
                 </button>

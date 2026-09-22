@@ -3,6 +3,7 @@ import { X, Eye, EyeOff, Download, RefreshCw, CheckCircle, Sun, Moon, Upload, Fo
 import { useStore } from '../store'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
+import { useEscapeToClose } from '../hooks/useEscapeToClose'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const api = (window as any).api
@@ -23,6 +24,8 @@ export default function SettingsModal({ onClose }: Props) {
   const [appVersion, setAppVersion] = useState<string>('')
   const [backupBusy, setBackupBusy] = useState<'' | 'export' | 'import' | 'reset'>('')
   const [lastBackup, setLastBackup] = useState<{ name: string; at: number } | null>(null)
+
+  useEscapeToClose(onClose)
   const [updateState, setUpdateState] = useState<UpdateState>('idle')
   const [updateVersion, setUpdateVersion] = useState<string>('')
   const [updateProgress, setUpdateProgress] = useState(0)

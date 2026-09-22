@@ -209,10 +209,11 @@ export default function EditorView() {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); forceSave() }
       if ((e.ctrlKey || e.metaKey) && e.key === '.') { e.preventDefault(); setFocusMode(!focusMode) }
       if (e.key === 'Escape' && focusMode) setFocusMode(false)
+      if (e.key === 'Escape' && showDeleteConfirm) setShowDeleteConfirm(false)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [title, content, focusMode, setFocusMode])
+  }, [title, content, focusMode, setFocusMode, showDeleteConfirm])
 
   if (!course) return null
 

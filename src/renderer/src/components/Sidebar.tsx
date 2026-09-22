@@ -3,6 +3,7 @@ import { Plus, Home, BookOpen, MoreHorizontal } from 'lucide-react'
 import { useStore } from '../store'
 import SubjectModal from './SubjectModal'
 import ContextMenu from './ContextMenu'
+import { useEscapeToClose } from '../hooks/useEscapeToClose'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const api = (window as any).api
@@ -14,6 +15,8 @@ export default function Sidebar() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; subjectId: string } | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [deleteConfirmCount, setDeleteConfirmCount] = useState(0)
+
+  useEscapeToClose(deleteConfirm ? () => setDeleteConfirm(null) : undefined)
 
   function askDelete(subjectId: string) {
     setDeleteConfirm(subjectId)

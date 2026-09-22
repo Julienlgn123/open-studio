@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 import type { Subject, Course, CourseVersion, Tag } from '../../../shared/types'
 
+// Kept outside the store state on purpose: showToast can be called again before an
+// earlier toast's timer has fired (e.g. two validation errors in a row). Without
+// clearing the previous timer, that stale timeout still hides the toast at its own
+// 3s mark, cutting the newer message's display time short or hiding it immediately.
+let toastTimer: ReturnType<typeof setTimeout> | null = null
+
 export interface AITask {
   courseId: string
   courseTitle: string
@@ -173,10 +179,11 @@ export const useStore = create<AppStore>((set, get) => ({
   saveSettings: async (settings) => { await api.settings.set(settings); set({ settings }) },
 
   showToast: (message, type = 'info') => {
+    if (toastTimer) clearTimeout(toastTimer)
     set({ toast: { message, type } })
-    setTimeout(() => get().hideToast(), 3000)
+    toastTimer = setTimeout(() => get().hideToast(), 3000)
   },
-  hideToast: () => set({ toast: null }),
+  hideToast: () => { if (toastTimer) { clearTimeout(toastTimer); toastTimer = null }; set({ toast: null }) },
 
   startAITask: (task) => set({ aiTask: { ...task, status: 'running' } }),
   completeAITask: (result) => set((s) => s.aiTask ? { aiTask: { ...s.aiTask, status: 'done', result } } : {}),

@@ -4,6 +4,7 @@ import { useStore } from '../store'
 import type { QuizQuestion, QuizResult } from '../../../shared/types'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
+import { useEscapeToClose } from '../hooks/useEscapeToClose'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const api = (window as any).api
@@ -28,6 +29,8 @@ export default function QuizStudio() {
   const [revealed, setRevealed] = useState<boolean[]>([])
   const [showHistory, setShowHistory] = useState(false)
   const [history, setHistory] = useState<QuizResult[]>([])
+
+  useEscapeToClose(showHistory ? () => setShowHistory(false) : undefined)
 
   function toggleCourse(id: string) {
     setSelectedCourseIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])

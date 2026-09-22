@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Download, Sparkles, CheckCircle } from 'lucide-react'
+import { useEscapeToClose } from '../hooks/useEscapeToClose'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const api = (window as any).api
@@ -67,6 +68,8 @@ export default function UpdatePromptModal() {
     setDismissed(true)
     setStep('hidden')
   }
+
+  useEscapeToClose(step === 'prompt' || step === 'downloaded' || step === 'error' ? declineUpdate : undefined)
 
   if (step === 'hidden') return null
 

@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Upload, FileText } from 'lucide-react'
 import { useStore } from '../store'
 import { textToHtml } from '../utils/text'
+import SubjectModal from './SubjectModal'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const api = (window as any).api
@@ -23,6 +24,14 @@ export default function NewCourseModal({ subjectId, onClose }: Props) {
   const [importing, setImporting] = useState(false)
   const [importedText, setImportedText] = useState('')
   const [importedFileName, setImportedFileName] = useState('')
+  const [showCreateSubject, setShowCreateSubject] = useState(false)
+
+  // Lets someone land here with zero subjects (fresh install, or every subject just
+  // got deleted) create one without leaving this modal — createSubject() prepends to
+  // the list, so the newly created one is always subjects[0].
+  useEffect(() => {
+    if (subjects.length > 0 && !selectedSubjectId) setSelectedSubjectId(subjects[0].id)
+  }, [subjects, selectedSubjectId])
 
   async function handleImport() {
     setImporting(true)
@@ -64,6 +73,7 @@ export default function NewCourseModal({ subjectId, onClose }: Props) {
   }
 
   return (
+    <>
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal fade-in" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
@@ -100,9 +110,14 @@ export default function NewCourseModal({ subjectId, onClose }: Props) {
           )}
 
           {subjects.length === 0 && (
-            <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
-              Crée d'abord une matière dans la barre latérale.
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <p style={{ fontSize: 13, color: 'var(--text-tertiary)', margin: 0 }}>
+                Il te faut d'abord une matière.
+              </p>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowCreateSubject(true)}>
+                Nouvelle matière
+              </button>
+            </div>
           )}
 
           <div className="field">
@@ -137,5 +152,8 @@ export default function NewCourseModal({ subjectId, onClose }: Props) {
         </div>
       </div>
     </div>
+
+    {showCreateSubject && <SubjectModal onClose={() => setShowCreateSubject(false)} />}
+    </>
   )
 }

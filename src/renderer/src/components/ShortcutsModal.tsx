@@ -1,4 +1,5 @@
 import { X } from 'lucide-react'
+import { useEscapeToClose } from '../hooks/useEscapeToClose'
 
 const isMac = navigator.platform.toUpperCase().includes('MAC')
 const mod = isMac ? '⌘' : 'Ctrl'
@@ -51,6 +52,7 @@ const GROUPS: { title: string; items: [string, string][] }[] = [
 ]
 
 export default function ShortcutsModal({ onClose }: { onClose: () => void }) {
+  useEscapeToClose(onClose)
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal fade-in" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
