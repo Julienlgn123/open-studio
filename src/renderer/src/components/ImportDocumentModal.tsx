@@ -68,7 +68,7 @@ export default function ImportDocumentModal({
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }} onClick={onClose}>
-      <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 24, width: 560, maxWidth: '90vw' }} onClick={(e) => e.stopPropagation()}>
+      <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 24, width: 560, maxWidth: '90vw', maxHeight: 'calc(100vh - 48px)', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <div style={{ fontSize: 16, fontWeight: 600 }}>Importer le cours du professeur</div>
           <button className="icon-btn" onClick={onClose}><X size={16} /></button>

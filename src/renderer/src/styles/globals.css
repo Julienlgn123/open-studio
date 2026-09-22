@@ -480,6 +480,15 @@ button {
   width: 100%;
   max-width: 480px;
   box-shadow: var(--shadow-xl);
+  /* .modal-overlay centers this with align-items: center, which only ever adds
+     space — it never shrinks the box, so on a short window (or a modal that's grown
+     taller than it used to be) the header and footer buttons ran off both edges
+     with no way to reach them. Capping the modal's own height and scrolling only
+     its body (header/footer stay put, flex-shrink: 0 below) fixes that everywhere
+     at once instead of per-modal. */
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
 }
 
 .modal-header {
@@ -487,6 +496,7 @@ button {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 20px;
+  flex-shrink: 0;
 }
 
 .modal-title {
@@ -499,6 +509,8 @@ button {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .modal-footer {
@@ -506,6 +518,7 @@ button {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 20px;
+  flex-shrink: 0;
 }
 
 /* Course list */
@@ -1000,6 +1013,12 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  /* Neither side used to shrink or wrap, so on a narrower window (down to the
+     900px the app allows) the right-hand controls just ran past the edge of the
+     window with no way to reach them — wrapping to a second line keeps every
+     control reachable instead. */
+  flex-wrap: wrap;
+  row-gap: 10px;
   padding: 16px 20px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -1009,6 +1028,8 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .page-header-title {
@@ -1020,6 +1041,7 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 /* Tab bar */
@@ -1084,6 +1106,12 @@ button {
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
   padding: 16px;
+  /* Its parent has overflow: hidden (so the chat/result panes that share that
+     slot can manage their own scrolling) — without its own overflow, a shorter
+     window just clipped the lower rows of actions (Résumer, Expliquer, Réorganiser,
+     Fusionner, Chat libre) with no way to reach them. */
+  flex: 1;
+  overflow-y: auto;
 }
 
 .ai-action-card {
