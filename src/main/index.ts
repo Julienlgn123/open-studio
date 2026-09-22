@@ -13,7 +13,7 @@ import { initDb, getSubjects, createSubject, updateSubject, deleteSubject,
   getFlashcards, getDueFlashcards, getAllDueFlashcards, countAllDueFlashcards,
   getFlashcardsForExport, createFlashcards, reviewFlashcard, deleteFlashcard,
   logStudySession, getStudyStats } from './db'
-import { existsSync, mkdirSync, writeFileSync, unlinkSync, readFileSync, chmodSync, copyFileSync, statSync } from 'fs'
+import { existsSync, mkdirSync, writeFileSync, unlinkSync, readFileSync, chmodSync, copyFileSync, statSync, rmSync } from 'fs'
 import ffmpeg from 'fluent-ffmpeg'
 import { pickAndExtractDocument, extractArticleFromUrl } from './documents'
 import { exportBackup, importBackup, autoBackup, openBackupsFolder, latestBackupInfo, resetAllData } from './backup'
@@ -209,6 +209,14 @@ function getAttachmentsDir(): string {
   return dir
 }
 
+// The DB row for a course is gone by the time this runs — this only mops up what's left on disk
+// (its recording and its whole attachments/<courseId> folder), so any failure here is harmless.
+function deleteCourseFiles(course: { id: string; audioPath?: string; videoPath?: string }): void {
+  if (course.audioPath) { try { unlinkSync(course.audioPath) } catch { /* already gone */ } }
+  if (course.videoPath) { try { unlinkSync(course.videoPath) } catch { /* already gone */ } }
+  try { rmSync(join(getAttachmentsDir(), course.id), { recursive: true, force: true }) } catch { /* already gone */ }
+}
+
 function registerIpc(): void {
   ipcMain.handle('window:minimize', () => mainWindow.minimize())
   ipcMain.handle('window:maximize', () => { mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize() })
@@ -217,13 +225,23 @@ function registerIpc(): void {
   ipcMain.handle('subjects:get', () => getSubjects())
   ipcMain.handle('subjects:create', (_, d) => createSubject(d))
   ipcMain.handle('subjects:update', (_, id, d) => { updateSubject(id, d); return true })
-  ipcMain.handle('subjects:delete', (_, id) => { deleteSubject(id); return true })
+  ipcMain.handle('subjects:delete', (_, id) => {
+    const courses = getCoursesBySubject(id)
+    deleteSubject(id)
+    for (const c of courses) deleteCourseFiles(c)
+    return true
+  })
 
   ipcMain.handle('courses:bySubject', (_, id) => getCoursesBySubject(id))
   ipcMain.handle('courses:get', (_, id) => getCourse(id))
   ipcMain.handle('courses:create', (_, d) => createCourse(d))
   ipcMain.handle('courses:update', (_, id, d) => { updateCourse(id, d); return true })
-  ipcMain.handle('courses:delete', (_, id) => { deleteCourse(id); return true })
+  ipcMain.handle('courses:delete', (_, id) => {
+    const course = getCourse(id)
+    deleteCourse(id)
+    if (course) deleteCourseFiles(course)
+    return true
+  })
   ipcMain.handle('courses:all', () => getAllCourses())
 
   ipcMain.handle('versions:get', (_, id) => getVersions(id))

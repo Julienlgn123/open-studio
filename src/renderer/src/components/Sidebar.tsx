@@ -4,11 +4,26 @@ import { useStore } from '../store'
 import SubjectModal from './SubjectModal'
 import ContextMenu from './ContextMenu'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const api = (window as any).api
+
 export default function Sidebar() {
   const { subjects, activeSubjectId, view, setActiveSubject, setView, loadCourses, deleteSubject, showToast } = useStore()
   const [showCreate, setShowCreate] = useState(false)
   const [editSubject, setEditSubject] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; subjectId: string } | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [deleteConfirmCount, setDeleteConfirmCount] = useState(0)
+
+  function askDelete(subjectId: string) {
+    setDeleteConfirm(subjectId)
+    setDeleteConfirmCount(0)
+    // Le state global `courses` peut ne contenir que les cours de la matière actuellement
+    // ouverte (loadCourses(id)) plutôt que la totalité — on va chercher le vrai compte pour
+    // cette matière précise plutôt que de se fier à un filtre sur un state potentiellement
+    // désynchronisé.
+    api.courses.bySubject(subjectId).then((list: unknown[]) => setDeleteConfirmCount(list.length))
+  }
 
   function openSubject(id: string) {
     setActiveSubject(id)
@@ -24,11 +39,12 @@ export default function Sidebar() {
 
   async function handleDelete(id: string) {
     await deleteSubject(id)
-    setContextMenu(null)
+    setDeleteConfirm(null)
     showToast('Matière supprimée', 'success')
   }
 
   const subject = editSubject ? subjects.find((s) => s.id === editSubject) : undefined
+  const subjectToDelete = deleteConfirm ? subjects.find((s) => s.id === deleteConfirm) : undefined
 
   return (
     <>
@@ -111,10 +127,27 @@ export default function Sidebar() {
               label: 'Supprimer',
               icon: <MoreHorizontal size={14} />,
               danger: true,
-              onClick: () => handleDelete(contextMenu.subjectId)
+              onClick: () => { askDelete(contextMenu.subjectId); setContextMenu(null) }
             }
           ]}
         />
+      )}
+
+      {deleteConfirm && subjectToDelete && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }} onClick={() => setDeleteConfirm(null)}>
+          <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 24, minWidth: 320, maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Supprimer « {subjectToDelete.emoji} {subjectToDelete.name} » ?</div>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
+              {deleteConfirmCount > 0
+                ? `Cette matière et ${deleteConfirmCount === 1 ? 'son cours' : `ses ${deleteConfirmCount} cours`} seront définitivement supprimés. Cette action est irréversible.`
+                : 'Cette matière sera définitivement supprimée. Cette action est irréversible.'}
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={() => setDeleteConfirm(null)}>Annuler</button>
+              <button className="btn" style={{ background: 'var(--danger, #ef4444)', color: '#fff' }} onClick={() => handleDelete(deleteConfirm)}>Supprimer</button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

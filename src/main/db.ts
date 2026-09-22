@@ -146,8 +146,25 @@ export function updateSubject(id: string, data: Partial<Omit<Subject, 'id' | 'cr
   db.prepare(`UPDATE subjects SET ${fields.join(', ')} WHERE id = ?`).run(...values)
 }
 
+// Deletes the courses (and their versions/tags/attachments/flashcards rows) by hand rather
+// than relying on the schema's ON DELETE CASCADE: a db file created before that clause existed
+// keeps its original table definition forever (SQLite doesn't retrofit constraints), so this
+// stays correct regardless of when the user's local database was first created.
 export function deleteSubject(id: string): void {
-  db.prepare('DELETE FROM subjects WHERE id = ?').run(id)
+  const tx = db.transaction((subjectId: string) => {
+    const courseIds = (db.prepare('SELECT id FROM courses WHERE subject_id = ?').all(subjectId) as Array<{ id: string }>)
+      .map((r) => r.id)
+    for (const courseId of courseIds) {
+      db.prepare('DELETE FROM course_versions WHERE course_id = ?').run(courseId)
+      db.prepare('DELETE FROM course_tags WHERE course_id = ?').run(courseId)
+      db.prepare('DELETE FROM attachments WHERE course_id = ?').run(courseId)
+      db.prepare('DELETE FROM flashcards WHERE course_id = ?').run(courseId)
+      db.prepare('UPDATE quiz_results SET course_id = NULL WHERE course_id = ?').run(courseId)
+    }
+    db.prepare('DELETE FROM courses WHERE subject_id = ?').run(subjectId)
+    db.prepare('DELETE FROM subjects WHERE id = ?').run(subjectId)
+  })
+  tx(id)
 }
 
 // ─── Courses ───────────────────────────────────────────────────────────────
