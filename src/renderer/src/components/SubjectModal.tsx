@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { X } from 'lucide-react'
 import { useStore } from '../store'
 import type { Subject } from '../../../shared/types'
-import EmojiPicker from './EmojiPicker'
+import EmojiPickerButton from './EmojiPickerButton'
 
 const COLORS = [
   '#7c6ff7', '#6366f1', '#8b5cf6', '#ec4899',
@@ -20,7 +20,6 @@ export default function SubjectModal({ subject, onClose }: Props) {
   const [name, setName] = useState(subject?.name ?? '')
   const [color, setColor] = useState(subject?.color ?? COLORS[0])
   const [emoji, setEmoji] = useState(subject?.emoji ?? '📚')
-  const [showPicker, setShowPicker] = useState(false)
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit() {
@@ -52,30 +51,7 @@ export default function SubjectModal({ subject, onClose }: Props) {
           <div className="field">
             <label className="field-label">Nom & Emoji</label>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              {/* Emoji button */}
-              <div style={{ position: 'relative' }}>
-                <button
-                  onClick={() => setShowPicker(!showPicker)}
-                  style={{
-                    fontSize: 22, padding: '7px 10px',
-                    background: 'var(--bg-elevated)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius-md)',
-                    cursor: 'pointer', lineHeight: 1
-                  }}
-                >
-                  {emoji}
-                </button>
-                {showPicker && (
-                  <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 3000 }}>
-                    <EmojiPicker
-                      value={emoji}
-                      onChange={(e) => { setEmoji(e); setShowPicker(false) }}
-                      onClose={() => setShowPicker(false)}
-                    />
-                  </div>
-                )}
-              </div>
+              <EmojiPickerButton value={emoji} onChange={setEmoji} />
               <input
                 className="field-input"
                 value={name}

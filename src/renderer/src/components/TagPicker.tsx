@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Plus, X, Trash2 } from 'lucide-react'
 import { useStore } from '../store'
-import EmojiPicker from './EmojiPicker'
+import EmojiPickerButton from './EmojiPickerButton'
 
 const COLORS = [
   '#7c6ff7', '#6366f1', '#8b5cf6', '#ec4899',
@@ -21,7 +21,6 @@ export default function TagPicker({
   const [name, setName] = useState('')
   const [emoji, setEmoji] = useState('🏷️')
   const [color, setColor] = useState(COLORS[0])
-  const [showPicker, setShowPicker] = useState(false)
 
   function toggle(id: string) {
     onChange(selectedTagIds.includes(id) ? selectedTagIds.filter((x) => x !== id) : [...selectedTagIds, id])
@@ -74,19 +73,7 @@ export default function TagPicker({
 
       {showCreate && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '10px 12px', background: 'var(--bg-overlay)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => setShowPicker(!showPicker)}
-              style={{ fontSize: 18, padding: '5px 8px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', cursor: 'pointer', lineHeight: 1 }}
-            >
-              {emoji}
-            </button>
-            {showPicker && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 3000 }}>
-                <EmojiPicker value={emoji} onChange={(e) => { setEmoji(e); setShowPicker(false) }} onClose={() => setShowPicker(false)} />
-              </div>
-            )}
-          </div>
+          <EmojiPickerButton value={emoji} onChange={setEmoji} size={18} />
           <input
             className="field-input"
             style={{ flex: 1, fontSize: 12.5, padding: '6px 10px' }}
