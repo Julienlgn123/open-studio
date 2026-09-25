@@ -6,6 +6,7 @@
     "name": "Julienlgn123",
     "email": "129546749+Julienlgn123@users.noreply.github.com"
   },
+  "homepage": "https://github.com/Julienlgn123/open-studio/tree/main/apps/cours-studio",
   "main": "out/main/index.js",
   "scripts": {
     "postinstall": "electron-rebuild --only better-sqlite3",
@@ -156,7 +157,8 @@
     },
     "deb": {
       "artifactName": "Cours-Studio-${version}.deb"
-    }
+    },
+    "publish": null
   },
   "dependencies": {
     "@tiptap/extension-character-count": "^2.10.4",

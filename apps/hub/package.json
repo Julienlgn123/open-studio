@@ -6,6 +6,7 @@
     "name": "Julienlgn123",
     "email": "129546749+Julienlgn123@users.noreply.github.com"
   },
+  "homepage": "https://github.com/Julienlgn123/open-studio",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",

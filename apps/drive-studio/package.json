@@ -6,6 +6,7 @@
     "name": "Julienlgn123",
     "email": "129546749+Julienlgn123@users.noreply.github.com"
   },
+  "homepage": "https://github.com/Julienlgn123/open-studio/tree/main/apps/drive-studio",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -86,7 +87,8 @@
     },
     "deb": {
       "artifactName": "Drive-Studio-${version}.deb"
-    }
+    },
+    "publish": null
   },
   "dependencies": {
     "better-sqlite3": "^11.10.0",
