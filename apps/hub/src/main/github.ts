@@ -88,9 +88,20 @@ export async function fetchLatestRelease(owner: string, repo: string): Promise<G
   }
 }
 
-/** Choisit l'asset adapté à l'OS/arch courants dans les assets d'une release. */
-export function pickAsset(assets: GhAsset[], platform: NodeJS.Platform, arch: string): GhAsset | null {
-  const byPattern = (re: RegExp): GhAsset | undefined => assets.find((a) => re.test(a.name))
+/**
+ * Choisit l'asset adapté à l'OS/arch courants dans les assets d'une release.
+ * `assetPrefix` restreint d'abord la recherche aux fichiers de cette app —
+ * indispensable quand la release contient les installateurs de plusieurs apps
+ * du monorepo (toutes celles sans `owner`/`repo` propre).
+ */
+export function pickAsset(
+  assets: GhAsset[],
+  platform: NodeJS.Platform,
+  arch: string,
+  assetPrefix?: string
+): GhAsset | null {
+  const scoped = assetPrefix ? assets.filter((a) => a.name.startsWith(assetPrefix)) : assets
+  const byPattern = (re: RegExp): GhAsset | undefined => scoped.find((a) => re.test(a.name))
 
   if (platform === 'win32') {
     return byPattern(/setup.*\.exe$/i) ?? byPattern(/\.exe$/i) ?? null

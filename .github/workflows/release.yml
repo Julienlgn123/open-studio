@@ -8,6 +8,9 @@ on:
 jobs:
   # ─── Windows ────────────────────────────────────────────────
   build-windows:
+    strategy:
+      matrix:
+        app: [hub, local-ia-studio]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,21 +23,24 @@ jobs:
         run: npm install
 
       - name: Build Windows (NSIS + Portable)
-        run: npm run dist -- --publish never
+        run: npm run dist -w apps/${{ matrix.app }} -- --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: windows
+          name: ${{ matrix.app }}-windows
           path: |
-            dist-installer/*.exe
-            dist-installer/*.yml
-            dist-installer/*.blockmap
+            apps/${{ matrix.app }}/dist-installer/*.exe
+            apps/${{ matrix.app }}/dist-installer/*.yml
+            apps/${{ matrix.app }}/dist-installer/*.blockmap
 
   # ─── macOS ─────────────────────────────────────────────────
   build-mac:
+    strategy:
+      matrix:
+        app: [hub, local-ia-studio]
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -47,7 +53,7 @@ jobs:
         run: npm install
 
       - name: Build macOS (DMG x64 + arm64)
-        run: npm run dist:mac -- --publish never
+        run: npm run dist:mac -w apps/${{ matrix.app }} -- --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # No paid Developer ID cert available: leave identity/CSC_* unset so
@@ -59,15 +65,18 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: mac
+          name: ${{ matrix.app }}-mac
           path: |
-            dist-installer/*.dmg
-            dist-installer/*.zip
-            dist-installer/*.yml
-            dist-installer/*.blockmap
+            apps/${{ matrix.app }}/dist-installer/*.dmg
+            apps/${{ matrix.app }}/dist-installer/*.zip
+            apps/${{ matrix.app }}/dist-installer/*.yml
+            apps/${{ matrix.app }}/dist-installer/*.blockmap
 
   # ─── Linux ─────────────────────────────────────────────────
   build-linux:
+    strategy:
+      matrix:
+        app: [hub, local-ia-studio]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -83,21 +92,23 @@ jobs:
         run: npm install
 
       - name: Build Linux (AppImage + deb)
-        run: npm run dist:linux -- --publish never
+        run: npm run dist:linux -w apps/${{ matrix.app }} -- --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: linux
+          name: ${{ matrix.app }}-linux
           path: |
-            dist-installer/*.AppImage
-            dist-installer/*.deb
-            dist-installer/*.yml
-            dist-installer/*.blockmap
+            apps/${{ matrix.app }}/dist-installer/*.AppImage
+            apps/${{ matrix.app }}/dist-installer/*.deb
+            apps/${{ matrix.app }}/dist-installer/*.yml
+            apps/${{ matrix.app }}/dist-installer/*.blockmap
 
   # ─── Create Release ─────────────────────────────────────────
+  # Une seule release pour toute la suite : le hub (auto-update via electron-updater)
+  # et chaque app qu'il installe (assets préfixés, cf. apps/hub/src/main/catalog.ts).
   release:
     needs: [build-windows, build-mac, build-linux]
     runs-on: ubuntu-latest
@@ -119,20 +130,21 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "Open Studio v${{ steps.version.outputs.VERSION }}"
+          name: "Open Studio Suite v${{ steps.version.outputs.VERSION }}"
           body: |
-            ## 🗂️ Open Studio v${{ steps.version.outputs.VERSION }}
+            ## 🗂️ Open Studio Suite v${{ steps.version.outputs.VERSION }}
 
-            Hub qui installe et lance les apps de la suite (Cours Studio, Drive Backup
-            Manager...) — chaque app garde son propre dossier de données, inchangé.
+            Installe **Open Studio** une seule fois : il télécharge, installe et lance
+            chaque app de la suite depuis son catalogue, et gère leurs mises à jour —
+            aucune des apps gérées ne se télécharge séparément.
 
-            ### 🪟 Windows
+            ### 🪟 Windows — installer Open Studio
             | Fichier | Description |
             |---|---|
             | `Open-Studio-Setup-*.exe` | Installateur (recommandé) |
             | `Open-Studio-Portable-*.exe` | Portable — clé USB, aucune installation |
 
-            ### 🍎 macOS
+            ### 🍎 macOS — installer Open Studio
             | Fichier | Description |
             |---|---|
             | `Open-Studio-*-x64.dmg` | Mac Intel (2020 et avant) |
@@ -140,14 +152,17 @@ jobs:
 
             > Première ouverture sur macOS : clic droit → **Ouvrir** → **Ouvrir quand même**
 
-            ### 🐧 Linux
+            ### 🐧 Linux — installer Open Studio
             | Fichier | Description |
             |---|---|
             | `Open-Studio-*.AppImage` | Universel — toutes les distros |
             | `Open-Studio-*.deb` | Debian / Ubuntu / Mint |
 
             ---
-            🔄 Mises à jour automatiques au démarrage.
+            Les fichiers `Local-IA-Studio-*` de cette release sont ceux qu'Open Studio
+            télécharge lui-même depuis son catalogue — pas besoin de les récupérer ici.
+
+            🔄 Mises à jour automatiques au démarrage (Open Studio uniquement).
           files: dist-artifacts/**/*
           draft: false
           prerelease: false

@@ -1,0 +1,5 @@
+node_modules
+out
+dist-installer
+*.tsbuildinfo
+.DS_Store

@@ -30,29 +30,15 @@ export const CATALOG: CatalogEntry[] = [
     accent: '#38bdf8'
   },
   {
-    id: 'plan-studio',
-    name: 'Plan Studio',
-    productName: 'Plan Studio',
-    debPackageName: 'plan-studio',
+    id: 'local-ia-studio',
+    name: 'Local IA Studio',
+    productName: 'Local IA Studio',
+    debPackageName: 'local-ia-studio',
     description:
-      'Planning personnel local : événements, tâches, objectifs et rappels au même endroit.',
-    category: 'Productivité',
-    owner: 'Julienlgn123',
-    repo: 'plan-studio',
-    fallbackEmoji: '📅',
-    accent: '#f59e0b'
-  },
-  {
-    id: 'pdf-studio',
-    name: 'PDF Studio',
-    productName: 'PDF Studio',
-    debPackageName: 'pdf-studio',
-    description:
-      'Lecture, édition et organisation de PDF en local — fusion, découpe, réorganisation de pages.',
-    category: 'Documents',
-    owner: 'Julienlgn123',
-    repo: 'pdf-studio',
-    fallbackEmoji: '📄',
-    accent: '#ef4444'
+      'Chat avec des modèles IA en local, ultra simple et optimisé — moteur Ollama ou GGUF embarqué.',
+    category: 'IA',
+    assetPrefix: 'Local-IA-Studio',
+    fallbackEmoji: '🤖',
+    accent: '#7c5cff'
   }
 ]

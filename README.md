@@ -21,10 +21,13 @@ son catalogue.
 
 Apps actuellement au catalogue :
 
-- **[Cours Studio](https://github.com/Julienlgn123/cours-studio)** — prise et gestion de cours en local.
-- **[Drive Studio](https://github.com/Julienlgn123/drive-studio)** — gestionnaire multi-comptes Google Drive.
-- **[Plan Studio](https://github.com/Julienlgn123/plan-studio)** — planning personnel local (événements, tâches, objectifs).
-- **[PDF Studio](https://github.com/Julienlgn123/pdf-studio)** — lecture, édition et organisation de PDF en local.
+- **[Local IA Studio](apps/local-ia-studio)** — chat avec des modèles IA en local (Ollama ou GGUF embarqué). Vit dans ce monorepo.
+- **[Cours Studio](https://github.com/Julienlgn123/cours-studio)** — prise et gestion de cours en local. *(repo séparé pour l'instant, migration vers ce monorepo à venir)*
+- **[Drive Studio](https://github.com/Julienlgn123/drive-studio)** — gestionnaire multi-comptes Google Drive. *(repo séparé pour l'instant, migration vers ce monorepo à venir)*
+
+Aucune app de la suite ne se télécharge ni ne se met à jour séparément : Open
+Studio est le seul point d'installation et de mise à jour, et le seul à créer
+un raccourci — les apps qu'il gère n'en créent pas.
 
 100 % local, aucun serveur : Open Studio ne fait qu'interroger l'API GitHub
 publique (releases) et gérer les fichiers déjà publiés par chaque app.
@@ -50,12 +53,35 @@ suivi (quelle app est installée, quelle version) vit dans son dossier à lui.
 
 ---
 
+## Structure du monorepo
+
+```
+apps/
+  hub/              — Open Studio lui-même (le launcher)
+  local-ia-studio/  — app de la suite, buildée et publiée avec le hub
+```
+
+Chaque app garde son propre `package.json`/`electron.vite.config.ts` et se
+lance indépendamment (`npm run dev -w apps/local-ia-studio`). `npm install` à
+la racine installe tout, via les [npm workspaces](https://docs.npmjs.com/cli/v10/using-npm/workspaces).
+
 ## Ajouter une app au catalogue
 
-Un seul endroit à toucher : [`src/main/catalog.ts`](src/main/catalog.ts). Chaque
-entrée décrit le repo GitHub cible (le nom du produit doit correspondre
-exactement à `build.productName` de son `package.json`) — le reste (détection
-d'install, téléchargement, installation, lancement) est générique.
+Un seul endroit à toucher : [`apps/hub/src/main/catalog.ts`](apps/hub/src/main/catalog.ts).
+
+- **App qui vit dans ce monorepo** (cas normal pour toute nouvelle app) : un
+  dossier `apps/<id>`, et une entrée catalogue *sans* `owner`/`repo`, avec un
+  `assetPrefix` qui correspond au préfixe de ses fichiers d'installateur
+  (`build.*.artifactName` de son `package.json`, ex. `Local-IA-Studio`). Ses
+  installateurs sont alors cherchés dans la release de *ce* repo, filtrés par
+  ce préfixe — un seul tag `vX.Y.Z` ici publie toute la suite d'un coup.
+- **App encore sur son propre repo** (legacy, en cours de migration) : garder
+  `owner`/`repo` sur son entrée catalogue, comme avant.
+
+Dans les deux cas, le nom du produit doit correspondre exactement à
+`build.productName` du `package.json` de l'app, et son NSIS doit avoir
+`createDesktopShortcut`/`createStartMenuShortcut` à `false` — Open Studio est
+le seul à créer un raccourci.
 
 ## Limites connues
 

@@ -20,9 +20,16 @@ export interface CatalogEntry {
   debPackageName: string
   description: string
   category: string
-  owner: string
-  repo: string
-  /** Emoji affiché tant que le vrai logo (resources/icon.png du repo) n'a pas pu être chargé. */
+  /**
+   * App encore hébergée dans son propre repo GitHub. Omis pour une app vivant
+   * dans ce monorepo (`apps/<id>`) : ses installateurs sont alors cherchés dans
+   * la release de ce repo (Julienlgn123/open-studio), filtrés par `assetPrefix`.
+   */
+  owner?: string
+  repo?: string
+  /** Préfixe des noms de fichiers d'installateurs de cette app dans la release partagée (ex: "Local-IA-Studio"). Requis quand `owner`/`repo` sont omis. */
+  assetPrefix?: string
+  /** Emoji affiché tant que le vrai logo (resources/icon.png) n'a pas pu être chargé. */
   fallbackEmoji: string
   accent: string
 }

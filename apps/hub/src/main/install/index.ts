@@ -8,7 +8,15 @@ import { broadcast } from '../events'
 import { winInstaller } from './win'
 import { macInstaller } from './mac'
 import { linuxInstaller } from './linux'
-import type { AppState, InstallProgress } from '@shared/types'
+import type { AppState, CatalogEntry, InstallProgress } from '@shared/types'
+
+/** Repo de repli pour toute app du catalogue sans `owner`/`repo` propre (vit dans ce monorepo, sous `apps/<id>`). */
+const SUITE_OWNER = 'Julienlgn123'
+const SUITE_REPO = 'open-studio'
+
+function repoFor(entry: CatalogEntry): { owner: string; repo: string } {
+  return { owner: entry.owner ?? SUITE_OWNER, repo: entry.repo ?? SUITE_REPO }
+}
 
 const platformInstaller =
   process.platform === 'win32' ? winInstaller : process.platform === 'darwin' ? macInstaller : linuxInstaller
@@ -31,9 +39,10 @@ export async function listAppStates(): Promise<AppState[]> {
     CATALOG.map(async (entry) => {
       const execPath = await resolveExecPath(entry.id).catch(() => null)
       const tracked = getTrackedApp(entry.id)
+      const { owner, repo } = repoFor(entry)
       let latestVersion: string | null = null
       try {
-        const rel = await fetchLatestRelease(entry.owner, entry.repo)
+        const rel = await fetchLatestRelease(owner, repo)
         latestVersion = rel.tag_name.replace(/^v/, '')
       } catch {
         // Pas de connexion / repo indisponible : on garde le statut connu.
@@ -45,13 +54,15 @@ export async function listAppStates(): Promise<AppState[]> {
           ? 'update_available'
           : 'installed'
 
+      // App du monorepo (pas de repo propre) : son code/icône vivent sous apps/<id> du repo suite.
+      const iconPath = entry.owner ? 'resources/icon.png' : `apps/${entry.id}/resources/icon.png`
       return {
         ...entry,
         status,
         installedVersion,
         latestVersion,
-        repoUrl: `https://github.com/${entry.owner}/${entry.repo}`,
-        logoUrl: `https://raw.githubusercontent.com/${entry.owner}/${entry.repo}/main/resources/icon.png`
+        repoUrl: entry.owner ? `https://github.com/${owner}/${repo}` : `https://github.com/${owner}/${repo}/tree/main/apps/${entry.id}`,
+        logoUrl: `https://raw.githubusercontent.com/${owner}/${repo}/main/${iconPath}`
       }
     })
   )
@@ -65,9 +76,10 @@ export async function installOrUpdateApp(id: string): Promise<AppState> {
   const entry = CATALOG.find((c) => c.id === id)
   if (!entry) throw new Error('App inconnue : ' + id)
 
-  const rel = await fetchLatestRelease(entry.owner, entry.repo)
+  const { owner, repo } = repoFor(entry)
+  const rel = await fetchLatestRelease(owner, repo)
   const version = rel.tag_name.replace(/^v/, '')
-  const asset = pickAsset(rel.assets, process.platform, process.arch)
+  const asset = pickAsset(rel.assets, process.platform, process.arch, entry.assetPrefix)
   if (!asset) {
     throw new Error(
       `Aucun installateur disponible pour ta plateforme dans la dernière release de ${entry.name}.`
