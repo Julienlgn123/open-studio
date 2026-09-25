@@ -10,7 +10,7 @@ export default function ToastStack(): JSX.Element | null {
     t.type === 'success' ? 'var(--success)' : t.type === 'error' ? 'var(--danger)' : 'var(--accent-light)'
 
   return (
-    <div className="toast fade-in">
+    <div className="toast fade-in" style={{ ['--toast-color' as string]: color }}>
       <Icon size={16} style={{ color, flexShrink: 0 }} />
       <span>{t.message}</span>
     </div>

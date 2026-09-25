@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Download, ExternalLink, Play, RefreshCw, Trash2 } from 'lucide-react'
 import { useStore } from '../store'
 import ProgressBar from './ProgressBar'
-import { getCategoryColor } from '../lib/categories'
 import { formatBytes } from '../lib/format'
 import type { AppState, InstallProgress } from '@shared/types'
 
@@ -74,37 +73,46 @@ export default function AppCard({
 
   const canLaunch = app.status === 'installed'
   const canUpdate = app.status === 'update_available'
+  const metaItems = [
+    app.installedVersion && `Installé : ${app.installedVersion}`,
+    app.latestVersion && `Dernière : ${app.latestVersion}`,
+    diskUsage != null && formatBytes(diskUsage)
+  ].filter(Boolean) as string[]
 
   return (
-    <div className="app-card fade-in">
+    <div className="app-card fade-in" style={{ ['--card-accent' as string]: app.accent }}>
+      <div className="app-card-accent" />
+
       <div className="app-card-head">
-        <div
-          className="app-logo"
-          style={{
-            background: logoFailed ? app.accent : 'var(--bg-elevated)',
-            borderColor: getCategoryColor(app.category)
-          }}
-          data-tooltip={app.category}
-        >
-          {!logoFailed ? (
-            <img src={app.logoUrl} alt="" onError={() => setLogoFailed(true)} />
-          ) : (
-            app.fallbackEmoji
-          )}
+        <div className="app-logo-wrap">
+          <div className="app-logo-glow" />
+          <div className="app-logo" data-tooltip={app.category}>
+            {!logoFailed ? (
+              <img src={app.logoUrl} alt="" onError={() => setLogoFailed(true)} />
+            ) : (
+              app.fallbackEmoji
+            )}
+          </div>
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="app-card-title">{app.name}</div>
           <div className="app-card-category">{app.category}</div>
         </div>
-        <span className={`status-pill ${app.status}`}>{STATUS_LABEL[app.status]}</span>
+        <span className={`status-pill ${app.status}`}>
+          <span className="status-pill-dot" />
+          {STATUS_LABEL[app.status]}
+        </span>
       </div>
 
       <p className="app-card-desc">{app.description}</p>
 
       <div className="app-card-meta">
-        {app.installedVersion && <span>Installé : {app.installedVersion}</span>}
-        {app.latestVersion && <span>Dernière : {app.latestVersion}</span>}
-        {diskUsage != null && <span>{formatBytes(diskUsage)}</span>}
+        {metaItems.map((item, i) => (
+          <span key={item}>
+            {i > 0 && <span className="app-card-meta-sep">·</span>}
+            {item}
+          </span>
+        ))}
         <button
           className="icon-btn"
           style={{ width: 22, height: 22, marginLeft: 'auto' }}

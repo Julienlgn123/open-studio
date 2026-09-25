@@ -170,7 +170,7 @@ button {
 }
 
 .view-pad {
-  padding: 20px;
+  padding: 22px 24px 28px;
 }
 
 .col { display: flex; flex-direction: column; }
@@ -301,13 +301,24 @@ button {
 }
 
 .status-pill {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: var(--radius-full);
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 500; padding: 3px 9px; border-radius: var(--radius-full);
+  flex-shrink: 0;
 }
+.status-pill-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
 .status-pill.installed { background: var(--success-dim); color: var(--success); }
 .status-pill.update_available { background: var(--warning-dim); color: var(--warning); }
 .status-pill.not_installed { background: var(--bg-overlay); color: var(--text-tertiary); }
 .status-pill.error { background: var(--danger-dim); color: var(--danger); }
+.status-pill.downloading, .status-pill.installing, .status-pill.launching, .status-pill.uninstalling {
+  background: var(--accent-dim); color: var(--accent-light);
+}
+.status-pill.downloading .status-pill-dot,
+.status-pill.installing .status-pill-dot,
+.status-pill.launching .status-pill-dot,
+.status-pill.uninstalling .status-pill-dot { animation: pulse 1.2s ease-in-out infinite; }
+
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
 /* Cards */
 .card {
@@ -315,10 +326,11 @@ button {
   border-radius: var(--radius-lg); padding: 16px;
 }
 .card:hover { border-color: var(--border-medium); }
-.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
 
 /* App catalogue */
 .app-card {
+  position: relative;
   background: var(--bg-surface);
   /* 2px (pas 1px) : un contour de 1px atterrit parfois sur une frontière de
      pixel physique fractionnaire selon la mise à l'échelle de l'écran, et
@@ -327,41 +339,61 @@ button {
      CSS est rigoureusement identique partout. 2px laisse de la marge. */
   border: 2px solid var(--border-medium);
   border-radius: var(--radius-lg);
-  padding: 17px;
+  padding: 18px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  overflow: hidden;
   transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
 }
 .app-card:hover {
   border-color: var(--border-strong);
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   box-shadow: var(--shadow-md);
 }
 
-.app-card-head { display: flex; align-items: center; gap: 12px; }
+/* Liseré de couleur en haut de carte — identité visuelle propre à chaque app */
+.app-card-accent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--card-accent, var(--accent));
+  opacity: 0.85;
+}
 
-.app-logo {
+.app-card-head { display: flex; align-items: center; gap: 13px; }
+
+.app-logo-wrap {
+  position: relative;
   width: 46px;
   height: 46px;
-  border-radius: var(--radius-lg);
-  /* Couleur posée en inline style (1 couleur = 1 profil/catégorie).
-     3px + un p'tit padding (au lieu de coller le contour direct sur l'image) :
-     chaque logo source a son propre dessin jusqu'au bord, avec des contrastes
-     différents — collé dessus, le même contour CSS pouvait donc sembler plus
-     ou moins épais d'une app à l'autre. Le padding isole le contour du
-     contenu de l'image, pour une épaisseur qui se voit pareil partout. */
-  border: 3px solid transparent;
-  padding: 2px;
   flex-shrink: 0;
+}
+.app-logo-glow {
+  position: absolute;
+  inset: -8px;
+  background: var(--card-accent, var(--accent));
+  opacity: 0.22;
+  filter: blur(10px);
+  border-radius: var(--radius-lg);
+}
+.app-logo {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 22px;
   color: white;
   overflow: hidden;
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-sm);
 }
-.app-logo img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
+.app-logo img { width: 100%; height: 100%; object-fit: cover; }
 
 .app-card-title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
 .app-card-category { font-size: 11.5px; color: var(--text-tertiary); }
@@ -376,10 +408,11 @@ button {
 .app-card-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   font-size: 11.5px;
   color: var(--text-tertiary);
 }
+.app-card-meta-sep { margin: 0 4px; opacity: 0.6; }
 
 .app-card-actions {
   display: flex;
@@ -559,6 +592,7 @@ button {
   right: 20px;
   background: var(--bg-elevated);
   border: 1px solid var(--border-medium);
+  border-left: 3px solid var(--toast-color, var(--accent));
   border-radius: var(--radius-lg);
   padding: 12px 16px;
   font-size: 13.5px;
