@@ -474,10 +474,34 @@ button {
   border-radius: var(--radius-lg);
   padding: 12px 14px;
 }
-.update-banner-icon { color: var(--warning); flex-shrink: 0; }
+.update-banner-icon { color: var(--warning); flex-shrink: 0; align-self: flex-start; margin-top: 2px; }
 .update-banner-text { flex: 1; min-width: 0; }
 .update-banner-title { font-size: 13.5px; font-weight: 600; color: var(--text-primary); }
 .update-banner-sub { font-size: 11.5px; }
+.update-banner-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 4px;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.update-banner-toggle:hover { color: var(--text-primary); }
+.update-banner-changelog {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  white-space: pre-wrap;
+  font-size: 11px;
+  color: var(--text-secondary);
+  max-height: 160px;
+  overflow-y: auto;
+}
 
 /* Page header */
 .page-header {

@@ -7,4 +7,6 @@ export interface PlatformInstaller {
   install(entry: CatalogEntry, downloadedPath: string, managedDir: string): Promise<string>
   launch(entry: CatalogEntry, execPath: string): Promise<void>
   uninstall(entry: CatalogEntry, execPath: string): Promise<void>
+  /** Taille occupée sur le disque par l'install, en octets — `null` si impossible à déterminer. */
+  getInstalledSize(entry: CatalogEntry, execPath: string): Promise<number | null>
 }

@@ -23,6 +23,7 @@ const api = {
     install: (id: string): Promise<AppState> => ipcRenderer.invoke('apps:install', id),
     launch: (id: string): Promise<void> => ipcRenderer.invoke('apps:launch', id),
     uninstall: (id: string): Promise<void> => ipcRenderer.invoke('apps:uninstall', id),
+    getInstalledSize: (id: string): Promise<number | null> => ipcRenderer.invoke('apps:size', id),
     onProgress: (cb: (p: InstallProgress) => void) => on<InstallProgress>('apps:progress', cb)
   },
   shell: {

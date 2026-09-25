@@ -1,7 +1,7 @@
 import { ipcMain, BrowserWindow, shell } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { getSettings, setTheme } from './store'
-import { listAppStates, installOrUpdateApp, launchApp, uninstallApp } from './install'
+import { listAppStates, installOrUpdateApp, launchApp, uninstallApp, getInstalledSize } from './install'
 
 function getWin(): BrowserWindow {
   return BrowserWindow.getAllWindows()[0]
@@ -26,6 +26,7 @@ export function registerIpc(): void {
   ipcMain.handle('apps:install', (_, id: string) => installOrUpdateApp(id))
   ipcMain.handle('apps:launch', (_, id: string) => launchApp(id))
   ipcMain.handle('apps:uninstall', (_, id: string) => uninstallApp(id))
+  ipcMain.handle('apps:size', (_, id: string) => getInstalledSize(id))
 
   ipcMain.handle('shell:openExternal', (_, url: string) => shell.openExternal(url))
 

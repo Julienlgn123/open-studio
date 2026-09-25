@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Download, ExternalLink, Play, RefreshCw, Trash2 } from 'lucide-react'
 import { useStore } from '../store'
 import ProgressBar from './ProgressBar'
 import { getCategoryColor } from '../lib/categories'
+import { formatBytes } from '../lib/format'
 import type { AppState, InstallProgress } from '@shared/types'
 
 const STATUS_LABEL: Record<AppState['status'], string> = {
@@ -29,7 +30,24 @@ export default function AppCard({
   const { install, update, launch, uninstall, toast } = useStore()
   const [busy, setBusy] = useState(false)
   const [logoFailed, setLogoFailed] = useState(false)
+  const [diskUsage, setDiskUsage] = useState<number | null>(null)
   const working = busy || !!progress
+
+  useEffect(() => {
+    if (app.status !== 'installed' && app.status !== 'update_available') return
+    let cancelled = false
+    window.api.apps
+      .getInstalledSize(app.id)
+      .then((size) => {
+        if (!cancelled) setDiskUsage(size)
+      })
+      .catch(() => {
+        if (!cancelled) setDiskUsage(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [app.id, app.status])
 
   async function onPrimary(): Promise<void> {
     setBusy(true)
@@ -86,6 +104,7 @@ export default function AppCard({
       <div className="app-card-meta">
         {app.installedVersion && <span>Installé : {app.installedVersion}</span>}
         {app.latestVersion && <span>Dernière : {app.latestVersion}</span>}
+        {diskUsage != null && <span>{formatBytes(diskUsage)}</span>}
         <button
           className="icon-btn"
           style={{ width: 22, height: 22, marginLeft: 'auto' }}

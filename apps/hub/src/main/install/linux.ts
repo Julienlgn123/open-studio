@@ -67,5 +67,17 @@ export const linuxInstaller: PlatformInstaller = {
 
   async uninstall(entry) {
     await run('pkexec', ['dpkg', '-r', entry.debPackageName])
+  },
+
+  async getInstalledSize(entry) {
+    // dpkg connaît déjà la taille installée du paquet (en Ko) sans avoir à
+    // reparcourir nous-mêmes tous ses fichiers sur le disque.
+    try {
+      const out = await run('dpkg-query', ['-W', "-f=${Installed-Size}", entry.debPackageName])
+      const kb = Number(out.trim())
+      return Number.isFinite(kb) ? kb * 1024 : null
+    } catch {
+      return null
+    }
   }
 }
