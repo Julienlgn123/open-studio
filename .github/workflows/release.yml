@@ -180,3 +180,19 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # GitHub liste tous les fichiers d'une release, sans distinction — on ne
+      # peut pas cacher les installateurs des apps gérées, juste rendre très
+      # clair qu'il ne faut pas les télécharger directement ici (label affiché
+      # à la place du nom de fichier dans l'UI GitHub).
+      - name: Label managed-app assets as internal
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.version.outputs.VERSION }}"
+          gh api "repos/${{ github.repository }}/releases/tags/$TAG" --jq \
+            '.assets[] | select(((.name | startswith("Open-Studio")) or (.name | endswith(".yml"))) | not) | .id' |
+          while read -r id; do
+            gh api -X PATCH "repos/${{ github.repository }}/releases/assets/$id" \
+              -f label="Géré par Open Studio — ne pas télécharger ici"
+          done
