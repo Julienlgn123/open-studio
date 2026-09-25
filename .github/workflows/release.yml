@@ -34,6 +34,7 @@ jobs:
           path: |
             apps/${{ matrix.app }}/dist-installer/*.exe
             apps/${{ matrix.app }}/dist-installer/*.yml
+            !apps/${{ matrix.app }}/dist-installer/builder-debug.yml
             apps/${{ matrix.app }}/dist-installer/*.blockmap
 
   # ─── macOS ─────────────────────────────────────────────────
@@ -70,6 +71,7 @@ jobs:
             apps/${{ matrix.app }}/dist-installer/*.dmg
             apps/${{ matrix.app }}/dist-installer/*.zip
             apps/${{ matrix.app }}/dist-installer/*.yml
+            !apps/${{ matrix.app }}/dist-installer/builder-debug.yml
             apps/${{ matrix.app }}/dist-installer/*.blockmap
 
   # ─── Linux ─────────────────────────────────────────────────
@@ -104,6 +106,7 @@ jobs:
             apps/${{ matrix.app }}/dist-installer/*.AppImage
             apps/${{ matrix.app }}/dist-installer/*.deb
             apps/${{ matrix.app }}/dist-installer/*.yml
+            !apps/${{ matrix.app }}/dist-installer/builder-debug.yml
             apps/${{ matrix.app }}/dist-installer/*.blockmap
 
   # ─── Create Release ─────────────────────────────────────────
