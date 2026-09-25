@@ -19,6 +19,13 @@ jobs:
         with:
           node-version: 22
 
+      # Windows Defender scanning a file mid-write is the usual cause of the
+      # intermittent "Access to the path is denied" MSBuild failures seen here
+      # while electron-rebuild compiles better-sqlite3 for Electron's ABI.
+      - name: Disable Windows Defender real-time scanning
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
+        shell: powershell
+
       - name: Install dependencies
         run: npm install
 
