@@ -16,7 +16,9 @@ const api = {
   settings: {
     get: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),
     setTheme: (theme: 'dark' | 'light'): Promise<AppSettings> =>
-      ipcRenderer.invoke('settings:setTheme', theme)
+      ipcRenderer.invoke('settings:setTheme', theme),
+    setOnboardingSeen: (seen: boolean): Promise<AppSettings> =>
+      ipcRenderer.invoke('settings:setOnboardingSeen', seen)
   },
   apps: {
     list: (): Promise<AppState[]> => ipcRenderer.invoke('apps:list'),

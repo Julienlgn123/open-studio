@@ -1,23 +1,28 @@
 import { useEffect, useMemo, useState } from 'react'
-import { LayoutGrid, ArrowUpCircle } from 'lucide-react'
+import { ArrowUpCircle } from 'lucide-react'
 import { useStore } from './store'
 import TitleBar from './components/TitleBar'
 import ToastStack from './components/Toast'
 import AppCard from './components/AppCard'
 import UpdateBanner from './components/UpdateBanner'
+import Onboarding from './components/Onboarding'
+import Brandmark from './components/Brandmark'
 import { getCategoryColor } from './lib/categories'
 import type { InstallProgress } from '@shared/types'
 
 type SortMode = 'name' | 'status'
 
 export default function App(): JSX.Element {
-  const { apps, loading, loadSettings, loadApps } = useStore()
+  const { apps, loading, settings, loadSettings, loadApps, setOnboardingSeen } = useStore()
   const [progress, setProgress] = useState<Record<string, InstallProgress>>({})
   const [dismissedUpdates, setDismissedUpdates] = useState<Set<string>>(new Set())
   const [selfUpdate, setSelfUpdate] = useState<{ version: string } | null>(null)
   const [installingSelfUpdate, setInstallingSelfUpdate] = useState(false)
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
   const [sortMode, setSortMode] = useState<SortMode>('name')
+  const [showOnboarding, setShowOnboarding] = useState(false)
+
+  const installedCount = useMemo(() => apps.filter((a) => a.status !== 'not_installed').length, [apps])
 
   const categories = useMemo(
     () => Array.from(new Set(apps.map((a) => a.category))).sort(),
@@ -57,6 +62,7 @@ export default function App(): JSX.Element {
       await loadSettings()
       await loadApps()
       window.api.app.notifyReady()
+      if (!useStore.getState().settings.onboardingSeen) setShowOnboarding(true)
     })()
 
     const offProgress = window.api.apps.onProgress((p) => {
@@ -71,17 +77,25 @@ export default function App(): JSX.Element {
 
   return (
     <div className="app">
-      <TitleBar />
+      <TitleBar onHelp={() => setShowOnboarding(true)} />
       <div className="app-body">
         <main className="main">
-          <div className="page-header">
-            <div className="page-header-left">
-              <LayoutGrid size={16} />
-              <span className="page-header-title">Catalogue</span>
-              <span className="muted" style={{ fontSize: 13 }}>
-                {visibleApps.length} app{visibleApps.length !== 1 ? 's' : ''}
-                {activeCategory ? ` · ${activeCategory}` : ''}
-              </span>
+          <div className="hero">
+            <div className="hero-row">
+              <div className="hero-title">
+                <Brandmark size={34} />
+                <div>
+                  <h1>Catalogue</h1>
+                  <div className="hero-sub">
+                    Installe, lance et mets à jour les apps de la suite depuis un seul endroit.
+                  </div>
+                </div>
+              </div>
+              <div className="hero-stats">
+                <strong>{installedCount}</strong>&nbsp;installée{installedCount !== 1 ? 's' : ''} sur{' '}
+                <strong>{apps.length}</strong>
+                {activeCategory && <>&nbsp;· {activeCategory}</>}
+              </div>
             </div>
           </div>
 
@@ -182,6 +196,14 @@ export default function App(): JSX.Element {
       </div>
 
       <ToastStack />
+      {showOnboarding && (
+        <Onboarding
+          onClose={() => {
+            setShowOnboarding(false)
+            if (!settings.onboardingSeen) setOnboardingSeen(true)
+          }}
+        />
+      )}
     </div>
   )
 }

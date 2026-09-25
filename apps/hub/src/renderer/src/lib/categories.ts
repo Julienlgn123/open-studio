@@ -4,9 +4,10 @@
  * ensemble (ex : Cours Studio et Plan Studio sont tous les deux "Productivité").
  */
 export const CATEGORY_COLORS: Record<string, string> = {
-  Productivité: '#7c6ff7',
+  Productivité: '#7c5cff',
   Stockage: '#38bdf8',
-  Documents: '#ef4444'
+  Documents: '#ef4444',
+  IA: '#c026a3'
 }
 
 export const DEFAULT_CATEGORY_COLOR = '#8b8b93'

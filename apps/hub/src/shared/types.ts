@@ -55,4 +55,5 @@ export interface InstallProgress {
 
 export interface AppSettings {
   theme?: 'dark' | 'light'
+  onboardingSeen?: boolean
 }

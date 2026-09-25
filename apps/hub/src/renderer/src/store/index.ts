@@ -18,6 +18,7 @@ interface Store {
   loadSettings: () => Promise<void>
   setTheme: (t: 'dark' | 'light') => Promise<void>
   applyTheme: () => void
+  setOnboardingSeen: (seen: boolean) => Promise<void>
 
   loadApps: () => Promise<void>
   install: (id: string) => Promise<void>
@@ -48,6 +49,10 @@ export const useStore = create<Store>((set, get) => ({
   applyTheme: () => {
     const t = get().settings.theme === 'light' ? 'light' : 'dark'
     document.documentElement.setAttribute('data-theme', t)
+  },
+  setOnboardingSeen: async (seen) => {
+    const settings = await api.settings.setOnboardingSeen(seen)
+    set({ settings })
   },
 
   loadApps: async () => {

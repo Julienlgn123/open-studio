@@ -1,6 +1,6 @@
 import { ipcMain, BrowserWindow, shell } from 'electron'
 import { autoUpdater } from 'electron-updater'
-import { getSettings, setTheme } from './store'
+import { getSettings, setTheme, setOnboardingSeen } from './store'
 import { listAppStates, installOrUpdateApp, launchApp, uninstallApp, getInstalledSize } from './install'
 
 function getWin(): BrowserWindow {
@@ -19,6 +19,10 @@ export function registerIpc(): void {
   ipcMain.handle('settings:get', () => getSettings())
   ipcMain.handle('settings:setTheme', (_, theme: 'dark' | 'light') => {
     setTheme(theme)
+    return getSettings()
+  })
+  ipcMain.handle('settings:setOnboardingSeen', (_, seen: boolean) => {
+    setOnboardingSeen(seen)
     return getSettings()
   })
 

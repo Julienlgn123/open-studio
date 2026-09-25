@@ -13,6 +13,7 @@ interface TrackedApp {
 
 interface StoredData {
   theme?: 'dark' | 'light'
+  onboardingSeen?: boolean
   apps?: Record<string, TrackedApp>
 }
 
@@ -33,12 +34,19 @@ function writeRaw(s: StoredData): void {
 }
 
 export function getSettings(): AppSettings {
-  return { theme: readRaw().theme ?? 'dark' }
+  const raw = readRaw()
+  return { theme: raw.theme ?? 'dark', onboardingSeen: raw.onboardingSeen ?? false }
 }
 
 export function setTheme(theme: 'dark' | 'light'): void {
   const raw = readRaw()
   raw.theme = theme
+  writeRaw(raw)
+}
+
+export function setOnboardingSeen(seen: boolean): void {
+  const raw = readRaw()
+  raw.onboardingSeen = seen
   writeRaw(raw)
 }
 
