@@ -13,7 +13,7 @@
     "preview": "electron-vite preview",
     "start": "electron-vite dev",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "postinstall": "electron-builder install-app-deps",
+    "postinstall": "electron-rebuild --only better-sqlite3",
     "dist": "electron-vite build && electron-builder --win",
     "dist:mac": "electron-vite build && electron-builder --mac",
     "dist:linux": "electron-vite build && electron-builder --linux"
@@ -44,8 +44,8 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": false,
       "shortcutName": "Drive Studio",
       "artifactName": "Drive-Studio-Setup-${version}.${ext}"
     },
@@ -86,17 +86,11 @@
     },
     "deb": {
       "artifactName": "Drive-Studio-${version}.deb"
-    },
-    "publish": {
-      "provider": "github",
-      "owner": "Julienlgn123",
-      "repo": "drive-studio"
     }
   },
   "dependencies": {
     "better-sqlite3": "^11.10.0",
     "date-fns": "^4.1.0",
-    "electron-updater": "^6.8.9",
     "framer-motion": "^12.23.6",
     "googleapis": "^144.0.0",
     "jszip": "^3.10.1",
@@ -115,7 +109,7 @@
     "@types/react-dom": "^18.3.5",
     "@types/uuid": "^9.0.8",
     "@vitejs/plugin-react": "^4.5.2",
-    "electron": "^35.3.0",
+    "electron": "35.7.5",
     "electron-builder": "^26.15.3",
     "electron-vite": "^3.1.0",
     "typescript": "^5.8.3",

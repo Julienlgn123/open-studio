@@ -1,7 +1,6 @@
 import { app, BrowserWindow, shell, ipcMain, session, Tray, Menu, nativeImage } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { autoUpdater } from 'electron-updater'
 import { initDb } from './db'
 import { registerIpc } from './ipc'
 import { startScheduler, stopScheduler } from './scheduler'
@@ -180,23 +179,6 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow(false)
     else mainWindow?.show()
   })
-
-  if (app.isPackaged) {
-    autoUpdater.autoDownload = false
-    autoUpdater.autoInstallOnAppQuit = true
-    let checked = false
-    ipcMain.on('renderer:ready', () => {
-      if (checked) return
-      checked = true
-      autoUpdater.checkForUpdates().catch(() => null)
-    })
-    setTimeout(() => {
-      if (!checked) {
-        checked = true
-        autoUpdater.checkForUpdates().catch(() => null)
-      }
-    }, 8000)
-  }
 })
 
 // Toute tentative de quitter l'app (Cmd+Q, fermeture OS, menu système...) doit

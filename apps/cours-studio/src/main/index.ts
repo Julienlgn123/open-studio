@@ -3,7 +3,6 @@ import { join, extname, dirname } from 'path'
 import { pathToFileURL } from 'url'
 import { tmpdir } from 'os'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { autoUpdater } from 'electron-updater'
 import { initDb, getSubjects, createSubject, updateSubject, reorderSubjects,
   softDeleteSubject, restoreSubject, getTrashedSubjects, permanentlyDeleteSubject,
   getCoursesBySubject, getCourse, createCourse, updateCourse,
@@ -21,8 +20,6 @@ import ffmpeg from 'fluent-ffmpeg'
 import { pickAndExtractDocument, extractArticleFromUrl } from './documents'
 import { exportBackup, importBackup, autoBackup, openBackupsFolder, latestBackupInfo, resetAllData, chooseAutoBackupFolder, runAutoBackupToFolder } from './backup'
 import { htmlToMarkdown } from './markdown'
-
-const RELEASES_URL = 'https://github.com/Julienlgn123/cours-studio/releases/latest'
 
 // Cross-platform ffmpeg binary name
 const ffmpegBin = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
@@ -170,45 +167,6 @@ app.whenReady().then(() => {
       n.show()
     }
   } catch { /* notifications are best-effort */ }
-
-  // Auto-updater (only when packaged)
-  if (app.isPackaged) {
-    autoUpdater.autoDownload = false
-    autoUpdater.autoInstallOnAppQuit = true
-
-    autoUpdater.on('update-available', (info) => {
-      mainWindow.webContents.send('update:available', { version: info.version })
-    })
-    autoUpdater.on('update-not-available', () => {
-      mainWindow.webContents.send('update:not-available')
-    })
-    autoUpdater.on('download-progress', (progress) => {
-      mainWindow.webContents.send('update:progress', {
-        percent: progress.percent,
-        transferred: progress.transferred,
-        total: progress.total,
-        bytesPerSecond: progress.bytesPerSecond
-      })
-    })
-    autoUpdater.on('update-downloaded', () => {
-      mainWindow.webContents.send('update:downloaded')
-    })
-    autoUpdater.on('error', (err) => {
-      mainWindow.webContents.send('update:error', err.message)
-    })
-
-    // The renderer signals when it's mounted and actually listening for
-    // update events — checking too early (e.g. a blind setTimeout) can fire
-    // 'update-available' before anyone subscribed, silently losing it.
-    let updateChecked = false
-    ipcMain.on('renderer:ready', () => {
-      if (updateChecked) return
-      updateChecked = true
-      autoUpdater.checkForUpdates()
-    })
-    // Fallback in case the ready signal is ever missed for some reason
-    setTimeout(() => { if (!updateChecked) { updateChecked = true; autoUpdater.checkForUpdates() } }, 8000)
-  }
 })
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
@@ -607,13 +565,4 @@ function registerIpc(): void {
   ipcMain.handle('settings:get', () => { try { return JSON.parse(readFileSync(settingsPath, 'utf-8')) } catch { return {} } })
   ipcMain.handle('settings:set', (_, d) => { writeFileSync(settingsPath, JSON.stringify(d, null, 2)); return true })
   ipcMain.handle('app:version', () => app.getVersion())
-  ipcMain.handle('update:check', () => { if (app.isPackaged) autoUpdater.checkForUpdates() })
-  ipcMain.handle('update:download', () => {
-    // macOS: ad-hoc signed builds fail Squirrel's signature check, so never try
-    // to self-apply — send people to the Releases page for a manual download.
-    if (process.platform === 'darwin') { shell.openExternal(RELEASES_URL); return }
-    if (app.isPackaged) autoUpdater.downloadUpdate()
-  })
-  ipcMain.handle('update:install', () => { if (app.isPackaged && process.platform !== 'darwin') { autoUpdater.quitAndInstall(false, true) } })
-  ipcMain.handle('update:openReleases', () => { shell.openExternal(RELEASES_URL); return true })
 }

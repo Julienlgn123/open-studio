@@ -15,7 +15,6 @@ import Toast from './components/Toast'
 import AIBanner from './components/AIBanner'
 import ErrorBoundary from './components/ErrorBoundary'
 import PomodoroWidget from './components/PomodoroWidget'
-import UpdatePromptModal from './components/UpdatePromptModal'
 import GlobalSearchModal from './components/GlobalSearchModal'
 import TourOverlay from './tour/TourOverlay'
 import { useAccessibleTooltips } from './hooks/useAccessibleTooltips'
@@ -144,7 +143,6 @@ export default function App() {
       <AnimatePresence>
         {toast && <Toast key="toast" />}
       </AnimatePresence>
-      <UpdatePromptModal />
       <PomodoroWidget />
       {showSearch && <GlobalSearchModal onClose={() => setShowSearch(false)} />}
       <TourOverlay />

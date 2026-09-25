@@ -40,7 +40,6 @@ export default function App(): JSX.Element {
   useEffect(() => {
     ;(async () => {
       await loadAll()
-      window.api.app.notifyReady()
       // Au démarrage : quotas + scan complet du contenu de chaque Drive.
       syncQuotas({ silent: true })
       syncDriveFiles({ silent: true })

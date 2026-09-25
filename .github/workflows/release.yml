@@ -10,7 +10,7 @@ jobs:
   build-windows:
     strategy:
       matrix:
-        app: [hub, local-ia-studio]
+        app: [hub, cours-studio, drive-studio]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,7 +40,7 @@ jobs:
   build-mac:
     strategy:
       matrix:
-        app: [hub, local-ia-studio]
+        app: [hub, cours-studio, drive-studio]
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -76,7 +76,7 @@ jobs:
   build-linux:
     strategy:
       matrix:
-        app: [hub, local-ia-studio]
+        app: [hub, cours-studio, drive-studio]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -159,8 +159,9 @@ jobs:
             | `Open-Studio-*.deb` | Debian / Ubuntu / Mint |
 
             ---
-            Les fichiers `Local-IA-Studio-*` de cette release sont ceux qu'Open Studio
-            télécharge lui-même depuis son catalogue — pas besoin de les récupérer ici.
+            Les fichiers `Cours-Studio-*` et `Drive-Studio-*` de cette release sont ceux
+            qu'Open Studio télécharge lui-même depuis son catalogue — pas besoin de les
+            récupérer ici.
 
             🔄 Mises à jour automatiques au démarrage (Open Studio uniquement).
           files: dist-artifacts/**/*

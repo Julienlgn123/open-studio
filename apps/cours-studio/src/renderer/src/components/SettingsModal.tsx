@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Eye, EyeOff, Download, RefreshCw, CheckCircle, Sun, Moon, Upload, FolderOpen, Save, Trash2 } from 'lucide-react'
+import { X, Eye, EyeOff, Sun, Moon, Upload, FolderOpen, Save, Trash2 } from 'lucide-react'
 import { useStore } from '../store'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
@@ -11,8 +11,6 @@ const api = (window as any).api
 interface Props {
   onClose: () => void
 }
-
-type UpdateState = 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
 
 export default function SettingsModal({ onClose }: Props) {
   const { settings, saveSettings, showToast, startTour } = useStore()
@@ -26,26 +24,10 @@ export default function SettingsModal({ onClose }: Props) {
   const [lastBackup, setLastBackup] = useState<{ name: string; at: number } | null>(null)
 
   useEscapeToClose(onClose)
-  const [updateState, setUpdateState] = useState<UpdateState>('idle')
-  const [updateVersion, setUpdateVersion] = useState<string>('')
-  const [updateProgress, setUpdateProgress] = useState(0)
-  const [updateError, setUpdateError] = useState('')
 
   useEffect(() => {
     api.app.version().then(setAppVersion).catch(() => setAppVersion('dev'))
     api.backup.latest().then(setLastBackup).catch(() => setLastBackup(null))
-
-    const cleanups = [
-      api.app.onUpdateAvailable(({ version }: { version: string }) => {
-        setUpdateVersion(version)
-        setUpdateState('available')
-      }),
-      api.app.onUpdateNotAvailable(() => setUpdateState('not-available')),
-      api.app.onUpdateProgress((pct: number) => { setUpdateProgress(pct); setUpdateState('downloading') }),
-      api.app.onUpdateDownloaded(() => setUpdateState('downloaded')),
-      api.app.onUpdateError((err: string) => { setUpdateError(err); setUpdateState('error') })
-    ]
-    return () => cleanups.forEach((c) => c())
   }, [])
 
   async function handleSave() {
@@ -96,12 +78,6 @@ export default function SettingsModal({ onClose }: Props) {
     } finally {
       setBackupBusy('')
     }
-  }
-
-  function checkUpdate() {
-    setUpdateState('checking')
-    setUpdateError('')
-    api.app.checkUpdate()
   }
 
   return (
@@ -228,83 +204,12 @@ export default function SettingsModal({ onClose }: Props) {
             </div>
           </div>
 
-          {/* Update section */}
+          {/* Version */}
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 4 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>Mise à jour</div>
-                <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
-                  Version actuelle : <strong>{appVersion || '—'}</strong>
-                </div>
-              </div>
-
-              {(updateState === 'idle' || updateState === 'not-available' || updateState === 'error') && (
-                <button className="btn btn-secondary btn-sm" onClick={checkUpdate} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <RefreshCw size={13} />
-                  Vérifier
-                </button>
-              )}
+            <div style={{ fontSize: 13, fontWeight: 500 }}>Version</div>
+            <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
+              {appVersion || '—'} — les mises à jour se font depuis Open Studio.
             </div>
-
-            {updateState === 'checking' && (
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span className="spinner" style={{ width: 12, height: 12 }} /> Vérification en cours...
-              </div>
-            )}
-
-            {updateState === 'not-available' && (
-              <div style={{ fontSize: 12, color: 'var(--success)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <CheckCircle size={13} /> L'application est à jour.
-              </div>
-            )}
-
-            {updateState === 'available' && (
-              <div style={{ background: 'var(--accent-dim)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 'var(--radius-md)', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent-light)' }}>Mise à jour disponible</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Version {updateVersion} est disponible</div>
-                </div>
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => {
-                    if (api?.platform === 'darwin') { api.app.openReleases(); return }
-                    api.app.downloadUpdate(); setUpdateState('downloading')
-                  }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}
-                >
-                  <Download size={13} /> Télécharger
-                </button>
-              </div>
-            )}
-
-            {updateState === 'downloading' && (
-              <div>
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                  Téléchargement... {updateProgress}%
-                </div>
-                <div style={{ height: 4, background: 'var(--bg-overlay)', borderRadius: 2, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${updateProgress}%`, background: 'var(--accent)', borderRadius: 2, transition: 'width 0.3s' }} />
-                </div>
-              </div>
-            )}
-
-            {updateState === 'downloaded' && (
-              <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 'var(--radius-md)', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--success)' }}>Prêt à installer</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>L'app va redémarrer pour installer la mise à jour</div>
-                </div>
-                <button className="btn btn-sm" onClick={() => api.app.installUpdate()} style={{ background: 'var(--success)', color: '#fff', flexShrink: 0 }}>
-                  Installer et relancer
-                </button>
-              </div>
-            )}
-
-            {updateState === 'error' && (
-              <div style={{ fontSize: 12, color: 'var(--danger)' }}>
-                Erreur : {updateError || 'Impossible de vérifier les mises à jour.'}
-              </div>
-            )}
           </div>
 
           {/* Zone dangereuse */}

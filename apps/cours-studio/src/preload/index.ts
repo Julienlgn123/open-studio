@@ -141,38 +141,6 @@ const api = {
   },
   app: {
     version: () => ipcRenderer.invoke('app:version'),
-    checkUpdate: () => ipcRenderer.invoke('update:check'),
-    // Tells main it's safe to run the startup update check — the renderer is
-    // mounted and its update listeners are registered, so nothing gets lost
-    notifyReady: () => ipcRenderer.send('renderer:ready'),
-    downloadUpdate: () => ipcRenderer.invoke('update:download'),
-    installUpdate: () => ipcRenderer.invoke('update:install'),
-    // macOS builds are only ad-hoc signed, so Squirrel can't self-apply an
-    // update — open the Releases page for a manual download instead
-    openReleases: () => ipcRenderer.invoke('update:openReleases'),
-    onUpdateAvailable: (cb: (info: { version: string }) => void) => {
-      const handler = (_: unknown, info: { version: string }) => cb(info)
-      ipcRenderer.on('update:available', handler)
-      return () => ipcRenderer.removeListener('update:available', handler)
-    },
-    onUpdateNotAvailable: (cb: () => void) => {
-      ipcRenderer.on('update:not-available', cb)
-      return () => ipcRenderer.removeListener('update:not-available', cb)
-    },
-    onUpdateProgress: (cb: (progress: { percent: number; transferred: number; total: number; bytesPerSecond: number }) => void) => {
-      const handler = (_: unknown, progress: { percent: number; transferred: number; total: number; bytesPerSecond: number }) => cb(progress)
-      ipcRenderer.on('update:progress', handler)
-      return () => ipcRenderer.removeListener('update:progress', handler)
-    },
-    onUpdateDownloaded: (cb: () => void) => {
-      ipcRenderer.on('update:downloaded', cb)
-      return () => ipcRenderer.removeListener('update:downloaded', cb)
-    },
-    onUpdateError: (cb: (err: string) => void) => {
-      const handler = (_: unknown, err: string) => cb(err)
-      ipcRenderer.on('update:error', handler)
-      return () => ipcRenderer.removeListener('update:error', handler)
-    },
     // Fired when the user clicks the "flashcards due" system notification
     onReviewAll: (cb: () => void) => {
       ipcRenderer.on('open-review-all', cb)

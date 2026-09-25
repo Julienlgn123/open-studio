@@ -11,34 +11,23 @@ export const CATALOG: CatalogEntry[] = [
     description:
       "Prise et gestion de cours en local : éditeur riche, résumés/QCM par IA, enregistrement audio.",
     category: 'Productivité',
-    owner: 'Julienlgn123',
-    repo: 'cours-studio',
+    assetPrefix: 'Cours-Studio',
     fallbackEmoji: '🎓',
     accent: '#7c6ff7'
   },
   {
-    id: 'stockage-studio',
+    id: 'drive-studio',
     name: 'Drive Studio',
     productName: 'Drive Studio',
     debPackageName: 'gdrive-backup-manager',
     description:
       'Centralise plusieurs comptes Google Drive : distribution automatique des uploads, backup planifié, dashboard.',
     category: 'Stockage',
-    owner: 'Julienlgn123',
-    repo: 'drive-studio',
+    assetPrefix: 'Drive-Studio',
     fallbackEmoji: '☁️',
     accent: '#38bdf8'
-  },
-  {
-    id: 'local-ia-studio',
-    name: 'Local IA Studio',
-    productName: 'Local IA Studio',
-    debPackageName: 'local-ia-studio',
-    description:
-      'Chat avec des modèles IA en local, ultra simple et optimisé — moteur Ollama ou GGUF embarqué.',
-    category: 'IA',
-    assetPrefix: 'Local-IA-Studio',
-    fallbackEmoji: '🤖',
-    accent: '#7c5cff'
   }
 ]
+
+// Local IA Studio est en pause pour l'instant (voir apps/local-ia-studio) —
+// pas encore ajoutée au catalogue tant que son développement n'a pas repris.

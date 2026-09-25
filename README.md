@@ -15,15 +15,18 @@ et lancement en un clic, comme Adobe Creative Cloud mais pour mes propres apps.
    télécharge, les installe et les lance à ta place.
 
 ➡️ **Pas besoin d'aller télécharger un `.exe` sur chaque repo séparément** : une
-fois Open Studio installé, tous les autres outils de la suite (Cours Studio,
-Drive Studio, Plan Studio, PDF Studio…) sont disponibles directement depuis
-son catalogue.
+fois Open Studio installé, tous les autres outils de la suite sont disponibles
+directement depuis son catalogue — ce repo est le seul point de vérité, les
+autres repos d'apps peuvent être supprimés une fois leur code migré ici.
 
 Apps actuellement au catalogue :
 
-- **[Local IA Studio](apps/local-ia-studio)** — chat avec des modèles IA en local (Ollama ou GGUF embarqué). Vit dans ce monorepo.
-- **[Cours Studio](https://github.com/Julienlgn123/cours-studio)** — prise et gestion de cours en local. *(repo séparé pour l'instant, migration vers ce monorepo à venir)*
-- **[Drive Studio](https://github.com/Julienlgn123/drive-studio)** — gestionnaire multi-comptes Google Drive. *(repo séparé pour l'instant, migration vers ce monorepo à venir)*
+- **[Cours Studio](apps/cours-studio)** — prise et gestion de cours en local.
+- **[Drive Studio](apps/drive-studio)** — gestionnaire multi-comptes Google Drive.
+
+En pause, pas encore au catalogue :
+
+- **[Local IA Studio](apps/local-ia-studio)** — chat avec des modèles IA en local (Ollama ou GGUF embarqué).
 
 Aucune app de la suite ne se télécharge ni ne se met à jour séparément : Open
 Studio est le seul point d'installation et de mise à jour, et le seul à créer
@@ -58,12 +61,17 @@ suivi (quelle app est installée, quelle version) vit dans son dossier à lui.
 ```
 apps/
   hub/              — Open Studio lui-même (le launcher)
-  local-ia-studio/  — app de la suite, buildée et publiée avec le hub
+  cours-studio/     — au catalogue, buildée et publiée avec le hub
+  drive-studio/     — au catalogue, buildée et publiée avec le hub
+  local-ia-studio/  — en pause, pas encore au catalogue
 ```
 
 Chaque app garde son propre `package.json`/`electron.vite.config.ts` et se
-lance indépendamment (`npm run dev -w apps/local-ia-studio`). `npm install` à
+lance indépendamment (`npm run dev -w apps/cours-studio`). `npm install` à
 la racine installe tout, via les [npm workspaces](https://docs.npmjs.com/cli/v10/using-npm/workspaces).
+
+`cours-studio` et `drive-studio` ont été importées avec `git subtree` depuis
+leurs anciens repos, historique de commits inclus.
 
 ## Ajouter une app au catalogue
 

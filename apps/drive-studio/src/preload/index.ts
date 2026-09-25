@@ -194,9 +194,6 @@ const api = {
   },
   clipboard: {
     write: (text: string): Promise<void> => ipcRenderer.invoke('clipboard:write', text)
-  },
-  app: {
-    notifyReady: () => ipcRenderer.send('renderer:ready')
   }
 }
 
