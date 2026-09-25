@@ -2,112 +2,42 @@
   <img src="https://raw.githubusercontent.com/Julienlgn123/open-studio/main/banner.png" alt="Open Studio" width="100%" />
 </p>
 
-Le hub desktop (Electron + React + TypeScript) de la suite « Julien Studio » :
-un seul catalogue pour installer, lancer et mettre à jour chaque app en un
-clic — plus besoin de traquer des installateurs éparpillés sur dix repos.
+Le point d'entrée unique de la suite **Julien Studio** : un seul catalogue
+pour installer, lancer et mettre à jour chaque app en un clic — plus besoin
+de traquer des installateurs éparpillés sur dix repos.
 
 ## Installation
 
-1. Télécharge la dernière release d'**Open Studio** : [Releases](https://github.com/Julienlgn123/open-studio/releases/latest)
+1. Télécharge la dernière release : [Releases](https://github.com/Julienlgn123/open-studio/releases/latest)
    (`Setup.exe` sur Windows, `.dmg` sur macOS, `.AppImage`/`.deb` sur Linux).
-2. Installe-le et lance-le.
-   - **macOS uniquement** : Open Studio n'a pas de certificat Apple Developer
-     payant, la build n'est donc signée qu'en *ad-hoc*. Au premier lancement,
-     macOS affiche **« Open Studio est endommagée et ne peut pas être
-     ouverte »** (le clic droit → Ouvrir ne suffit pas ici, contrairement à
-     une app juste non-notariée). Deux façons de le débloquer :
-     - double-clique `Fix-macOS-Signature.command` présent dans le `.dmg`, ou
-     - ouvre Terminal et lance :
-       ```bash
-       xattr -cr "/Applications/Open Studio.app"
-       ```
-3. Depuis son catalogue, choisis les outils qui t'intéressent — Open Studio les
+2. Installe-la et lance-la.
+   - **macOS uniquement** : au premier lancement, macOS peut afficher
+     « Open Studio est endommagée et ne peut pas être ouverte » (build sans
+     certificat Apple Developer payant). Double-clique
+     `Fix-macOS-Signature.command` fourni dans le `.dmg`, ou lance :
+     ```bash
+     xattr -cr "/Applications/Open Studio.app"
+     ```
+3. Depuis le catalogue, choisis les apps qui t'intéressent — Open Studio les
    télécharge, les installe et les lance à ta place.
 
-➡️ **Pas besoin d'aller télécharger un `.exe` sur chaque repo séparément** : une
-fois Open Studio installé, tous les autres outils de la suite sont disponibles
-directement depuis son catalogue — ce repo est le seul point de vérité, les
-autres repos d'apps peuvent être supprimés une fois leur code migré ici.
+## Apps de la suite
 
-Apps actuellement au catalogue :
+- **Cours Studio** — prise et gestion de cours en local.
+- **Drive Studio** — gestionnaire multi-comptes Google Drive.
+- **ENT Studio** — suit ton emploi du temps ENT et signale ce qui a changé.
+- **Local IA Studio** *(bientôt)* — chat avec des modèles IA en local.
 
-- **[Cours Studio](apps/cours-studio)** — prise et gestion de cours en local.
-- **[Drive Studio](apps/drive-studio)** — gestionnaire multi-comptes Google Drive.
-- **[ENT Studio](https://github.com/Julienlgn123/ent-studio)** — suit ton emploi du temps ENT (flux ICS) et signale ce qui a changé. *(repo séparé pour l'instant)*
+## Pourquoi Open Studio
 
-En pause, pas encore au catalogue :
-
-- **[Local IA Studio](apps/local-ia-studio)** — chat avec des modèles IA en local (Ollama ou GGUF embarqué).
-
-Aucune app de la suite ne se télécharge ni ne se met à jour séparément : Open
-Studio est le seul point d'installation et de mise à jour, et le seul à créer
-un raccourci — les apps qu'il gère n'en créent pas.
-
-100 % local, aucun serveur : Open Studio ne fait qu'interroger l'API GitHub
-publique (releases) et gérer les fichiers déjà publiés par chaque app.
+- **Un seul endroit** pour installer et mettre à jour toute la suite — plus
+  besoin d'aller chercher un `.exe` sur chaque repo séparément.
+- **Tes données restent intactes** : chaque app garde son dossier habituel,
+  exactement comme si tu l'avais installée toi-même.
+- **100 % local** : aucun serveur, Open Studio ne fait qu'interroger l'API
+  GitHub publique pour trouver les dernières versions.
 
 ---
 
-## Comment ça marche
-
-Pour chaque app du catalogue, Open Studio :
-
-1. Interroge la dernière **GitHub Release** du repo de l'app.
-2. Télécharge l'installateur adapté à l'OS courant (Setup `.exe` / `.dmg` / `.deb`).
-3. L'installe **pour de vrai** (vrai installateur natif, pas un simple "portable
-   caché") — sur un emplacement propre à Open Studio, sans jamais toucher aux
-   données de l'app (chaque app garde son dossier `%APPDATA%`/`~/Library`
-   habituel, exactement comme si tu l'avais installée toi-même).
-4. Si l'app est déjà installée par ailleurs (avant qu'Open Studio existe, ou
-   installée manuellement), Open Studio la détecte et propose direct
-   « Lancer » sans réinstaller.
-
-Aucune donnée des apps gérées n'est stockée par Open Studio — seul son propre
-suivi (quelle app est installée, quelle version) vit dans son dossier à lui.
-
----
-
-## Structure du monorepo
-
-```
-apps/
-  hub/              — Open Studio lui-même (le launcher)
-  cours-studio/     — au catalogue, buildée et publiée avec le hub
-  drive-studio/     — au catalogue, buildée et publiée avec le hub
-  local-ia-studio/  — en pause, pas encore au catalogue
-```
-
-Chaque app garde son propre `package.json`/`electron.vite.config.ts` et se
-lance indépendamment (`npm run dev -w apps/cours-studio`). `npm install` à
-la racine installe tout, via les [npm workspaces](https://docs.npmjs.com/cli/v10/using-npm/workspaces).
-
-`cours-studio` et `drive-studio` ont été importées avec `git subtree` depuis
-leurs anciens repos, historique de commits inclus.
-
-## Ajouter une app au catalogue
-
-Un seul endroit à toucher : [`apps/hub/src/main/catalog.ts`](apps/hub/src/main/catalog.ts).
-
-- **App qui vit dans ce monorepo** (cas normal pour toute nouvelle app) : un
-  dossier `apps/<id>`, et une entrée catalogue *sans* `owner`/`repo`, avec un
-  `assetPrefix` qui correspond au préfixe de ses fichiers d'installateur
-  (`build.*.artifactName` de son `package.json`, ex. `Local-IA-Studio`). Ses
-  installateurs sont alors cherchés dans la release de *ce* repo, filtrés par
-  ce préfixe — un seul tag `vX.Y.Z` ici publie toute la suite d'un coup.
-- **App encore sur son propre repo** (legacy, en cours de migration) : garder
-  `owner`/`repo` sur son entrée catalogue, comme avant.
-
-Dans les deux cas, le nom du produit doit correspondre exactement à
-`build.productName` du `package.json` de l'app, et son NSIS doit avoir
-`createDesktopShortcut`/`createStartMenuShortcut` à `false` — Open Studio est
-le seul à créer un raccourci.
-
-## Limites connues
-
-- **macOS / Linux** : le flux d'installation suit les conventions documentées
-  d'electron-builder (montage `.dmg` + copie dans `/Applications`, `dpkg`/`pkexec`
-  pour le `.deb`) mais n'a pas pu être testé sur du matériel réel dans cet
-  environnement de développement (Windows uniquement). À vérifier sur un vrai
-  Mac/Linux avant une confiance totale.
-- L'installation du `.deb` sur Linux nécessite `pkexec` (présent par défaut sur
-  la plupart des environnements de bureau GNOME/KDE) pour l'élévation de droits.
+Envie de contribuer ou de comprendre comment c'est fait sous le capot ?
+Voir [CONTRIBUTING.md](CONTRIBUTING.md).
