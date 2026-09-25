@@ -2,9 +2,9 @@
   <img src="https://raw.githubusercontent.com/Julienlgn123/open-studio/main/banner.png" alt="Open Studio" width="100%" />
 </p>
 
-Hub desktop (Electron + React + TypeScript) qui rassemble les apps de la suite
-« Julien Studio » en un seul endroit — vue catalogue, installation/mise à jour
-et lancement en un clic, comme Adobe Creative Cloud mais pour mes propres apps.
+Le hub desktop (Electron + React + TypeScript) de la suite « Julien Studio » :
+un seul catalogue pour installer, lancer et mettre à jour chaque app en un
+clic — plus besoin de traquer des installateurs éparpillés sur dix repos.
 
 ## Installation
 
