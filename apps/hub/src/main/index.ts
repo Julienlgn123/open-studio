@@ -91,7 +91,11 @@ app.whenReady().then(() => {
     autoUpdater.autoInstallOnAppQuit = true
 
     autoUpdater.on('update-downloaded', (info) => {
+      // Entièrement automatique : on prévient juste la personne, puis on
+      // redémarre tout seul quelques secondes après (le temps que le message
+      // s'affiche) — pas de bouton à cliquer pour rester à jour.
       broadcast('app:updateReady', { version: info.version })
+      setTimeout(() => autoUpdater.quitAndInstall(false, true), 5000)
     })
     autoUpdater.on('error', (err) => {
       // Une vérif qui échoue (pas de réseau, GitHub indisponible...) ne doit

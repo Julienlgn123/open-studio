@@ -33,7 +33,6 @@ const api = {
   },
   app: {
     notifyReady: () => ipcRenderer.send('renderer:ready'),
-    installUpdate: (): Promise<void> => ipcRenderer.invoke('app:installUpdate'),
     onUpdateReady: (cb: (payload: { version: string }) => void) =>
       on<{ version: string }>('app:updateReady', cb)
   }

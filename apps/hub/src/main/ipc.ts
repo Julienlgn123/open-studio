@@ -1,5 +1,4 @@
 import { ipcMain, BrowserWindow, shell } from 'electron'
-import { autoUpdater } from 'electron-updater'
 import { getSettings, setTheme, setOnboardingSeen } from './store'
 import { listAppStates, installOrUpdateApp, launchApp, uninstallApp, getInstalledSize } from './install'
 
@@ -33,6 +32,4 @@ export function registerIpc(): void {
   ipcMain.handle('apps:size', (_, id: string) => getInstalledSize(id))
 
   ipcMain.handle('shell:openExternal', (_, url: string) => shell.openExternal(url))
-
-  ipcMain.handle('app:installUpdate', () => autoUpdater.quitAndInstall())
 }

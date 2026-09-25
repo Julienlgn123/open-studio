@@ -17,7 +17,6 @@ export default function App(): JSX.Element {
   const [progress, setProgress] = useState<Record<string, InstallProgress>>({})
   const [dismissedUpdates, setDismissedUpdates] = useState<Set<string>>(new Set())
   const [selfUpdate, setSelfUpdate] = useState<{ version: string } | null>(null)
-  const [installingSelfUpdate, setInstallingSelfUpdate] = useState(false)
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
   const [sortMode, setSortMode] = useState<SortMode>('name')
   const [showOnboarding, setShowOnboarding] = useState(false)
@@ -106,34 +105,13 @@ export default function App(): JSX.Element {
                   <ArrowUpCircle size={18} className="update-banner-icon" />
                   <div className="update-banner-text">
                     <div className="update-banner-title">
-                      Mise à jour d'Open Studio prête — v{selfUpdate.version}
+                      Mise à jour d'Open Studio — v{selfUpdate.version}
                     </div>
                     <div className="update-banner-sub muted">
-                      Téléchargée en arrière-plan, un redémarrage suffit pour l'appliquer.
+                      Téléchargée en arrière-plan, installation automatique dans quelques secondes…
                     </div>
                   </div>
-                  <div className="row" style={{ gap: 6 }}>
-                    <button
-                      className="btn btn-sm btn-secondary"
-                      onClick={() => setSelfUpdate(null)}
-                      disabled={installingSelfUpdate}
-                    >
-                      Plus tard
-                    </button>
-                    <button
-                      className="btn btn-sm btn-primary"
-                      disabled={installingSelfUpdate}
-                      onClick={() => {
-                        setInstallingSelfUpdate(true)
-                        window.api.app.installUpdate().catch(() => setInstallingSelfUpdate(false))
-                      }}
-                    >
-                      {installingSelfUpdate ? (
-                        <div className="spinner" style={{ width: 12, height: 12, borderWidth: 2 }} />
-                      ) : null}
-                      Redémarrer maintenant
-                    </button>
-                  </div>
+                  <div className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
                 </div>
               )}
               <UpdateBanner
