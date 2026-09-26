@@ -1,6 +1,7 @@
 import type { EngineKind } from '@shared/types'
 import { getPreferences, listLlamaCppModels } from './db'
 import { checkOllama, listOllamaModels } from './providers/ollama'
+import { listLmStudioModels } from './providers/lmstudio'
 import { FALLBACK_MISTRAL_MODELS, MistralHttpError } from './providers/mistral'
 
 export interface Target {
@@ -36,6 +37,11 @@ export async function localFallback(): Promise<Target | null> {
   const ollama = (await checkOllama()).available ? await listOllamaModels().catch(() => []) : []
   if (prefs.defaultEngine === 'ollama' && ollama.some((m) => m.id === prefs.defaultModel)) return { engine: 'ollama', model: prefs.defaultModel! }
   if (prefs.defaultEngine === 'llamacpp' && gguf.some((m) => m.path === prefs.defaultModel)) return { engine: 'llamacpp', model: prefs.defaultModel! }
+  if (prefs.defaultEngine === 'lmstudio' && prefs.defaultModel) return { engine: 'lmstudio', model: prefs.defaultModel }
+  // Mac Apple Silicon : un modèle MLX de LM Studio est le plus rapide des modèles locaux.
+  const lms = await listLmStudioModels().catch(() => [])
+  const mlx = lms.find((m) => m.format === 'mlx')
+  if (mlx) return { engine: 'lmstudio', model: mlx.id }
   if (ollama.length) return { engine: 'ollama', model: ollama[0].id }
   if (gguf.length) return { engine: 'llamacpp', model: gguf[0].path }
   return null

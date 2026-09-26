@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   AppPreferences,
+  LmStudioModel,
   RunningProcess,
   ApprovalDecision,
   ToolApproval,
@@ -84,6 +85,26 @@ const api: Api = {
       }
     },
     cancel: (repo: string, file: string): Promise<void> => ipcRenderer.invoke('hf:download:cancel', repo, file)
+  },
+  lmstudio: {
+    models: (): Promise<LmStudioModel[]> => ipcRenderer.invoke('lmstudio:models')
+  },
+  mlx: {
+    search: (query: string): Promise<HfModel[]> => ipcRenderer.invoke('mlx:search', query),
+    size: (repo: string): Promise<number> => ipcRenderer.invoke('mlx:size', repo),
+    download: async (repo: string, onProgress: (p: HfDownloadProgress) => void): Promise<void> => {
+      const key = `mlx:${repo}`
+      const handler = (_: unknown, p: HfDownloadProgress): void => {
+        if (p.key === key) onProgress(p)
+      }
+      ipcRenderer.on('hf:download:progress', handler)
+      try {
+        await ipcRenderer.invoke('mlx:download', repo)
+      } finally {
+        ipcRenderer.removeListener('hf:download:progress', handler)
+      }
+    },
+    cancel: (repo: string): Promise<void> => ipcRenderer.invoke('mlx:cancel', repo)
   },
   mistral: {
     status: (): Promise<MistralStatus> => ipcRenderer.invoke('mistral:status'),

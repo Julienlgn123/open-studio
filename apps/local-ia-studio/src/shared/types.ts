@@ -1,10 +1,26 @@
-/** `mistral` = API Mistral (cloud), utilisable dès qu'une clé est enregistrée. */
-export type EngineKind = 'ollama' | 'llamacpp' | 'mistral'
+/**
+ * `mistral` = API Mistral (cloud), utilisable dès qu'une clé est enregistrée.
+ * `lmstudio` = serveur local de LM Studio (modèles MLX sur Mac Apple Silicon, ou GGUF).
+ */
+export type EngineKind = 'ollama' | 'llamacpp' | 'mistral' | 'lmstudio'
 
 export const ENGINE_LABELS: Record<EngineKind, string> = {
   ollama: 'Ollama',
   llamacpp: 'Embarqué',
-  mistral: 'Mistral · cloud'
+  mistral: 'Mistral · cloud',
+  lmstudio: 'LM Studio'
+}
+
+/** Modèle téléchargé dans LM Studio. */
+export interface LmStudioModel {
+  id: string
+  name: string
+  /** `mlx` (Apple Silicon) ou `gguf`. */
+  format: string | null
+  vision: boolean
+  loaded: boolean
+  maxContext: number | null
+  quant: string | null
 }
 
 export interface ModelInfo {
@@ -225,6 +241,7 @@ export type ExportFormat = 'markdown' | 'json'
 export interface EngineStatus {
   ollama: { available: boolean; version: string | null; error: string | null }
   llamacpp: { available: boolean }
+  lmstudio: { available: boolean }
 }
 
 export interface PullProgress {

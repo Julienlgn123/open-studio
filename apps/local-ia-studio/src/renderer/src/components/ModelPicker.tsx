@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Boxes, Check, ChevronDown, Cloud, Cpu, Server } from 'lucide-react'
+import { Apple, Boxes, Check, ChevronDown, Cloud, Cpu, Server } from 'lucide-react'
 import { useChatStore } from '../store/chatStore'
 import type { EngineKind } from '@shared/types'
 
@@ -27,6 +27,7 @@ export default function ModelPicker({
   const llamaModels = useChatStore((s) => s.llamaModels)
   const mistral = useChatStore((s) => s.mistral)
   const mistralModels = useChatStore((s) => s.mistralModels)
+  const lmstudioModels = useChatStore((s) => s.lmstudioModels)
   const setModelManagerOpen = useChatStore((s) => s.setModelManagerOpen)
 
   useEffect(() => {
@@ -41,6 +42,8 @@ export default function ModelPicker({
     ? 'Choisir un modèle'
     : engine === 'mistral'
       ? model
+      : engine === 'lmstudio'
+        ? (lmstudioModels.find((m) => m.id === model)?.name ?? model)
       : engine === 'ollama'
       ? (ollamaModels.find((m) => m.id === model)?.name ?? model)
       : shortName(llamaModels.find((m) => m.path === model)?.name ?? model.split(/[\\/]/).pop() ?? model)
@@ -81,7 +84,8 @@ export default function ModelPicker({
             : 'flex items-center gap-1.5 rounded-lg border border-base-700 bg-base-900 px-2.5 py-1.5 text-sm text-base-200 hover:bg-base-800'
         }
       >
-        {variant === 'default' && (engine === 'llamacpp' ? <Cpu size={13} /> : engine === 'mistral' ? <Cloud size={13} /> : <Server size={13} />)}
+        {variant === 'default' &&
+          (engine === 'llamacpp' ? <Cpu size={13} /> : engine === 'mistral' ? <Cloud size={13} /> : engine === 'lmstudio' ? <Apple size={13} /> : <Server size={13} />)}
         {variant === 'ghost' && engine === 'mistral' && <Cloud size={13} className="text-accent-400" />}
         <span className={`truncate ${variant === 'ghost' ? 'max-w-[180px] font-medium' : 'max-w-[220px]'}`}>{currentLabel}</span>
         <ChevronDown size={13} className="shrink-0 text-base-500" />
@@ -94,6 +98,23 @@ export default function ModelPicker({
           } ${variant === 'ghost' ? 'right-0' : 'left-0'}`}
         >
           <div className="max-h-80 overflow-y-auto p-1">
+            {lmstudioModels.length > 0 && (
+              <>
+                <div className="flex items-center gap-1.5 px-2.5 pb-1 pt-1.5 text-[11px] font-medium text-base-500">
+                  <Apple size={11} /> LM Studio
+                </div>
+                {lmstudioModels.map((m) => (
+                  <Item
+                    key={m.id}
+                    selected={engine === 'lmstudio' && model === m.id}
+                    label={m.name}
+                    meta={[m.format?.toUpperCase(), m.vision ? 'images' : null].filter(Boolean).join(' · ') || null}
+                    onPick={() => onChange('lmstudio', m.id)}
+                  />
+                ))}
+                <div className="mt-1 border-t border-base-800" />
+              </>
+            )}
             <div className="flex items-center gap-1.5 px-2.5 pb-1 pt-1.5 text-[11px] font-medium text-base-500">
               <Server size={11} /> Ollama {ollamaModels.length === 0 && '· aucun modèle'}
             </div>

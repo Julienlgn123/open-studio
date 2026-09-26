@@ -5,6 +5,7 @@ import type { InstallProgress, PullProgress } from '@shared/types'
 import HuggingFacePanel, { HfDownloads } from './HuggingFacePanel'
 import { formatBytes } from '../lib/format'
 import MachinePanel from './MachinePanel'
+import LmStudioSection from './LmStudioSection'
 
 
 const SUGGESTED = ['llama3.2:3b', 'qwen2.5:7b', 'phi4:14b', 'mistral:7b', 'gemma2:9b', 'deepseek-r1:8b']
@@ -134,6 +135,7 @@ export default function ModelManagerModal(): JSX.Element | null {
                 refreshEngines()
                 refreshOllamaModels()
                 refreshLlamaModels()
+                useChatStore.getState().refreshLmStudioModels()
               }}
               className="text-base-400 hover:text-base-100"
               title="Rafraîchir"
@@ -148,6 +150,9 @@ export default function ModelManagerModal(): JSX.Element | null {
 
         <div className="flex-1 space-y-6 overflow-y-auto px-6 pb-6">
           <MachinePanel onDownload={(name) => (engineStatus?.ollama.available ? startPull(name) : setPullName(name))} />
+
+          {/* Sur Mac, MLX (via LM Studio) passe en premier : c'est le plus rapide sur Apple Silicon. */}
+          {/Mac/i.test(navigator.platform) && <LmStudioSection />}
 
           {/* Ollama section */}
           <section className="space-y-3">
@@ -335,6 +340,8 @@ export default function ModelManagerModal(): JSX.Element | null {
               ))}
             </div>
           </section>
+
+          {!/Mac/i.test(navigator.platform) && <LmStudioSection />}
 
           {/* Local GGUF section */}
           <section className="space-y-3">

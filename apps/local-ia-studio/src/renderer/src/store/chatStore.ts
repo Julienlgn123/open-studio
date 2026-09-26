@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type {
+  LmStudioModel,
   AppPreferences,
   ApprovalDecision,
   ToolApproval,
@@ -35,6 +36,9 @@ interface ChatState {
   errors: Record<string, string | null>
   engineStatus: EngineStatus | null
   ollamaModels: ModelInfo[]
+  /** Modèles de LM Studio (MLX sur Mac Apple Silicon, ou GGUF). */
+  lmstudioModels: LmStudioModel[]
+  refreshLmStudioModels: () => Promise<void>
   llamaModels: LlamaModelEntry[]
   /** Téléchargements Hugging Face en cours ou terminés en erreur, par `repo/fichier`. */
   hfDownloads: Record<string, HfDownloadProgress>
@@ -209,6 +213,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     errors: {},
     engineStatus: null,
     ollamaModels: [],
+    lmstudioModels: [],
     llamaModels: [],
     hfDownloads: {},
     mistral: null,
@@ -234,6 +239,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       get().refreshOllamaModels()
       get().refreshMistral()
       get().refreshLlamaModels()
+      get().refreshLmStudioModels()
     },
 
     refreshEngines: async () => {
@@ -247,6 +253,14 @@ export const useChatStore = create<ChatState>((set, get) => {
         set({ ollamaModels })
       } catch {
         set({ ollamaModels: [] })
+      }
+    },
+
+    refreshLmStudioModels: async () => {
+      try {
+        set({ lmstudioModels: await window.api.lmstudio.models() })
+      } catch {
+        set({ lmstudioModels: [] })
       }
     },
 
@@ -289,10 +303,12 @@ export const useChatStore = create<ChatState>((set, get) => {
     setDraftModel: (engine, model) => set({ draft: { engine, model } }),
 
     draftModel: () => {
-      const { draft, preferences, ollamaModels, llamaModels, mistral, mistralModels } = get()
+      const { draft, preferences, ollamaModels, llamaModels, mistral, mistralModels, lmstudioModels } = get()
       const exists = (engine: EngineKind, model: string): boolean =>
         engine === 'ollama'
           ? ollamaModels.some((m) => m.id === model)
+          : engine === 'lmstudio'
+            ? lmstudioModels.some((m) => m.id === model)
           : engine === 'llamacpp'
             ? llamaModels.some((m) => m.path === model)
             : !!mistral?.configured && (mistralModels.length === 0 || mistralModels.some((m) => m.id === model))
@@ -300,7 +316,11 @@ export const useChatStore = create<ChatState>((set, get) => {
       if (preferences.defaultEngine && preferences.defaultModel && exists(preferences.defaultEngine, preferences.defaultModel)) {
         return { engine: preferences.defaultEngine, model: preferences.defaultModel }
       }
+      // Sur Mac, un modèle MLX (LM Studio) est le plus rapide : il passe en premier.
+      const mlx = lmstudioModels.find((m) => m.format === 'mlx')
+      if (mlx) return { engine: 'lmstudio', model: mlx.id }
       if (ollamaModels.length) return { engine: 'ollama', model: ollamaModels[0].id }
+      if (lmstudioModels.length) return { engine: 'lmstudio', model: lmstudioModels[0].id }
       if (llamaModels.length) return { engine: 'llamacpp', model: llamaModels[0].path }
       // Aucun modèle local : Mistral sert d'IA par défaut si une clé est enregistrée.
       if (mistral?.configured) return { engine: 'mistral', model: mistralModels[0]?.id ?? 'mistral-small-latest' }

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowDown, CircleAlert, Cloud, Cpu, Download, RefreshCw, Server, SlidersHorizontal } from 'lucide-react'
+import { Apple, ArrowDown, CircleAlert, Cloud, Cpu, Download, RefreshCw, Server, SlidersHorizontal } from 'lucide-react'
 import { useChatStore } from '../store/chatStore'
 import MessageBubble from './MessageBubble'
 import Composer from './Composer'
@@ -137,7 +137,7 @@ export default function ChatView(): JSX.Element {
         <div className="flex min-w-0 items-center gap-2.5">
           <h2 className="truncate text-[15px] font-semibold text-base-100">{conv.title}</h2>
           <span className="flex shrink-0 items-center gap-1 rounded-full bg-base-800 px-2 py-0.5 text-[11.5px] font-medium text-base-300">
-            {conv.engine === 'ollama' ? <Server size={10} /> : conv.engine === 'mistral' ? <Cloud size={10} /> : <Cpu size={10} />}
+            {conv.engine === 'ollama' ? <Server size={10} /> : conv.engine === 'mistral' ? <Cloud size={10} /> : conv.engine === 'lmstudio' ? <Apple size={10} /> : <Cpu size={10} />}
             {ENGINE_LABELS[conv.engine]}
           </span>
         </div>

@@ -4,6 +4,7 @@ import { contentWithTextAttachments, imagesOf } from '@shared/attachments'
 import { readableOllamaError, streamOllamaChat } from './providers/ollama'
 import { headers, mistralError, MISTRAL_BASE_URL, streamMistralChat, toMistralMessages } from './providers/mistral'
 import { streamLlamaCppChat } from './providers/llamacpp'
+import { LMSTUDIO_CHAT_URL, lmStudioError, streamLmStudioChat, toOpenAiMessages } from './providers/lmstudio'
 import { fileAccessSystemPrompt, runTool, toolDefs, toolLabel, type ToolDef } from './tools'
 
 const OLLAMA_URL = 'http://127.0.0.1:11434'
@@ -76,6 +77,7 @@ export async function runAttempt(
     const plain = withSystemNote(messages, NO_FILE_ACCESS_NOTE)
     if (engine === 'ollama') await streamOllamaChat(model, plain, options, cb.onToken, signal)
     else if (engine === 'mistral') await streamMistralChat(requireKey(mistralKey), model, plain, options, cb.onToken, signal)
+    else if (engine === 'lmstudio') await streamLmStudioChat(model, plain, options, cb.onToken, signal)
     else await streamLlamaCppChat(model, plain, options, cb.onToken, signal)
     return { tools, notice: null }
   }
@@ -86,7 +88,14 @@ export async function runAttempt(
     return { tools, notice: null }
   }
   if (engine === 'mistral') {
-    await mistralAgent(requireKey(mistralKey), model, msgs, options, cb, signal, run, defs)
+    const key = requireKey(mistralKey)
+    const ep = { url: `${MISTRAL_BASE_URL}/chat/completions`, headers: headers(key), error: mistralError }
+    await openAiAgent(ep, model, toMistralMessages(msgs), options, cb, signal, run, defs)
+    return { tools, notice: null }
+  }
+  if (engine === 'lmstudio') {
+    const ep = { url: LMSTUDIO_CHAT_URL, headers: { 'Content-Type': 'application/json' }, error: lmStudioError }
+    await openAiAgent(ep, model, toOpenAiMessages(msgs), options, cb, signal, run, defs)
     return { tools, notice: null }
   }
   try {
@@ -204,17 +213,24 @@ async function ollamaAgent(
   cb.onToken('\n\n_(Arrêt : trop d’appels d’outils d’affilée.)_')
 }
 
-async function mistralAgent(
-  apiKey: string,
+interface OpenAiEndpoint {
+  url: string
+  headers: Record<string, string>
+  /** Transforme une réponse HTTP en erreur ; `retryable` = limite de débit, on patiente. */
+  error: (res: Response) => Promise<Error & { retryable?: boolean; retryAfterMs?: number | null }>
+}
+
+/** Boucle d'outils pour les API au format OpenAI (Mistral, LM Studio). */
+async function openAiAgent(
+  ep: OpenAiEndpoint,
   model: string,
-  messages: ModelMessage[],
+  convo: unknown[],
   options: { temperature: number; topP: number; maxTokens: number },
   cb: AttemptCallbacks,
   signal: AbortSignal,
   run: RunTool,
   defs: ToolDef[]
 ): Promise<void> {
-  const convo = toMistralMessages(messages)
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const body = JSON.stringify({
@@ -230,9 +246,14 @@ async function mistralAgent(
     // Une tâche d'agent enchaîne beaucoup de requêtes : sur limite de débit, on patiente et on réessaie.
     let res: Response
     for (let attempt = 0; ; attempt++) {
-      res = await fetch(`${MISTRAL_BASE_URL}/chat/completions`, { method: 'POST', headers: headers(apiKey), body, signal })
+      try {
+        res = await fetch(ep.url, { method: 'POST', headers: ep.headers, body, signal })
+      } catch (err) {
+        if (signal.aborted) throw err
+        throw new Error(ep.url.includes('127.0.0.1') ? 'LM Studio ne répond pas : ouvre-le et démarre le serveur local.' : 'Connexion impossible.')
+      }
       if (res.ok && res.body) break
-      const err = await mistralError(res)
+      const err = await ep.error(res)
       if (!err.retryable || attempt >= 4) throw err
       await abortableSleep(Math.min(err.retryAfterMs ?? 1500 * 2 ** attempt, 15_000), signal)
     }
@@ -284,6 +305,12 @@ async function mistralAgent(
       }
     }
 
+    if (!calls.size) {
+      // Petits modèles locaux : l'appel d'outil arrive parfois en JSON dans le texte.
+      toolCallsInText(content, defs).forEach((c, i) =>
+        calls.set(i, { id: `call_${round}_${i}`, name: c.function.name, arguments: JSON.stringify(c.function.arguments) })
+      )
+    }
     if (!calls.size) return
     if (content) cb.onToken('\n\n')
     const list = [...calls.values()]

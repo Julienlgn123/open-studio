@@ -45,6 +45,7 @@ import { completeJsonLlamaCpp } from './providers/llamacpp'
 import { getHardwareInfo } from './hardware'
 import { recommendModel, type InstalledModel, type JsonCompleter } from './advisor'
 import { runAttempt } from './agent'
+import { checkLmStudio, completeJsonLmStudio, downloadMlxRepo, getLmStudioContextLength, listLmStudioModels, mlxRepoSize, searchMlxModels } from './providers/lmstudio'
 import { listServers, openInBrowser, stopAllServers, stopServer } from './webTools'
 import {
   describeTarget,
@@ -140,15 +141,17 @@ function registerIpc(): void {
 
   // --- Engine status ---
   ipcMain.handle('engines:status', async () => {
-    const ollama = await checkOllama()
-    return { ollama, llamacpp: { available: isLlamaCppAvailable() } }
+    const [ollama, lmstudio] = await Promise.all([checkOllama(), checkLmStudio()])
+    return { ollama, llamacpp: { available: isLlamaCppAvailable() }, lmstudio }
   })
   ipcMain.handle('engines:contextMax', (_, engine: EngineKind, model: string) =>
     engine === 'ollama'
       ? getOllamaContextLength(model)
       : engine === 'llamacpp'
         ? getGgufContextLength(model)
-        : Promise.resolve(null)
+        : engine === 'lmstudio'
+          ? getLmStudioContextLength(model)
+          : Promise.resolve(null)
   )
 
   // --- Mistral (cloud) : la clé reste dans le main process ---
@@ -196,7 +199,14 @@ function registerIpc(): void {
           /* fichier déplacé */
         }
         return { engine: 'llamacpp' as const, id: m.path, name: m.name, sizeGb, params: null }
-      })
+      }),
+      ...(await listLmStudioModels().catch(() => [])).map((m) => ({
+        engine: 'lmstudio' as const,
+        id: m.id,
+        name: `${m.name}${m.format ? ` (${m.format.toUpperCase()})` : ''}`,
+        sizeGb: null,
+        params: m.quant
+      }))
     ]
     return recommendModel(advisorCompleter(key), task, hardware, installed, ollama.available)
   })
@@ -318,6 +328,23 @@ function registerIpc(): void {
   ipcMain.handle('hf:download:cancel', (_, repo: string, file: string) => {
     activeStreams.get(`hf:${repo}/${file}`)?.abort()
   })
+
+  // --- LM Studio (modèles MLX pour Mac Apple Silicon) ---
+  ipcMain.handle('lmstudio:models', () => listLmStudioModels())
+  ipcMain.handle('mlx:search', (_, query: string) => searchMlxModels(query))
+  ipcMain.handle('mlx:size', (_, repo: string) => mlxRepoSize(repo))
+  ipcMain.handle('mlx:download', async (event, repo: string) => {
+    const key = `mlx:${repo}`
+    if (activeStreams.has(key)) return
+    const controller = new AbortController()
+    activeStreams.set(key, controller)
+    try {
+      await downloadMlxRepo(repo, (p) => !event.sender.isDestroyed() && event.sender.send('hf:download:progress', p), controller.signal)
+    } finally {
+      activeStreams.delete(key)
+    }
+  })
+  ipcMain.handle('mlx:cancel', (_, repo: string) => activeStreams.get(`mlx:${repo}`)?.abort())
 
   // --- Preferences ---
   ipcMain.handle('preferences:get', () => getPreferences())
@@ -516,7 +543,11 @@ function advisorCompleter(key: string): JsonCompleter {
     const local = await localFallback()
     if (!local) throw lastError
     const json =
-      local.engine === 'ollama' ? await completeJsonOllama(local.model, system, user) : await completeJsonLlamaCpp(local.model, system, user)
+      local.engine === 'ollama'
+        ? await completeJsonOllama(local.model, system, user)
+        : local.engine === 'lmstudio'
+          ? await completeJsonLmStudio(local.model, system, user)
+          : await completeJsonLlamaCpp(local.model, system, user)
     return { json, by: `${describeTarget(local)} (local, Mistral saturé)` }
   }
 }
