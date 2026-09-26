@@ -26,8 +26,13 @@ jobs:
         run: Set-MpPreference -DisableRealtimeMonitoring $true
         shell: powershell
 
+      # Scoped to this one workspace: a plain `npm install` at the repo root
+      # runs *every* workspace's postinstall, including sibling apps not even
+      # part of this job (e.g. the paused local-ia-studio) — each one an extra
+      # electron-rebuild that only adds more chances to hit the flaky failure
+      # above for no reason.
       - name: Install dependencies
-        run: npm install
+        run: npm install -w apps/${{ matrix.app }}
 
       - name: Build Windows (NSIS + Portable)
         run: npm run dist -w apps/${{ matrix.app }} -- --publish never
@@ -57,8 +62,9 @@ jobs:
         with:
           node-version: 22
 
+      # Scoped to this one workspace — see the Windows job for why.
       - name: Install dependencies
-        run: npm install
+        run: npm install -w apps/${{ matrix.app }}
 
       - name: Build macOS (DMG x64 + arm64)
         run: npm run dist:mac -w apps/${{ matrix.app }} -- --publish never
@@ -97,8 +103,9 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y rpm fakeroot dpkg
 
+      # Scoped to this one workspace — see the Windows job for why.
       - name: Install dependencies
-        run: npm install
+        run: npm install -w apps/${{ matrix.app }}
 
       - name: Build Linux (AppImage + deb)
         run: npm run dist:linux -w apps/${{ matrix.app }} -- --publish never
