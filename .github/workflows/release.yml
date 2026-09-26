@@ -172,6 +172,23 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
+      # Un seul zip à télécharger, avec un dossier par OS — pas besoin de
+      # comprendre lequel des dix fichiers de la release est le bon.
+      - name: Bundle a single per-OS zip
+        run: |
+          mkdir -p bundle/Windows bundle/macOS bundle/Linux
+          cp dist-artifacts/Open-Studio-Setup-*.exe bundle/Windows/
+          cp dist-artifacts/Open-Studio-*.dmg bundle/macOS/
+          cp dist-artifacts/Open-Studio-*.AppImage dist-artifacts/Open-Studio-*.deb bundle/Linux/
+          cat > bundle/Lire-moi.txt <<'EOF'
+          Ouvre le dossier de ton système, puis lance l'installateur dedans.
+
+          Windows -> Open-Studio-Setup-*.exe
+          macOS   -> le .dmg "arm64" (Apple Silicon M1/M2/M3/M4) ou "x64" (Intel)
+          Linux   -> le .deb (Debian/Ubuntu/Mint) ou le .AppImage (les autres distros)
+          EOF
+          (cd bundle && zip -r "../dist-artifacts/Open-Studio-Installateur.zip" Windows macOS Linux Lire-moi.txt)
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -183,17 +200,10 @@ jobs:
             chaque app de la suite depuis son catalogue, et gère leurs mises à jour —
             aucune des apps gérées ne se télécharge séparément.
 
-            ### 🪟 Windows — installer Open Studio
-            | Fichier | Description |
-            |---|---|
-            | `Open-Studio-Setup-*.exe` | Installateur (recommandé) |
-            | `Open-Studio-Portable-*.exe` | Portable — clé USB, aucune installation |
+            ### 📦 Télécharge `Open-Studio-Installateur.zip` ci-dessous
 
-            ### 🍎 macOS — installer Open Studio
-            | Fichier | Description |
-            |---|---|
-            | `Open-Studio-*-x64.dmg` | Mac Intel (2020 et avant) |
-            | `Open-Studio-*-arm64.dmg` | Mac Apple Silicon M1/M2/M3/M4 |
+            Dézippe-le, ouvre le dossier de ton système (**Windows**, **macOS** ou
+            **Linux**) et lance l'installateur dedans.
 
             > ⚠️ Première ouverture sur macOS : pas de certificat Apple Developer payant,
             > donc l'app n'est signée qu'en *ad-hoc* → macOS affiche **« Open Studio est
@@ -202,19 +212,13 @@ jobs:
             > ```
             > xattr -cr "/Applications/Open Studio.app"
             > ```
-            > puis ouvre l'app normalement. (Ou double-clique `Fix-macOS-Signature.command`
-            > fourni avec le `.dmg`.)
-
-            ### 🐧 Linux — installer Open Studio
-            | Fichier | Description |
-            |---|---|
-            | `Open-Studio-*.AppImage` | Universel — toutes les distros |
-            | `Open-Studio-*.deb` | Debian / Ubuntu / Mint |
+            > puis ouvre l'app normalement.
 
             ---
-            Les fichiers `Cours-Studio-*` et `Drive-Studio-*` de cette release sont ceux
-            qu'Open Studio télécharge lui-même depuis son catalogue — pas besoin de les
-            récupérer ici.
+            Tous les autres fichiers ci-dessous (par app/par OS) sont ceux qu'Open
+            Studio et son mécanisme de mise à jour utilisent automatiquement en
+            arrière-plan — pas besoin d'en télécharger un directement, sers-toi
+            seulement du zip au-dessus.
 
             🔄 Mises à jour automatiques au démarrage (Open Studio uniquement).
           files: dist-artifacts/**/*
@@ -224,17 +228,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # GitHub liste tous les fichiers d'une release, sans distinction — on ne
-      # peut pas cacher les installateurs des apps gérées, juste rendre très
-      # clair qu'il ne faut pas les télécharger directement ici (label affiché
-      # à la place du nom de fichier dans l'UI GitHub).
-      - name: Label managed-app assets as internal
+      # peut pas les cacher, juste rendre très clair que le zip ci-dessus est
+      # le seul à télécharger (label affiché à la place du nom de fichier).
+      - name: Label individual installers as internal-use-only
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="v${{ steps.version.outputs.VERSION }}"
           gh api "repos/${{ github.repository }}/releases/tags/$TAG" --jq \
-            '.assets[] | select(((.name | startswith("Open-Studio")) or (.name | endswith(".yml"))) | not) | .id' |
+            '.assets[] | select(((.name == "Open-Studio-Installateur.zip") or (.name | endswith(".yml"))) | not) | .id' |
           while read -r id; do
             gh api -X PATCH "repos/${{ github.repository }}/releases/assets/$id" \
-              -f label="Géré par Open Studio — ne pas télécharger ici"
+              -f label="Utilisé automatiquement — télécharge plutôt Open-Studio-Installateur.zip"
           done
