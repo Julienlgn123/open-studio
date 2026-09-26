@@ -90,6 +90,20 @@ export async function installOrUpdateApp(id: string): Promise<AppState> {
   }
 
   const dir = managedDir(id)
+  const execTargetDir = join(dir, 'install')
+
+  // Mettre à jour par-dessus l'existant a déjà causé des installs bancales
+  // (fichiers d'une ancienne version qui traînent à côté des nouveaux,
+  // verrous restants...) — on désinstalle proprement d'abord, comme pour un
+  // vrai premier install ensuite.
+  const existingExecPath = await resolveExecPath(id)
+  if (existingExecPath) {
+    emitProgress(id, 'uninstalling', 0)
+    await platformInstaller.uninstall(entry, existingExecPath)
+    clearTrackedApp(id)
+  }
+  rmSync(execTargetDir, { recursive: true, force: true })
+
   mkdirSync(dir, { recursive: true })
   const downloadPath = join(dir, asset.name)
 
@@ -99,7 +113,6 @@ export async function installOrUpdateApp(id: string): Promise<AppState> {
   )
 
   emitProgress(id, 'installing', 0)
-  const execTargetDir = join(dir, 'install')
   mkdirSync(execTargetDir, { recursive: true })
   const execPath = await platformInstaller.install(entry, downloadPath, execTargetDir)
   emitProgress(id, 'installing', 1)

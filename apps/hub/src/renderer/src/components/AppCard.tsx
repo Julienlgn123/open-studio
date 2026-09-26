@@ -129,9 +129,11 @@ export default function AppCard({
         <div className="col" style={{ gap: 4 }}>
           <ProgressBar ratio={progress.phase === 'downloading' ? progress.pct : 1} height={4} />
           <span className="muted" style={{ fontSize: 11 }}>
-            {progress.phase === 'downloading'
-              ? `Téléchargement… ${Math.round(progress.pct * 100)}%`
-              : 'Installation…'}
+            {progress.phase === 'uninstalling'
+              ? "Suppression de l'ancienne version…"
+              : progress.phase === 'downloading'
+                ? `Téléchargement… ${Math.round(progress.pct * 100)}%`
+                : 'Installation…'}
           </span>
         </div>
       )}

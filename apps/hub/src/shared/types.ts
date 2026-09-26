@@ -49,7 +49,7 @@ export interface AppState extends CatalogEntry {
 
 export interface InstallProgress {
   id: string
-  phase: 'downloading' | 'installing'
+  phase: 'uninstalling' | 'downloading' | 'installing'
   pct: number
 }
 
