@@ -172,22 +172,45 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      # Un seul zip à télécharger, avec un dossier par OS — pas besoin de
-      # comprendre lequel des dix fichiers de la release est le bon.
-      - name: Bundle a single per-OS zip
+      # Un zip par OS avec les installateurs de toute la suite dedans — la
+      # personne ne télécharge que celui de son système, pas les deux autres.
+      - name: Bundle one zip per OS
         run: |
-          mkdir -p bundle/Windows bundle/macOS bundle/Linux
-          cp dist-artifacts/Open-Studio-Setup-*.exe bundle/Windows/
-          cp dist-artifacts/Open-Studio-*.dmg bundle/macOS/
-          cp dist-artifacts/Open-Studio-*.AppImage dist-artifacts/Open-Studio-*.deb bundle/Linux/
-          cat > bundle/Lire-moi.txt <<'EOF'
-          Ouvre le dossier de ton système, puis lance l'installateur dedans.
+          mkdir -p bundle/windows bundle/mac bundle/linux
 
-          Windows -> Open-Studio-Setup-*.exe
-          macOS   -> le .dmg "arm64" (Apple Silicon M1/M2/M3/M4) ou "x64" (Intel)
-          Linux   -> le .deb (Debian/Ubuntu/Mint) ou le .AppImage (les autres distros)
+          cp dist-artifacts/Open-Studio-Setup-*.exe bundle/windows/
+          cp dist-artifacts/Cours-Studio-Setup-*.exe bundle/windows/
+          cp dist-artifacts/Drive-Studio-Setup-*.exe bundle/windows/
+          cat > bundle/windows/Lire-moi.txt <<'EOF'
+          Lance l'installateur de l'app que tu veux :
+          - Open-Studio-Setup-*.exe (recommandé, installe/lance/met à jour les autres)
+          - Cours-Studio-Setup-*.exe
+          - Drive-Studio-Setup-*.exe
           EOF
-          (cd bundle && zip -r "../dist-artifacts/Open-Studio-Installateur.zip" Windows macOS Linux Lire-moi.txt)
+          (cd bundle/windows && zip -r "../../dist-artifacts/Open-Studio-Windows.zip" .)
+
+          cp dist-artifacts/Open-Studio-*.dmg bundle/mac/
+          cp dist-artifacts/Cours-Studio-*.dmg bundle/mac/
+          cp dist-artifacts/Drive-Studio-*.dmg bundle/mac/
+          cat > bundle/mac/Lire-moi.txt <<'EOF'
+          Choisis le .dmg "arm64" (Apple Silicon M1/M2/M3/M4) ou "x64" (Intel)
+          de l'app que tu veux installer. Open-Studio-*.dmg est recommandé :
+          il installe/lance/met à jour les autres apps depuis son catalogue.
+
+          Première ouverture : macOS affiche "app endommagée" (pas de certificat
+          Apple Developer payant) -> Terminal -> xattr -cr "/Applications/NomDeLApp.app"
+          EOF
+          (cd bundle/mac && zip -r "../../dist-artifacts/Open-Studio-macOS.zip" .)
+
+          cp dist-artifacts/Open-Studio-*.AppImage dist-artifacts/Open-Studio-*.deb bundle/linux/
+          cp dist-artifacts/Cours-Studio-*.deb bundle/linux/
+          cp dist-artifacts/Drive-Studio-*.deb bundle/linux/
+          cat > bundle/linux/Lire-moi.txt <<'EOF'
+          Lance le .deb (Debian/Ubuntu/Mint) ou l'AppImage de l'app que tu veux.
+          Open-Studio.* est recommandé : il installe/lance/met à jour les autres
+          apps depuis son catalogue.
+          EOF
+          (cd bundle/linux && zip -r "../../dist-artifacts/Open-Studio-Linux.zip" .)
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -200,10 +223,18 @@ jobs:
             chaque app de la suite depuis son catalogue, et gère leurs mises à jour —
             aucune des apps gérées ne se télécharge séparément.
 
-            ### 📦 Télécharge `Open-Studio-Installateur.zip` ci-dessous
+            ### 📦 Télécharge le zip de ton système
 
-            Dézippe-le, ouvre le dossier de ton système (**Windows**, **macOS** ou
-            **Linux**) et lance l'installateur dedans.
+            | Système | Fichier |
+            |---|---|
+            | 🪟 Windows | `Open-Studio-Windows.zip` |
+            | 🍎 macOS | `Open-Studio-macOS.zip` |
+            | 🐧 Linux | `Open-Studio-Linux.zip` |
+
+            Dézippe-le et lance l'installateur `Open-Studio-*` dedans (les
+            installateurs de Cours Studio/Drive Studio sont là aussi si tu veux
+            les installer directement, mais Open Studio les propose déjà depuis
+            son catalogue).
 
             > ⚠️ Première ouverture sur macOS : pas de certificat Apple Developer payant,
             > donc l'app n'est signée qu'en *ad-hoc* → macOS affiche **« Open Studio est
@@ -215,10 +246,9 @@ jobs:
             > puis ouvre l'app normalement.
 
             ---
-            Tous les autres fichiers ci-dessous (par app/par OS) sont ceux qu'Open
-            Studio et son mécanisme de mise à jour utilisent automatiquement en
-            arrière-plan — pas besoin d'en télécharger un directement, sers-toi
-            seulement du zip au-dessus.
+            Tous les autres fichiers ci-dessous sont ceux qu'Open Studio et son
+            mécanisme de mise à jour utilisent automatiquement en arrière-plan —
+            pas besoin d'en télécharger un directement, sers-toi des 3 zips au-dessus.
 
             🔄 Mises à jour automatiques au démarrage (Open Studio uniquement).
           files: dist-artifacts/**/*
@@ -236,8 +266,8 @@ jobs:
         run: |
           TAG="v${{ steps.version.outputs.VERSION }}"
           gh api "repos/${{ github.repository }}/releases/tags/$TAG" --jq \
-            '.assets[] | select(((.name == "Open-Studio-Installateur.zip") or (.name | endswith(".yml"))) | not) | .id' |
+            '.assets[] as $a | select(((["Open-Studio-Windows.zip","Open-Studio-macOS.zip","Open-Studio-Linux.zip"] | index($a.name)) or ($a.name | endswith(".yml"))) | not) | $a.id' |
           while read -r id; do
             gh api -X PATCH "repos/${{ github.repository }}/releases/assets/$id" \
-              -f label="Utilisé automatiquement — télécharge plutôt Open-Studio-Installateur.zip"
+              -f label="Utilisé automatiquement — télécharge plutôt le zip de ton OS"
           done
