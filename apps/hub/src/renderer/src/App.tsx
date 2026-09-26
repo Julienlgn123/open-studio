@@ -68,9 +68,21 @@ export default function App(): JSX.Element {
       setProgress((prev) => ({ ...prev, [p.id]: p }))
     })
     const offUpdate = window.api.app.onUpdateReady((p) => setSelfUpdate(p))
+    // Mise à jour automatique d'une app gérée (faite en arrière-plan par Open Studio).
+    const offAuto = window.api.apps.onAutoUpdated((p) => {
+      setProgress((prev) => {
+        const next = { ...prev }
+        delete next[p.id]
+        return next
+      })
+      if (p.error) useStore.getState().toast(`Mise à jour de ${p.name} impossible : ${p.error}`, 'error')
+      else useStore.getState().toast(`${p.name} mis à jour${p.version ? ` (v${p.version})` : ''} ✓`, 'success')
+      void loadApps()
+    })
     return () => {
       offProgress()
       offUpdate()
+      offAuto()
     }
   }, [])
 

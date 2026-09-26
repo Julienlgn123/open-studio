@@ -26,7 +26,9 @@ const api = {
     launch: (id: string): Promise<void> => ipcRenderer.invoke('apps:launch', id),
     uninstall: (id: string): Promise<void> => ipcRenderer.invoke('apps:uninstall', id),
     getInstalledSize: (id: string): Promise<number | null> => ipcRenderer.invoke('apps:size', id),
-    onProgress: (cb: (p: InstallProgress) => void) => on<InstallProgress>('apps:progress', cb)
+    onProgress: (cb: (p: InstallProgress) => void) => on<InstallProgress>('apps:progress', cb),
+    onAutoUpdated: (cb: (p: { id: string; name: string; version: string | null; error?: string }) => void) =>
+      on<{ id: string; name: string; version: string | null; error?: string }>('apps:autoUpdated', cb)
   },
   shell: {
     openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:openExternal', url)

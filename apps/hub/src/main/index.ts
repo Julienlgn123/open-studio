@@ -2,6 +2,8 @@ import { app, BrowserWindow, shell, ipcMain, session } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
+import { isInstalling } from './install'
+import { startManagedAppsAutoUpdate, UPDATE_INTERVAL_MS } from './autoUpdate'
 import { registerIpc } from './ipc'
 import { broadcast } from './events'
 
@@ -93,9 +95,14 @@ app.whenReady().then(() => {
     autoUpdater.on('update-downloaded', (info) => {
       // Entièrement automatique : on prévient juste la personne, puis on
       // redémarre tout seul quelques secondes après (le temps que le message
-      // s'affiche) — pas de bouton à cliquer pour rester à jour.
+      // s'affiche) — pas de bouton à cliquer pour rester à jour. Si une app
+      // gérée est en train de s'installer, on attend qu'elle ait fini.
       broadcast('app:updateReady', { version: info.version })
-      setTimeout(() => autoUpdater.quitAndInstall(false, true), 5000)
+      const restartWhenIdle = (): void => {
+        if (isInstalling()) setTimeout(restartWhenIdle, 5000)
+        else autoUpdater.quitAndInstall(false, true)
+      }
+      setTimeout(restartWhenIdle, 5000)
     })
     autoUpdater.on('error', (err) => {
       // Une vérif qui échoue (pas de réseau, GitHub indisponible...) ne doit
@@ -111,6 +118,13 @@ app.whenReady().then(() => {
     }
     ipcMain.on('renderer:ready', runCheck)
     setTimeout(runCheck, 8000)
+    // Open Studio reste souvent ouvert longtemps : on revérifie régulièrement,
+    // pas seulement au démarrage.
+    setInterval(() => autoUpdater.checkForUpdates().catch(() => null), UPDATE_INTERVAL_MS)
+
+    // Les apps gérées (Cours Studio, Drive Studio, Local IA Studio…) se mettent
+    // aussi à jour toutes seules, dès qu'elles ne sont pas ouvertes.
+    startManagedAppsAutoUpdate()
   }
 })
 

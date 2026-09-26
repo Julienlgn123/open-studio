@@ -76,7 +76,38 @@ function emitProgress(id: string, phase: InstallProgress['phase'], pct: number):
   broadcast('apps:progress', { id, phase, pct } as InstallProgress)
 }
 
-export async function installOrUpdateApp(id: string): Promise<AppState> {
+// Apps en cours d'installation / mise à jour : empêche deux opérations simultanées sur la même
+// app (clic manuel pendant une mise à jour automatique) et retarde le redémarrage d'Open Studio.
+const busyApps = new Set<string>()
+
+export function isInstalling(): boolean {
+  return busyApps.size > 0
+}
+
+/** Télécharge le zip de la suite pour cet OS une seule fois, pour mettre à jour plusieurs apps d'un coup. */
+export async function downloadSuiteZip(): Promise<string> {
+  const rel = await fetchLatestRelease(SUITE_OWNER, SUITE_REPO)
+  const name = osZipAssetName()
+  const asset = rel.assets.find((a) => a.name === name)
+  if (!asset) throw new Error(`Le zip ${name} est introuvable dans la dernière release.`)
+  const dir = join(app.getPath('userData'), 'apps')
+  mkdirSync(dir, { recursive: true })
+  const zipPath = join(dir, `suite-${rel.tag_name}-${name}`)
+  await downloadTo(asset.browser_download_url, zipPath, () => {})
+  return zipPath
+}
+
+export async function installOrUpdateApp(id: string, opts: { sharedZipPath?: string } = {}): Promise<AppState> {
+  if (busyApps.has(id)) throw new Error('Une installation de cette app est déjà en cours.')
+  busyApps.add(id)
+  try {
+    return await doInstallOrUpdate(id, opts)
+  } finally {
+    busyApps.delete(id)
+  }
+}
+
+async function doInstallOrUpdate(id: string, opts: { sharedZipPath?: string }): Promise<AppState> {
   const entry = CATALOG.find((c) => c.id === id)
   if (!entry) throw new Error('App inconnue : ' + id)
 
@@ -123,19 +154,23 @@ export async function installOrUpdateApp(id: string): Promise<AppState> {
     // par OS, qui contient déjà tout. Coûte un téléchargement plus gros
     // (tout l'OS au lieu du seul fichier voulu), en échange d'une page de
     // release qui ne liste plus un installateur par app gérée.
-    const zipAssetName = osZipAssetName()
-    const zipAsset = rel.assets.find((a) => a.name === zipAssetName)
-    if (!zipAsset) {
-      throw new Error(`Le zip ${zipAssetName} est introuvable dans la dernière release.`)
+    let zipPath = opts.sharedZipPath
+    if (!zipPath) {
+      const zipAssetName = osZipAssetName()
+      const zipAsset = rel.assets.find((a) => a.name === zipAssetName)
+      if (!zipAsset) {
+        throw new Error(`Le zip ${zipAssetName} est introuvable dans la dernière release.`)
+      }
+      zipPath = join(dir, zipAssetName)
+      emitProgress(id, 'downloading', 0)
+      await downloadTo(zipAsset.browser_download_url, zipPath, (ratio) =>
+        emitProgress(id, 'downloading', ratio)
+      )
     }
-    const zipPath = join(dir, zipAssetName)
-    emitProgress(id, 'downloading', 0)
-    await downloadTo(zipAsset.browser_download_url, zipPath, (ratio) =>
-      emitProgress(id, 'downloading', ratio)
-    )
     downloadPath = join(dir, `${entry.assetPrefix ?? entry.id}-installer${process.platform === 'win32' ? '.exe' : process.platform === 'darwin' ? '.dmg' : '.deb'}`)
     extractInstaller(zipPath, entry.assetPrefix ?? '', downloadPath)
-    rmSync(zipPath, { force: true })
+    // Un zip partagé (mise à jour groupée) est supprimé par l'appelant, une fois toutes les apps faites.
+    if (!opts.sharedZipPath) rmSync(zipPath, { force: true })
   }
 
   emitProgress(id, 'installing', 0)
