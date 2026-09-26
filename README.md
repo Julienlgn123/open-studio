@@ -8,18 +8,19 @@ de traquer des installateurs éparpillés sur dix repos.
 
 ## Installation
 
-1. Télécharge la dernière release : [Releases](https://github.com/Julienlgn123/open-studio/releases/latest)
-   (`Setup.exe` sur Windows, `.dmg` sur macOS, `.AppImage`/`.deb` sur Linux).
-2. Installe-la et lance-la.
+1. Télécharge `Open-Studio-Installateur.zip` depuis la [dernière release](https://github.com/Julienlgn123/open-studio/releases/latest).
+2. Dézippe-le, ouvre le dossier de ton système (**Windows**, **macOS** ou
+   **Linux**) et lance l'installateur dedans.
    - **macOS uniquement** : au premier lancement, macOS peut afficher
      « Open Studio est endommagée et ne peut pas être ouverte » (build sans
-     certificat Apple Developer payant). Double-clique
-     `Fix-macOS-Signature.command` fourni dans le `.dmg`, ou lance :
+     certificat Apple Developer payant). Ouvre Terminal et lance :
      ```bash
      xattr -cr "/Applications/Open Studio.app"
      ```
 3. Depuis le catalogue, choisis les apps qui t'intéressent — Open Studio les
    télécharge, les installe et les lance à ta place.
+
+*(Les autres fichiers listés sur la page de release sont utilisés automatiquement par Open Studio et son mécanisme de mise à jour — pas besoin d'en télécharger un directement.)*
 
 ## Apps de la suite
 
