@@ -1,16 +1,30 @@
-import { useState } from 'react'
-import { X, Download, Trash2, FolderPlus, RefreshCw, CircleCheck, CircleAlert, CircleDashed, Rocket } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { X, Download, Trash2, FolderPlus, RefreshCw, CircleCheck, CircleAlert, CircleDashed, Rocket, Check } from 'lucide-react'
 import { useChatStore } from '../store/chatStore'
 import type { InstallProgress, PullProgress } from '@shared/types'
+import HuggingFacePanel, { HfDownloads } from './HuggingFacePanel'
+import { formatBytes } from '../lib/format'
+import MachinePanel from './MachinePanel'
 
-function formatBytes(n: number | null): string {
-  if (!n) return ''
-  const gb = n / 1024 ** 3
-  if (gb >= 1) return `${gb.toFixed(1)} Go`
-  return `${(n / 1024 ** 2).toFixed(0)} Mo`
-}
 
 const SUGGESTED = ['llama3.2:3b', 'qwen2.5:7b', 'phi4:14b', 'mistral:7b', 'gemma2:9b', 'deepseek-r1:8b']
+
+const isRunning = (phase: InstallProgress['phase']): boolean =>
+  phase === 'downloading' || phase === 'installing' || phase === 'waiting'
+
+function ConfirmInline({ label, onConfirm, onCancel }: { label: string; onConfirm: () => void; onCancel: () => void }): JSX.Element {
+  return (
+    <span className="flex shrink-0 items-center gap-1.5 text-xs">
+      <span className="text-red-300">{label}</span>
+      <button onClick={onConfirm} className="rounded p-0.5 text-red-400 hover:bg-red-500/20" title="Confirmer">
+        <Check size={13} />
+      </button>
+      <button onClick={onCancel} className="text-base-400 hover:text-base-100" title="Annuler">
+        <X size={13} />
+      </button>
+    </span>
+  )
+}
 
 export default function ModelManagerModal(): JSX.Element | null {
   const open = useChatStore((s) => s.modelManagerOpen)
@@ -25,43 +39,95 @@ export default function ModelManagerModal(): JSX.Element | null {
   const [pullName, setPullName] = useState('')
   const [pulls, setPulls] = useState<Record<string, PullProgress>>({})
   const [installProgress, setInstallProgress] = useState<InstallProgress | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  // Fonctions d'annulation renvoyées par le preload, gardées pour les boutons « Annuler ».
+  const stopPull = useRef<Record<string, () => void>>({})
+  const stopInstall = useRef<(() => void) | null>(null)
+  const pendingPull = useChatStore((s) => s.pendingPull)
+
+  // Téléchargement demandé par le conseiller : lancé dès que la fenêtre s'ouvre
+  // (ou pré-rempli si Ollama n'est pas encore installé).
+  useEffect(() => {
+    if (!open || !pendingPull) return
+    const name = useChatStore.getState().consumePendingPull()
+    if (!name) return
+    if (useChatStore.getState().engineStatus?.ollama.available) startPull(name)
+    else setPullName(name)
+  }, [open, pendingPull])
 
   if (!open) return null
 
-  const startPull = (name: string): void => {
-    if (!name.trim()) return
-    const stop = window.api.ollama.pull(name.trim(), (p) => {
-      setPulls((s) => ({ ...s, [name.trim()]: p }))
+  const removePull = (name: string): void => {
+    delete stopPull.current[name]
+    setPulls((s) => {
+      const n = { ...s }
+      delete n[name]
+      return n
+    })
+  }
+
+  const startPull = (raw: string): void => {
+    const name = raw.trim()
+    if (!name || stopPull.current[name]) return
+    setPulls((s) => ({
+      ...s,
+      [name]: { model: name, status: 'démarrage…', completed: null, total: null, done: false, error: null }
+    }))
+    stopPull.current[name] = window.api.ollama.pull(name, (p) => {
+      setPulls((s) => ({ ...s, [name]: p }))
       if (p.done) {
+        delete stopPull.current[name]
         refreshOllamaModels()
-        if (!p.error) setTimeout(() => setPulls((s) => { const n = { ...s }; delete n[name.trim()]; return n }), 1500)
+        if (!p.error) setTimeout(() => removePull(name), 1500)
       }
     })
-    void stop
     setPullName('')
+  }
+
+  const cancelPull = (name: string): void => {
+    stopPull.current[name]?.()
+    removePull(name)
   }
 
   const startInstallOllama = (): void => {
     setInstallProgress({ phase: 'downloading', percent: 0, message: 'Démarrage…' })
-    const stop = window.api.ollama.install((p) => {
+    stopInstall.current = window.api.ollama.install((p) => {
       setInstallProgress(p)
+      if (!isRunning(p.phase)) stopInstall.current = null
       if (p.phase === 'done') {
         refreshEngines()
         refreshOllamaModels()
         setTimeout(() => setInstallProgress(null), 2000)
       }
     })
-    void stop
+  }
+
+  const cancelInstall = (): void => {
+    stopInstall.current?.()
+    stopInstall.current = null
+    setInstallProgress(null)
+  }
+
+  const deleteOllamaModel = async (id: string): Promise<void> => {
+    setConfirmDelete(null)
+    setDeleteError(null)
+    try {
+      await window.api.ollama.delete(id)
+    } catch (err) {
+      setDeleteError(`Impossible de supprimer ${id} : ${err instanceof Error ? err.message : String(err)}`)
+    }
+    refreshOllamaModels()
   }
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/50 p-6" onClick={() => setOpen(false)}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6 backdrop-blur-md" onClick={() => setOpen(false)}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex h-[36rem] w-[42rem] max-w-full flex-col overflow-hidden rounded-xl border border-base-700 bg-base-900 shadow-panel"
+        className="flex h-[36rem] w-[42rem] max-w-full flex-col overflow-hidden rounded-[20px] border border-base-700 bg-base-850 shadow-panel"
       >
-        <div className="flex h-12 shrink-0 items-center justify-between border-b border-base-800 px-4">
-          <h2 className="text-sm font-semibold text-base-100">Gestion des modèles</h2>
+        <div className="flex shrink-0 items-center justify-between px-6 pb-4 pt-6">
+          <h2 className="text-[17px] font-semibold text-base-100">Gestion des modèles</h2>
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
@@ -80,7 +146,9 @@ export default function ModelManagerModal(): JSX.Element | null {
           </div>
         </div>
 
-        <div className="flex-1 space-y-6 overflow-y-auto p-4">
+        <div className="flex-1 space-y-6 overflow-y-auto px-6 pb-6">
+          <MachinePanel onDownload={(name) => (engineStatus?.ollama.available ? startPull(name) : setPullName(name))} />
+
           {/* Ollama section */}
           <section className="space-y-3">
             <div className="flex items-center gap-2">
@@ -103,7 +171,7 @@ export default function ModelManagerModal(): JSX.Element | null {
                 </p>
                 <button
                   onClick={startInstallOllama}
-                  className="flex shrink-0 items-center gap-1.5 rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-600"
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-400"
                 >
                   <Rocket size={13} />
                   Installer Ollama
@@ -113,25 +181,40 @@ export default function ModelManagerModal(): JSX.Element | null {
 
             {installProgress && (
               <div className="rounded-lg border border-base-700 bg-base-850 p-2.5">
-                <div className="flex items-center justify-between text-xs text-base-300">
+                <div className="flex items-center justify-between gap-2 text-xs text-base-300">
                   <span className="flex items-center gap-1.5">
-                    {installProgress.phase === 'error' ? (
-                      <CircleAlert size={12} className="text-red-400" />
+                    {installProgress.phase === 'error' || installProgress.phase === 'cancelled' ? (
+                      <CircleAlert size={12} className="shrink-0 text-red-400" />
                     ) : installProgress.phase === 'done' ? (
-                      <CircleCheck size={12} className="text-emerald-400" />
+                      <CircleCheck size={12} className="shrink-0 text-emerald-400" />
                     ) : (
-                      <CircleDashed size={12} className="animate-spin text-accent-400" />
+                      <CircleDashed size={12} className="shrink-0 animate-spin text-accent-400" />
                     )}
                     {installProgress.message}
                   </span>
-                  {installProgress.percent !== null && <span>{installProgress.percent}%</span>}
+                  <span className="flex shrink-0 items-center gap-2">
+                    {installProgress.percent !== null && isRunning(installProgress.phase) && (
+                      <span>{installProgress.percent}%</span>
+                    )}
+                    {isRunning(installProgress.phase) ? (
+                      <button
+                        onClick={cancelInstall}
+                        className="rounded px-1.5 py-0.5 text-base-400 hover:bg-base-700 hover:text-base-100"
+                      >
+                        Annuler
+                      </button>
+                    ) : (
+                      installProgress.phase !== 'done' && (
+                        <button onClick={() => setInstallProgress(null)} className="text-base-400 hover:text-base-100" title="Fermer">
+                          <X size={12} />
+                        </button>
+                      )
+                    )}
+                  </span>
                 </div>
-                {installProgress.percent !== null && installProgress.phase !== 'error' && (
+                {installProgress.percent !== null && isRunning(installProgress.phase) && (
                   <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-base-700">
-                    <div
-                      className="h-full bg-accent-500 transition-all"
-                      style={{ width: `${installProgress.percent}%` }}
-                    />
+                    <div className="h-full bg-accent-500 transition-all" style={{ width: `${installProgress.percent}%` }} />
                   </div>
                 )}
               </div>
@@ -148,7 +231,7 @@ export default function ModelManagerModal(): JSX.Element | null {
               <button
                 onClick={() => startPull(pullName)}
                 disabled={!pullName.trim()}
-                className="flex items-center gap-1.5 rounded-lg bg-accent-500 px-3 py-1.5 text-sm text-white enabled:hover:bg-accent-600 disabled:opacity-30"
+                className="flex items-center gap-1.5 rounded-lg bg-accent-500 px-3 py-1.5 text-sm text-white enabled:hover:bg-accent-400 disabled:opacity-30"
               >
                 <Download size={14} />
                 Télécharger
@@ -169,17 +252,40 @@ export default function ModelManagerModal(): JSX.Element | null {
 
             {Object.values(pulls).map((p) => (
               <div key={p.model} className="rounded-lg border border-base-700 bg-base-850 p-2.5">
-                <div className="flex items-center justify-between text-xs text-base-300">
-                  <span className="flex items-center gap-1.5">
-                    {p.error ? <CircleAlert size={12} className="text-red-400" /> : <CircleDashed size={12} className="animate-spin text-accent-400" />}
-                    {p.model}
+                <div className="flex items-center justify-between gap-2 text-xs text-base-300">
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    {p.error ? (
+                      <CircleAlert size={12} className="shrink-0 text-red-400" />
+                    ) : p.done ? (
+                      <CircleCheck size={12} className="shrink-0 text-emerald-400" />
+                    ) : (
+                      <CircleDashed size={12} className="shrink-0 animate-spin text-accent-400" />
+                    )}
+                    <span className="truncate">{p.model}</span>
                   </span>
-                  <span>{p.error ? 'Erreur' : p.status}</span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span>
+                      {p.error
+                        ? 'Erreur'
+                        : p.total && !p.done
+                          ? `${p.status} · ${Math.round(((p.completed ?? 0) / p.total) * 100)}%`
+                          : p.status}
+                    </span>
+                    {!(p.done && !p.error) && (
+                      <button
+                        onClick={() => cancelPull(p.model)}
+                        className="rounded px-1.5 py-0.5 text-base-400 hover:bg-base-700 hover:text-base-100"
+                      >
+                        {p.error ? 'Fermer' : 'Annuler'}
+                      </button>
+                    )}
+                  </span>
                 </div>
                 {p.error ? (
                   <p className="mt-1 text-xs text-red-400">{p.error}</p>
                 ) : (
-                  p.total && (
+                  !!p.total &&
+                  !p.done && (
                     <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-base-700">
                       <div
                         className="h-full bg-accent-500 transition-all"
@@ -191,24 +297,40 @@ export default function ModelManagerModal(): JSX.Element | null {
               </div>
             ))}
 
+            {deleteError && (
+              <p className="flex items-start gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 py-2 text-xs text-red-300">
+                <CircleAlert size={12} className="mt-0.5 shrink-0" />
+                <span className="flex-1">{deleteError}</span>
+                <button onClick={() => setDeleteError(null)} className="shrink-0 hover:text-red-100">
+                  <X size={12} />
+                </button>
+              </p>
+            )}
+
             <div className="space-y-1">
               {ollamaModels.map((m) => (
-                <div key={m.id} className="flex items-center justify-between rounded-lg border border-base-800 px-3 py-2">
+                <div key={m.id} className="flex items-center justify-between gap-2 rounded-lg border border-base-800 px-3 py-2">
                   <div className="min-w-0">
                     <p className="truncate text-sm text-base-100">{m.name}</p>
                     <p className="text-xs text-base-500">
                       {[m.paramsLabel, m.quant, formatBytes(m.sizeBytes)].filter(Boolean).join(' · ')}
                     </p>
                   </div>
-                  <button
-                    onClick={async () => {
-                      await window.api.ollama.delete(m.id)
-                      refreshOllamaModels()
-                    }}
-                    className="shrink-0 text-base-500 hover:text-red-400"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  {confirmDelete === m.id ? (
+                    <ConfirmInline
+                      label="Supprimer du disque ?"
+                      onConfirm={() => deleteOllamaModel(m.id)}
+                      onCancel={() => setConfirmDelete(null)}
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDelete(m.id)}
+                      className="shrink-0 text-base-500 hover:text-red-400"
+                      title="Supprimer le modèle"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -230,25 +352,44 @@ export default function ModelManagerModal(): JSX.Element | null {
               </button>
             </div>
             <p className="text-xs text-base-500">
-              Fonctionne sans rien installer : charge un fichier .gguf téléchargé (ex. sur Hugging Face) et discute avec, même
-              hors-ligne.
+              Fonctionne sans rien installer, même hors-ligne : télécharge un modèle depuis Hugging Face ci-dessous, ou ajoute
+              un fichier .gguf déjà présent sur ton disque.
             </p>
+
+            <HuggingFacePanel />
+            <HfDownloads />
+
             <div className="space-y-1">
               {llamaModels.map((m) => (
-                <div key={m.path} className="flex items-center justify-between rounded-lg border border-base-800 px-3 py-2">
+                <div key={m.path} className="flex items-center justify-between gap-2 rounded-lg border border-base-800 px-3 py-2">
                   <div className="min-w-0">
-                    <p className="truncate text-sm text-base-100">{m.name}</p>
+                    <p className="truncate text-sm text-base-100">
+                      {m.name}
+                      {m.downloaded && (
+                        <span className="ml-1.5 rounded bg-base-800 px-1.5 py-0.5 text-[10px] text-base-400">téléchargé</span>
+                      )}
+                    </p>
                     <p className="truncate text-xs text-base-500">{m.path}</p>
                   </div>
-                  <button
-                    onClick={async () => {
-                      await window.api.llamacpp.remove(m.path)
-                      refreshLlamaModels()
-                    }}
-                    className="shrink-0 text-base-500 hover:text-red-400"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  {confirmDelete === m.path ? (
+                    <ConfirmInline
+                      label={m.downloaded ? 'Supprimer du disque ?' : 'Retirer de la liste ?'}
+                      onConfirm={async () => {
+                        setConfirmDelete(null)
+                        await window.api.llamacpp.remove(m.path)
+                        refreshLlamaModels()
+                      }}
+                      onCancel={() => setConfirmDelete(null)}
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDelete(m.path)}
+                      className="shrink-0 text-base-500 hover:text-red-400"
+                      title={m.downloaded ? 'Supprimer le modèle' : 'Retirer de la liste (le fichier reste sur le disque)'}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

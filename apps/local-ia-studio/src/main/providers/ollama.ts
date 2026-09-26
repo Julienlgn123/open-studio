@@ -1,4 +1,5 @@
-import type { ModelInfo, PullProgress } from '@shared/types'
+import type { ModelInfo, ModelMessage, PullProgress } from '@shared/types'
+import { contentWithTextAttachments, imagesOf } from '@shared/attachments'
 
 const BASE_URL = 'http://127.0.0.1:11434'
 
@@ -47,11 +48,42 @@ export async function deleteOllamaModel(name: string): Promise<void> {
   if (!res.ok) throw new Error(`Suppression échouée (${res.status})`)
 }
 
+/** Contexte maximal déclaré par le modèle (`<arch>.context_length` dans /api/show). */
+export async function getOllamaContextLength(name: string): Promise<number | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/show`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: name }),
+      signal: AbortSignal.timeout(5000)
+    })
+    if (!res.ok) return null
+    const data = (await res.json()) as { model_info?: Record<string, unknown> }
+    const entry = Object.entries(data.model_info ?? {}).find(([k]) => k.endsWith('.context_length'))
+    return typeof entry?.[1] === 'number' ? entry[1] : null
+  } catch {
+    return null
+  }
+}
+
 export async function pullOllamaModel(
   name: string,
   onProgress: (p: PullProgress) => void,
   signal?: AbortSignal
 ): Promise<void> {
+  try {
+    await doPull(name, onProgress, signal)
+  } catch (err) {
+    if (signal?.aborted) {
+      onProgress({ model: name, status: 'cancelled', completed: null, total: null, done: true, error: null })
+      return
+    }
+    const message = err instanceof Error ? err.message : String(err)
+    onProgress({ model: name, status: 'error', completed: null, total: null, done: true, error: message })
+  }
+}
+
+async function doPull(name: string, onProgress: (p: PullProgress) => void, signal?: AbortSignal): Promise<void> {
   const res = await fetch(`${BASE_URL}/api/pull`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -102,14 +134,9 @@ export async function pullOllamaModel(
   onProgress({ model: name, status: 'success', completed: null, total: null, done: true, error: null })
 }
 
-export interface OllamaChatMessage {
-  role: 'system' | 'user' | 'assistant'
-  content: string
-}
-
 export async function streamOllamaChat(
   model: string,
-  messages: OllamaChatMessage[],
+  messages: ModelMessage[],
   options: { temperature: number; topP: number; contextLength: number; maxTokens: number },
   onToken: (chunk: string) => void,
   signal?: AbortSignal
@@ -119,7 +146,14 @@ export async function streamOllamaChat(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model,
-      messages,
+      messages: messages.map((m) => {
+        const images = imagesOf(m.attachments)
+        return {
+          role: m.role,
+          content: contentWithTextAttachments(m.content, m.attachments),
+          ...(images.length ? { images } : {})
+        }
+      }),
       stream: true,
       options: {
         temperature: options.temperature,
@@ -132,7 +166,7 @@ export async function streamOllamaChat(
   })
   if (!res.ok || !res.body) {
     const text = await res.text().catch(() => '')
-    throw new Error(text || `Ollama a répondu ${res.status}`)
+    throw new Error(readableError(text) || `Ollama a répondu ${res.status}`)
   }
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
@@ -145,14 +179,60 @@ export async function streamOllamaChat(
     buf = lines.pop() ?? ''
     for (const line of lines) {
       if (!line.trim()) continue
+      let parsed: { message?: { content?: string }; error?: string }
       try {
-        const parsed = JSON.parse(line) as { message?: { content?: string }; done?: boolean; error?: string }
-        if (parsed.error) throw new Error(parsed.error)
-        const content = parsed.message?.content
-        if (content) onToken(content)
-      } catch (e) {
-        if (e instanceof Error && e.message && !e.message.startsWith('Unexpected')) throw e
+        parsed = JSON.parse(line)
+      } catch {
+        continue
       }
+      if (parsed.error) throw new Error(readableError(parsed.error))
+      if (parsed.message?.content) onToken(parsed.message.content)
     }
   }
 }
+
+/** Ollama renvoie parfois des erreurs JSON imbriquées : on extrait le message et on traduit les cas courants. */
+function readableError(raw: string): string {
+  let message = raw.trim()
+  for (let i = 0; i < 3; i++) {
+    try {
+      const parsed = JSON.parse(message) as { error?: string | { message?: string }; message?: string }
+      const inner = typeof parsed.error === 'string' ? parsed.error : (parsed.error?.message ?? parsed.message)
+      if (!inner) break
+      message = inner
+    } catch {
+      break
+    }
+  }
+  if (/multimodal|does not support (images|vision)/i.test(message)) {
+    return 'Ce modèle ne lit pas les images. Choisis un modèle vision (gemma3, llava, qwen2.5vl…) ou retire l’image.'
+  }
+  if (/model .*not found/i.test(message)) {
+    return `Modèle introuvable dans Ollama (${message}). Télécharge-le depuis « Gérer les modèles ».`
+  }
+  return message
+}
+
+/** Réponse JSON d'un modèle Ollama (format imposé) — repli du conseiller quand Mistral est indisponible. */
+export async function completeJsonOllama(model: string, system: string, user: string): Promise<string> {
+  const res = await fetch(`${BASE_URL}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      stream: false,
+      format: 'json',
+      options: { temperature: 0.2, num_ctx: 8192 },
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user }
+      ]
+    }),
+    signal: AbortSignal.timeout(180000)
+  })
+  if (!res.ok) throw new Error(readableError(await res.text().catch(() => '')) || `Ollama a répondu ${res.status}`)
+  const data = (await res.json()) as { message?: { content?: string } }
+  return data.message?.content ?? '{}'
+}
+
+export { readableError as readableOllamaError }

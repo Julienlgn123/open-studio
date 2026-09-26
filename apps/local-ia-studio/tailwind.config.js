@@ -1,28 +1,31 @@
+/** Les couleurs passent par des variables CSS (canaux RGB) : le thème clair/sombre
+ * se bascule avec `data-theme` sur <html>, sans toucher aux classes des composants. */
+const v = (name) => `rgb(var(--${name}) / <alpha-value>)`
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./src/renderer/index.html', './src/renderer/src/**/*.{ts,tsx}'],
-  darkMode: 'class',
   theme: {
     extend: {
       colors: {
         base: {
-          50: '#f6f6f7',
-          100: '#e8e8ea',
-          200: '#d3d3d8',
-          300: '#a8a8b3',
-          400: '#7a7a88',
-          500: '#5c5c6b',
-          600: '#44444f',
-          700: '#2f2f38',
-          800: '#1c1c22',
-          850: '#17171c',
-          900: '#111115',
-          950: '#0a0a0d'
+          50: v('base-50'),
+          100: v('base-100'),
+          200: v('base-200'),
+          300: v('base-300'),
+          400: v('base-400'),
+          500: v('base-500'),
+          600: v('base-600'),
+          700: v('base-700'),
+          800: v('base-800'),
+          850: v('base-850'),
+          900: v('base-900'),
+          950: v('base-950')
         },
         accent: {
-          400: '#8f7cff',
-          500: '#7c5cff',
-          600: '#6a45f0'
+          400: v('accent-400'),
+          500: v('accent-500'),
+          600: v('accent-600')
         }
       },
       fontFamily: {
@@ -30,7 +33,8 @@ export default {
         mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace']
       },
       boxShadow: {
-        panel: '0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.35)'
+        panel: 'var(--shadow-panel)',
+        composer: 'var(--shadow-composer)'
       }
     }
   },

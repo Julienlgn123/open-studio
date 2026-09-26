@@ -7,7 +7,7 @@ apps/
   hub/              — Open Studio lui-même (le launcher)
   cours-studio/     — au catalogue, buildée et publiée avec le hub
   drive-studio/     — au catalogue, buildée et publiée avec le hub
-  local-ia-studio/  — en pause, pas encore au catalogue
+  local-ia-studio/  — au catalogue, buildée et publiée avec le hub
 ```
 
 Chaque app garde son propre `package.json`/`electron.vite.config.ts` et se

@@ -18,8 +18,13 @@ function installerUrlForPlatform(): { url: string; fileName: string } {
   }
 }
 
-async function downloadFile(url: string, destPath: string, onProgress: (percent: number | null) => void): Promise<void> {
-  const res = await fetch(url)
+async function downloadFile(
+  url: string,
+  destPath: string,
+  onProgress: (percent: number | null) => void,
+  signal?: AbortSignal
+): Promise<void> {
+  const res = await fetch(url, { signal })
   if (!res.ok || !res.body) throw new Error(`Téléchargement échoué (HTTP ${res.status})`)
 
   const total = Number(res.headers.get('content-length') ?? 0) || null
@@ -31,12 +36,20 @@ async function downloadFile(url: string, destPath: string, onProgress: (percent:
     onProgress(total ? Math.min(100, Math.round((received / total) * 100)) : null)
   })
 
-  await pipeline(nodeStream, createWriteStream(destPath))
+  await pipeline(nodeStream, createWriteStream(destPath), { signal })
 }
 
-async function waitForOllama(timeoutMs: number): Promise<boolean> {
+function removeQuietly(path: string): void {
+  try {
+    unlinkSync(path)
+  } catch {
+    /* best effort cleanup */
+  }
+}
+
+async function waitForOllama(timeoutMs: number, signal?: AbortSignal): Promise<boolean> {
   const start = Date.now()
-  while (Date.now() - start < timeoutMs) {
+  while (Date.now() - start < timeoutMs && !signal?.aborted) {
     const status = await checkOllama()
     if (status.available) return true
     await new Promise((r) => setTimeout(r, 2000))
@@ -48,12 +61,19 @@ export async function installOllama(onProgress: (p: InstallProgress) => void, si
   const { url, fileName } = installerUrlForPlatform()
   const destPath = join(app.getPath('temp'), fileName)
 
+  const cancelled = (): void => onProgress({ phase: 'cancelled', percent: null, message: 'Installation annulée.' })
+
   onProgress({ phase: 'downloading', percent: 0, message: 'Téléchargement de l’installeur Ollama…' })
   try {
-    await downloadFile(url, destPath, (percent) => {
-      onProgress({ phase: 'downloading', percent, message: 'Téléchargement de l’installeur Ollama…' })
-    })
+    await downloadFile(
+      url,
+      destPath,
+      (percent) => onProgress({ phase: 'downloading', percent, message: 'Téléchargement de l’installeur Ollama…' }),
+      signal
+    )
   } catch (err) {
+    removeQuietly(destPath)
+    if (signal?.aborted) return cancelled()
     onProgress({
       phase: 'error',
       percent: null,
@@ -61,14 +81,17 @@ export async function installOllama(onProgress: (p: InstallProgress) => void, si
     })
     return
   }
-  if (signal?.aborted) return
+  if (signal?.aborted) {
+    removeQuietly(destPath)
+    return cancelled()
+  }
 
   onProgress({ phase: 'installing', percent: null, message: 'Installation en cours…' })
 
   try {
     if (process.platform === 'win32') {
       // Ollama's Windows installer is built with Inno Setup, which supports silent installs.
-      await runProcess(destPath, ['/VERYSILENT', '/NORESTART', '/SUPPRESSMSGBOXES'])
+      await runProcess(destPath, ['/VERYSILENT', '/NORESTART', '/SUPPRESSMSGBOXES'], signal)
     } else if (process.platform === 'darwin') {
       // No unattended installer on macOS: reveal the downloaded archive so the OS
       // unzips it and the user drags Ollama.app into Applications (a couple of clicks,
@@ -82,9 +105,10 @@ export async function installOllama(onProgress: (p: InstallProgress) => void, si
       })
     } else {
       chmodSync(destPath, 0o755)
-      await runProcess('sh', [destPath])
+      await runProcess('sh', [destPath], signal)
     }
   } catch (err) {
+    if (signal?.aborted) return cancelled()
     onProgress({
       phase: 'error',
       percent: null,
@@ -98,7 +122,8 @@ export async function installOllama(onProgress: (p: InstallProgress) => void, si
 
   if (process.platform !== 'darwin') {
     onProgress({ phase: 'waiting', percent: null, message: 'Démarrage d’Ollama…' })
-    const ready = await waitForOllama(90_000)
+    const ready = await waitForOllama(90_000, signal)
+    if (signal?.aborted) return cancelled()
     if (!ready) {
       onProgress({
         phase: 'error',
@@ -109,21 +134,18 @@ export async function installOllama(onProgress: (p: InstallProgress) => void, si
     }
   }
 
-  try {
-    unlinkSync(destPath)
-  } catch {
-    /* best effort cleanup */
-  }
-
+  removeQuietly(destPath)
   onProgress({ phase: 'done', percent: 100, message: 'Ollama est prêt.' })
 }
 
-function runProcess(command: string, args: string[]): Promise<void> {
+function runProcess(command: string, args: string[], signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { windowsHide: false })
+    // `signal` tue le processus d'installation si l'utilisateur annule.
+    const child = spawn(command, args, { windowsHide: false, signal })
     child.on('error', reject)
     child.on('exit', (code) => {
-      if (code === 0 || code === null) resolve()
+      if (signal?.aborted) reject(new Error('Installation annulée.'))
+      else if (code === 0 || code === null) resolve()
       else reject(new Error(`Le programme d’installation s’est arrêté avec le code ${code}.`))
     })
   })

@@ -39,8 +39,17 @@ export const CATALOG: CatalogEntry[] = [
     repo: 'ent-studio',
     fallbackEmoji: '🗓️',
     accent: '#3b82f6'
+  },
+  {
+    id: 'local-ia-studio',
+    name: 'Local IA Studio',
+    productName: 'Local IA Studio',
+    debPackageName: 'local-ia-studio',
+    description:
+      'Discute avec des modèles IA 100 % en local : Ollama ou modèles GGUF téléchargés depuis Hugging Face, images et fichiers joints.',
+    category: 'IA',
+    assetPrefix: 'Local-IA-Studio',
+    fallbackEmoji: '✨',
+    accent: '#7c5cff'
   }
 ]
-
-// Local IA Studio est en pause pour l'instant (voir apps/local-ia-studio) —
-// pas encore ajoutée au catalogue tant que son développement n'a pas repris.

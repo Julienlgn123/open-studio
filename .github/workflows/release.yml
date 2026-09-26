@@ -10,7 +10,7 @@ jobs:
   build-windows:
     strategy:
       matrix:
-        app: [hub, cours-studio, drive-studio]
+        app: [hub, cours-studio, drive-studio, local-ia-studio]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,7 +28,7 @@ jobs:
 
       # Scoped to this one workspace: a plain `npm install` at the repo root
       # runs *every* workspace's postinstall, including sibling apps not even
-      # part of this job (e.g. the paused local-ia-studio) — each one an extra
+      # part of this job — each one an extra
       # electron-rebuild that only adds more chances to hit the flaky failure
       # above for no reason.
       - name: Install dependencies
@@ -65,7 +65,7 @@ jobs:
   build-mac:
     strategy:
       matrix:
-        app: [hub, cours-studio, drive-studio]
+        app: [hub, cours-studio, drive-studio, local-ia-studio]
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -111,7 +111,7 @@ jobs:
   build-linux:
     strategy:
       matrix:
-        app: [hub, cours-studio, drive-studio]
+        app: [hub, cours-studio, drive-studio, local-ia-studio]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -181,17 +181,20 @@ jobs:
           cp dist-artifacts/Open-Studio-Setup-*.exe bundle/windows/
           cp dist-artifacts/Cours-Studio-Setup-*.exe bundle/windows/
           cp dist-artifacts/Drive-Studio-Setup-*.exe bundle/windows/
+          cp dist-artifacts/Local-IA-Studio-Setup-*.exe bundle/windows/
           cat > bundle/windows/Lire-moi.txt <<'EOF'
           Lance l'installateur de l'app que tu veux :
           - Open-Studio-Setup-*.exe (recommandé, installe/lance/met à jour les autres)
           - Cours-Studio-Setup-*.exe
           - Drive-Studio-Setup-*.exe
+          - Local-IA-Studio-Setup-*.exe
           EOF
           (cd bundle/windows && zip -r "../../dist-artifacts/Open-Studio-Windows.zip" .)
 
           cp dist-artifacts/Open-Studio-*.dmg bundle/mac/
           cp dist-artifacts/Cours-Studio-*.dmg bundle/mac/
           cp dist-artifacts/Drive-Studio-*.dmg bundle/mac/
+          cp dist-artifacts/Local-IA-Studio-*.dmg bundle/mac/
           cat > bundle/mac/Lire-moi.txt <<'EOF'
           Choisis le .dmg "arm64" (Apple Silicon M1/M2/M3/M4) ou "x64" (Intel)
           de l'app que tu veux installer. Open-Studio-*.dmg est recommandé :
@@ -205,6 +208,7 @@ jobs:
           cp dist-artifacts/Open-Studio-*.AppImage dist-artifacts/Open-Studio-*.deb bundle/linux/
           cp dist-artifacts/Cours-Studio-*.deb bundle/linux/
           cp dist-artifacts/Drive-Studio-*.deb bundle/linux/
+          cp dist-artifacts/Local-IA-Studio-*.deb bundle/linux/
           cat > bundle/linux/Lire-moi.txt <<'EOF'
           Lance le .deb (Debian/Ubuntu/Mint) ou l'AppImage de l'app que tu veux.
           Open-Studio.* est recommandé : il installe/lance/met à jour les autres
@@ -212,12 +216,12 @@ jobs:
           EOF
           (cd bundle/linux && zip -r "../../dist-artifacts/Open-Studio-Linux.zip" .)
 
-          # Cours Studio/Drive Studio n'ont plus besoin d'exister comme assets
+          # Les apps gérées n'ont plus besoin d'exister comme assets
           # de release à part : ils sont déjà dans les 3 zips ci-dessus, et
           # Open Studio les récupère lui-même en les extrayant de là (voir
           # apps/hub/src/main/install/zipSource.ts) plutôt que d'aller
           # chercher un fichier séparé par nom.
-          rm -f dist-artifacts/Cours-Studio-* dist-artifacts/Drive-Studio-*
+          rm -f dist-artifacts/Cours-Studio-* dist-artifacts/Drive-Studio-* dist-artifacts/Local-IA-Studio-*
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -239,7 +243,7 @@ jobs:
             | 🐧 Linux | `Open-Studio-Linux.zip` |
 
             Dézippe-le et lance l'installateur `Open-Studio-*` dedans (les
-            installateurs de Cours Studio/Drive Studio sont là aussi si tu veux
+            installateurs de Cours Studio/Drive Studio/Local IA Studio sont là aussi si tu veux
             les installer directement, mais Open Studio les propose déjà depuis
             son catalogue).
 
