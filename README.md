@@ -8,9 +8,9 @@ de traquer des installateurs éparpillés sur dix repos.
 
 ## Installation
 
-1. Télécharge `Open-Studio-Installateur.zip` depuis la [dernière release](https://github.com/Julienlgn123/open-studio/releases/latest).
-2. Dézippe-le, ouvre le dossier de ton système (**Windows**, **macOS** ou
-   **Linux**) et lance l'installateur dedans.
+1. Télécharge le zip de ton système depuis la [dernière release](https://github.com/Julienlgn123/open-studio/releases/latest) :
+   `Open-Studio-Windows.zip`, `Open-Studio-macOS.zip` ou `Open-Studio-Linux.zip`.
+2. Dézippe-le et lance l'installateur `Open-Studio-*` dedans.
    - **macOS uniquement** : au premier lancement, macOS peut afficher
      « Open Studio est endommagée et ne peut pas être ouverte » (build sans
      certificat Apple Developer payant). Ouvre Terminal et lance :
