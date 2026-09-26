@@ -1,30 +1,35 @@
-/** Version SVG (vectorielle, nette à toute taille) de la marque Open Studio — anneau + point. */
+import { useId } from 'react'
+
+/**
+ * Marque Open Studio en SVG, relevée sur resources/icon.png (coordonnées de l'icône 1024 px) :
+ * anneau centré (512, 512), rayon 196,5, épaisseur 111, ouvert entre 12 h et ~21° au-dessus
+ * de 3 h ; point centré (669, 285), rayon 54. Dégradés échantillonnés sur l'icône.
+ */
 export default function Brandmark({ size = 20 }: { size?: number }): JSX.Element {
+  // Ids uniques : plusieurs marques sur la même page ne doivent pas partager leurs dégradés.
+  const id = useId().replace(/:/g, '')
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width={size} height={size} viewBox="240 226 543 543" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
       <defs>
-        <linearGradient id="os-ring" x1="10" y1="85" x2="85" y2="15" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#3d58ec" />
-          <stop offset="0.55" stopColor="#9333ea" />
-          <stop offset="1" stopColor="#c026a3" />
+        <linearGradient id={`${id}-ring`} x1="300" y1="700" x2="700" y2="300" gradientUnits="userSpaceOnUse">
+          <stop offset="0.1" stopColor="#3d58ec" />
+          <stop offset="0.4" stopColor="#6545ed" />
+          <stop offset="0.65" stopColor="#8d37d8" />
+          <stop offset="0.85" stopColor="#ae30b0" />
         </linearGradient>
-        <linearGradient id="os-dot" x1="70" y1="10" x2="90" y2="30" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#fbb46a" />
-          <stop offset="1" stopColor="#f8756a" />
+        <linearGradient id={`${id}-dot`} x1="615" y1="231" x2="723" y2="339" gradientUnits="userSpaceOnUse">
+          <stop offset="0.2" stopColor="#fba470" />
+          <stop offset="0.5" stopColor="#f97f69" />
+          <stop offset="0.8" stopColor="#f65862" />
         </linearGradient>
       </defs>
-      <circle
-        cx="50"
-        cy="54"
-        r="32"
-        stroke="url(#os-ring)"
-        strokeWidth="16"
+      <path
+        d="M 695.7 442.2 A 196.5 196.5 0 1 1 512 315.5"
+        stroke={`url(#${id}-ring)`}
+        strokeWidth="111"
         strokeLinecap="round"
-        strokeDasharray="156 45"
-        strokeDashoffset="-18"
-        transform="rotate(-8 50 54)"
       />
-      <circle cx="76" cy="22" r="8" fill="url(#os-dot)" />
+      <circle cx="669" cy="285" r="54" fill={`url(#${id}-dot)`} />
     </svg>
   )
 }
