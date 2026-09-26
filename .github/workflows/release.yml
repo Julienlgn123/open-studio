@@ -212,6 +212,13 @@ jobs:
           EOF
           (cd bundle/linux && zip -r "../../dist-artifacts/Open-Studio-Linux.zip" .)
 
+          # Cours Studio/Drive Studio n'ont plus besoin d'exister comme assets
+          # de release à part : ils sont déjà dans les 3 zips ci-dessus, et
+          # Open Studio les récupère lui-même en les extrayant de là (voir
+          # apps/hub/src/main/install/zipSource.ts) plutôt que d'aller
+          # chercher un fichier séparé par nom.
+          rm -f dist-artifacts/Cours-Studio-* dist-artifacts/Drive-Studio-*
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -257,9 +264,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # GitHub liste tous les fichiers d'une release, sans distinction — on ne
-      # peut pas les cacher, juste rendre très clair que le zip ci-dessus est
-      # le seul à télécharger (label affiché à la place du nom de fichier).
+      # Reste ici : uniquement les fichiers propres au hub (Setup/blockmap/yml),
+      # indispensables tels quels à son propre auto-updater — GitHub ne permet
+      # pas de les cacher, juste de rendre très clair qu'il ne faut pas les
+      # télécharger directement (label affiché à la place du nom de fichier).
       - name: Label individual installers as internal-use-only
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

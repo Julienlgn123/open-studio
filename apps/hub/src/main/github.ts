@@ -90,19 +90,21 @@ export async function fetchLatestRelease(owner: string, repo: string): Promise<G
 }
 
 /**
- * Choisit l'asset adapté à l'OS/arch courants dans les assets d'une release.
- * `assetPrefix` restreint d'abord la recherche aux fichiers de cette app —
- * indispensable quand la release contient les installateurs de plusieurs apps
- * du monorepo (toutes celles sans `owner`/`repo` propre).
+ * Choisit, parmi une liste de noms de fichiers, celui adapté à l'OS/arch
+ * courants. `assetPrefix` restreint d'abord la recherche aux fichiers de
+ * cette app — indispensable quand la liste mélange les installateurs de
+ * plusieurs apps du monorepo (toutes celles sans `owner`/`repo` propre).
+ * Partagé entre `pickAsset` (assets d'une release GitHub) et l'extraction
+ * depuis le zip par OS (mêmes noms de fichiers, juste une autre source).
  */
-export function pickAsset(
-  assets: GhAsset[],
+export function pickInstallerName(
+  names: string[],
   platform: NodeJS.Platform,
   arch: string,
   assetPrefix?: string
-): GhAsset | null {
-  const scoped = assetPrefix ? assets.filter((a) => a.name.startsWith(assetPrefix)) : assets
-  const byPattern = (re: RegExp): GhAsset | undefined => scoped.find((a) => re.test(a.name))
+): string | null {
+  const scoped = assetPrefix ? names.filter((n) => n.startsWith(assetPrefix)) : names
+  const byPattern = (re: RegExp): string | undefined => scoped.find((n) => re.test(n))
 
   if (platform === 'win32') {
     return byPattern(/setup.*\.exe$/i) ?? byPattern(/\.exe$/i) ?? null
@@ -117,6 +119,24 @@ export function pickAsset(
   }
   // linux
   return byPattern(/\.deb$/i) ?? null
+}
+
+/**
+ * Choisit l'asset adapté à l'OS/arch courants dans les assets d'une release.
+ */
+export function pickAsset(
+  assets: GhAsset[],
+  platform: NodeJS.Platform,
+  arch: string,
+  assetPrefix?: string
+): GhAsset | null {
+  const name = pickInstallerName(
+    assets.map((a) => a.name),
+    platform,
+    arch,
+    assetPrefix
+  )
+  return assets.find((a) => a.name === name) ?? null
 }
 
 /** Télécharge une URL vers un fichier local, avec callback de progression (0..1). */

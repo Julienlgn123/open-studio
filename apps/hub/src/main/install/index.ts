@@ -8,6 +8,7 @@ import { broadcast } from '../events'
 import { winInstaller } from './win'
 import { macInstaller } from './mac'
 import { linuxInstaller } from './linux'
+import { osZipAssetName, extractInstaller } from './zipSource'
 import type { AppState, CatalogEntry, InstallProgress } from '@shared/types'
 
 /** Repo de repli pour toute app du catalogue sans `owner`/`repo` propre (vit dans ce monorepo, sous `apps/<id>`). */
@@ -82,12 +83,6 @@ export async function installOrUpdateApp(id: string): Promise<AppState> {
   const { owner, repo } = repoFor(entry)
   const rel = await fetchLatestRelease(owner, repo)
   const version = rel.tag_name.replace(/^v/, '')
-  const asset = pickAsset(rel.assets, process.platform, process.arch, entry.assetPrefix)
-  if (!asset) {
-    throw new Error(
-      `Aucun installateur disponible pour ta plateforme dans la dernière release de ${entry.name}.`
-    )
-  }
 
   const dir = managedDir(id)
   const execTargetDir = join(dir, 'install')
@@ -107,12 +102,41 @@ export async function installOrUpdateApp(id: string): Promise<AppState> {
   }
 
   mkdirSync(dir, { recursive: true })
-  const downloadPath = join(dir, asset.name)
+  let downloadPath: string
 
-  emitProgress(id, 'downloading', 0)
-  await downloadTo(asset.browser_download_url, downloadPath, (ratio) =>
-    emitProgress(id, 'downloading', ratio)
-  )
+  if (entry.owner) {
+    // App encore sur son propre repo : son installateur est un asset direct.
+    const asset = pickAsset(rel.assets, process.platform, process.arch, entry.assetPrefix)
+    if (!asset) {
+      throw new Error(
+        `Aucun installateur disponible pour ta plateforme dans la dernière release de ${entry.name}.`
+      )
+    }
+    downloadPath = join(dir, asset.name)
+    emitProgress(id, 'downloading', 0)
+    await downloadTo(asset.browser_download_url, downloadPath, (ratio) =>
+      emitProgress(id, 'downloading', ratio)
+    )
+  } else {
+    // App de ce monorepo : pas d'asset séparé sur la release (ça ferait
+    // autant de fichiers que d'apps) — son installateur est extrait du zip
+    // par OS, qui contient déjà tout. Coûte un téléchargement plus gros
+    // (tout l'OS au lieu du seul fichier voulu), en échange d'une page de
+    // release qui ne liste plus un installateur par app gérée.
+    const zipAssetName = osZipAssetName()
+    const zipAsset = rel.assets.find((a) => a.name === zipAssetName)
+    if (!zipAsset) {
+      throw new Error(`Le zip ${zipAssetName} est introuvable dans la dernière release.`)
+    }
+    const zipPath = join(dir, zipAssetName)
+    emitProgress(id, 'downloading', 0)
+    await downloadTo(zipAsset.browser_download_url, zipPath, (ratio) =>
+      emitProgress(id, 'downloading', ratio)
+    )
+    downloadPath = join(dir, `${entry.assetPrefix ?? entry.id}-installer${process.platform === 'win32' ? '.exe' : process.platform === 'darwin' ? '.dmg' : '.deb'}`)
+    extractInstaller(zipPath, entry.assetPrefix ?? '', downloadPath)
+    rmSync(zipPath, { force: true })
+  }
 
   emitProgress(id, 'installing', 0)
   mkdirSync(execTargetDir, { recursive: true })
