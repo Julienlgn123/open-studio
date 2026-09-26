@@ -1481,3 +1481,75 @@ kbd {
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
   animation: update-progress-shimmer 1.3s linear infinite;
 }
+
+/* ─── Synchronisation entre deux PC ─────────────────────── */
+.sync-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--bg-overlay);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms, background 150ms;
+}
+.sync-choice svg { color: var(--accent); }
+.sync-choice strong { font-size: 14px; }
+.sync-choice span { font-size: 12px; color: var(--text-tertiary); line-height: 1.45; }
+.sync-choice:hover { border-color: var(--accent); background: var(--accent-dim); }
+.sync-code {
+  margin: 6px 0 8px;
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+.sync-code-input {
+  font-size: 22px !important;
+  letter-spacing: 0.3em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.sync-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--warning-dim, rgba(251,191,36,0.12));
+  color: var(--warning, #fbbf24);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.sync-warning svg { flex-shrink: 0; margin-top: 1px; }
+.sync-searching {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--border-medium);
+  color: var(--text-tertiary);
+  font-size: 12.5px;
+}
+.sync-peer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-overlay);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 13px;
+}
+.sync-peer:hover { border-color: var(--border-medium); }
+.sync-peer.on { border-color: var(--accent); background: var(--accent-dim); }
+.sync-pulse { animation: sync-pulse 1.4s ease-in-out infinite; color: var(--accent); }
+@keyframes sync-pulse { 50% { opacity: 0.3; } }

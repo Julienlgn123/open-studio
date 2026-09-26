@@ -44,6 +44,23 @@ const api = {
   },
   exportPdf: (data: { title: string; html: string }): Promise<string | null> => ipcRenderer.invoke('export:pdf', data),
   exportMarkdown: (data: { title: string; html: string }): Promise<string | null> => ipcRenderer.invoke('export:markdown', data),
+  sync: {
+    startReceive: (): Promise<{ code: string; name: string; port: number; addresses: string[] }> => ipcRenderer.invoke('sync:startReceive'),
+    stopReceive: (): Promise<boolean> => ipcRenderer.invoke('sync:stopReceive'),
+    startDiscovery: (): Promise<boolean> => ipcRenderer.invoke('sync:startDiscovery'),
+    stopDiscovery: (): Promise<boolean> => ipcRenderer.invoke('sync:stopDiscovery'),
+    send: (host: string, port: number, code: string): Promise<void> => ipcRenderer.invoke('sync:send', host, port, code),
+    onStatus: (cb: (s: unknown) => void): (() => void) => {
+      const h = (_: unknown, s: unknown): void => cb(s)
+      ipcRenderer.on('sync:status', h)
+      return () => ipcRenderer.removeListener('sync:status', h)
+    },
+    onPeers: (cb: (p: unknown) => void): (() => void) => {
+      const h = (_: unknown, p: unknown): void => cb(p)
+      ipcRenderer.on('sync:peers', h)
+      return () => ipcRenderer.removeListener('sync:peers', h)
+    }
+  },
   backup: {
     export: (): Promise<string | null> => ipcRenderer.invoke('backup:export'),
     import: (): Promise<boolean> => ipcRenderer.invoke('backup:import'),

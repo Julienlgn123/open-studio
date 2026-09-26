@@ -10,7 +10,42 @@ import { checkpointDb, closeDb, getDbPath } from './db'
 const JSZip = require('jszip')
 
 // Folders / files inside userData that make up the full user data set
-const DATA_ENTRIES = ['cours-studio.db', 'settings.json', 'attachments', 'recordings']
+export const DATA_ENTRIES = ['cours-studio.db', 'settings.json', 'attachments', 'recordings']
+
+/**
+ * La base garde le chemin complet des enregistrements (C:\Users\<nom>\AppData\…\recordings\…).
+ * Après une restauration ou une synchro venant d'un autre PC, ces chemins désignent le dossier
+ * de l'autre machine : on les rattache au dossier recordings de celle-ci.
+ */
+export function rewriteMediaPaths(dbPath: string): void {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const Database = require('better-sqlite3')
+  let db: any
+  try {
+    db = new Database(dbPath)
+    const rows = db.prepare('SELECT id, audio_path, video_path FROM courses').all() as { id: string; audio_path: string | null; video_path: string | null }[]
+    const fix = (p: string | null): string | null => {
+      if (!p) return p
+      const parts = p.split(/[\\/]+/)
+      const i = parts.lastIndexOf('recordings')
+      if (i < 0) return p
+      const local = join(userData(), ...parts.slice(i))
+      return local === p ? p : local
+    }
+    const update = db.prepare('UPDATE courses SET audio_path = ?, video_path = ? WHERE id = ?')
+    db.transaction(() => {
+      for (const r of rows) {
+        const audio = fix(r.audio_path)
+        const video = fix(r.video_path)
+        if (audio !== r.audio_path || video !== r.video_path) update.run(audio, video, r.id)
+      }
+    })()
+  } catch {
+    /* base illisible : rien à corriger */
+  } finally {
+    try { db?.close() } catch { /* ok */ }
+  }
+}
 
 function userData(): string {
   return app.getPath('userData')
@@ -118,6 +153,9 @@ export async function importBackup(window: BrowserWindow): Promise<boolean> {
     mkdirSync(join(dest, '..'), { recursive: true })
     writeFileSync(dest, Buffer.from(await file.async('nodebuffer')))
   }
+
+  // Sauvegarde faite sur un autre PC : les chemins des enregistrements pointent vers lui.
+  rewriteMediaPaths(getDbPath())
 
   app.relaunch()
   app.exit(0)

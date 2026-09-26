@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { X, Eye, EyeOff, Sun, Moon, Upload, FolderOpen, Save, Trash2 } from 'lucide-react'
+import { X, Eye, EyeOff, Sun, Moon, Upload, FolderOpen, Save, Trash2, Wifi } from 'lucide-react'
+import SyncModal from './SyncModal'
 import { useStore } from '../store'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
@@ -22,8 +23,9 @@ export default function SettingsModal({ onClose }: Props) {
   const [appVersion, setAppVersion] = useState<string>('')
   const [backupBusy, setBackupBusy] = useState<'' | 'export' | 'import' | 'reset'>('')
   const [lastBackup, setLastBackup] = useState<{ name: string; at: number } | null>(null)
+  const [showSync, setShowSync] = useState(false)
 
-  useEscapeToClose(onClose)
+  useEscapeToClose(() => { if (!showSync) onClose() })
 
   useEffect(() => {
     api.app.version().then(setAppVersion).catch(() => setAppVersion('dev'))
@@ -81,6 +83,7 @@ export default function SettingsModal({ onClose }: Props) {
   }
 
   return (
+    <>
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal fade-in" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460, width: '100%' }}>
         <div className="modal-header">
@@ -179,6 +182,16 @@ export default function SettingsModal({ onClose }: Props) {
             </div>
 
             <div style={{ borderTop: '1px solid var(--border)', marginTop: 14, paddingTop: 14 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 500, marginBottom: 2 }}>Synchroniser avec un autre PC</div>
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10 }}>
+                Copie tous tes cours, médias et réglages d’un PC à l’autre par le Wi-Fi, sans clé USB ni cloud.
+              </div>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowSync(true)}>
+                <Wifi size={13} /> Synchroniser…
+              </button>
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--border)', marginTop: 14, paddingTop: 14 }}>
               <div style={{ fontSize: 12.5, fontWeight: 500, marginBottom: 2 }}>Sauvegarde automatique</div>
               <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10 }}>
                 {settings.autoBackupFolder
@@ -242,5 +255,7 @@ export default function SettingsModal({ onClose }: Props) {
         </div>
       </div>
     </div>
+    {showSync && <SyncModal onClose={() => setShowSync(false)} />}
+    </>
   )
 }

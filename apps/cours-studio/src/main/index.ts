@@ -18,6 +18,7 @@ import { initDb, getSubjects, createSubject, updateSubject, reorderSubjects,
 import { existsSync, mkdirSync, writeFileSync, unlinkSync, readFileSync, chmodSync, copyFileSync, statSync, rmSync } from 'fs'
 import ffmpeg from 'fluent-ffmpeg'
 import { pickAndExtractDocument, extractArticleFromUrl } from './documents'
+import { startReceive, stopReceive, startDiscovery, stopDiscovery, sendTo } from './sync'
 import { exportBackup, importBackup, autoBackup, openBackupsFolder, latestBackupInfo, resetAllData, chooseAutoBackupFolder, runAutoBackupToFolder } from './backup'
 import { htmlToMarkdown } from './markdown'
 
@@ -514,6 +515,13 @@ function registerIpc(): void {
   })
 
   // Backup / restore of the whole local data set
+  // Synchro directe entre deux PC du même réseau local
+  ipcMain.handle('sync:startReceive', () => startReceive())
+  ipcMain.handle('sync:stopReceive', () => { stopReceive(); return true })
+  ipcMain.handle('sync:startDiscovery', () => { startDiscovery(); return true })
+  ipcMain.handle('sync:stopDiscovery', () => { stopDiscovery(); return true })
+  ipcMain.handle('sync:send', (_, host: string, port: number, code: string) => sendTo(host, port, code))
+
   ipcMain.handle('backup:export', () => exportBackup(mainWindow))
   ipcMain.handle('backup:import', () => importBackup(mainWindow))
   ipcMain.handle('backup:openFolder', () => { openBackupsFolder(); return true })
