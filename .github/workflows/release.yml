@@ -34,12 +34,17 @@ jobs:
       - name: Install dependencies
         run: npm install -w apps/${{ matrix.app }}
 
-      - name: Build Windows (NSIS + Portable)
+      - name: Build Windows
         run: npm run dist -w apps/${{ matrix.app }} -- --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload artifacts
+      # Le hub garde tout (portable + blockmap : son propre auto-updater en a
+      # besoin) ; les apps gérées n'exposent que leur unique installateur —
+      # Open Studio ne regarde jamais que ça, le reste n'est que du bruit sur
+      # la page de release.
+      - name: Upload artifacts (hub)
+        if: matrix.app == 'hub'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.app }}-windows
@@ -48,6 +53,13 @@ jobs:
             apps/${{ matrix.app }}/dist-installer/*.yml
             !apps/${{ matrix.app }}/dist-installer/builder-debug.yml
             apps/${{ matrix.app }}/dist-installer/*.blockmap
+
+      - name: Upload artifacts (managed app)
+        if: matrix.app != 'hub'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-windows
+          path: apps/${{ matrix.app }}/dist-installer/*.exe
 
   # ─── macOS ─────────────────────────────────────────────────
   build-mac:
@@ -76,7 +88,8 @@ jobs:
           # ad-hoc signing is the free fix. Do NOT set CSC_IDENTITY_AUTO_DISCOVERY=false
           # here, it disables that fallback too.
 
-      - name: Upload artifacts
+      - name: Upload artifacts (hub)
+        if: matrix.app == 'hub'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.app }}-mac
@@ -86,6 +99,13 @@ jobs:
             apps/${{ matrix.app }}/dist-installer/*.yml
             !apps/${{ matrix.app }}/dist-installer/builder-debug.yml
             apps/${{ matrix.app }}/dist-installer/*.blockmap
+
+      - name: Upload artifacts (managed app)
+        if: matrix.app != 'hub'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-mac
+          path: apps/${{ matrix.app }}/dist-installer/*.dmg
 
   # ─── Linux ─────────────────────────────────────────────────
   build-linux:
@@ -112,7 +132,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload artifacts
+      - name: Upload artifacts (hub)
+        if: matrix.app == 'hub'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.app }}-linux
@@ -122,6 +143,13 @@ jobs:
             apps/${{ matrix.app }}/dist-installer/*.yml
             !apps/${{ matrix.app }}/dist-installer/builder-debug.yml
             apps/${{ matrix.app }}/dist-installer/*.blockmap
+
+      - name: Upload artifacts (managed app)
+        if: matrix.app != 'hub'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-linux
+          path: apps/${{ matrix.app }}/dist-installer/*.deb
 
   # ─── Create Release ─────────────────────────────────────────
   # Une seule release pour toute la suite : le hub (auto-update via electron-updater)
