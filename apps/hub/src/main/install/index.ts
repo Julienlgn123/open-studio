@@ -95,14 +95,16 @@ export async function installOrUpdateApp(id: string): Promise<AppState> {
   // Mettre à jour par-dessus l'existant a déjà causé des installs bancales
   // (fichiers d'une ancienne version qui traînent à côté des nouveaux,
   // verrous restants...) — on désinstalle proprement d'abord, comme pour un
-  // vrai premier install ensuite.
+  // vrai premier install ensuite. `uninstall()` fait déjà le ménage du
+  // dossier cible lui-même (avec retries) : pas la peine — et dangereux, ça
+  // a fait planter un update sur un verrou encore temporairement présent —
+  // de le refaire ici avec un rmSync brut sans retry juste après.
   const existingExecPath = await resolveExecPath(id)
   if (existingExecPath) {
     emitProgress(id, 'uninstalling', 0)
     await platformInstaller.uninstall(entry, existingExecPath)
     clearTrackedApp(id)
   }
-  rmSync(execTargetDir, { recursive: true, force: true })
 
   mkdirSync(dir, { recursive: true })
   const downloadPath = join(dir, asset.name)
