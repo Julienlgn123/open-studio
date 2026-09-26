@@ -18,7 +18,8 @@ export function AppIcon({ app }: { app: AppState }): JSX.Element {
 const PHASE_LABEL: Record<InstallProgress['phase'], string> = {
   uninstalling: 'Préparation…',
   downloading: 'Téléchargement',
-  installing: 'Installation…'
+  installing: 'Installation…',
+  done: 'Terminé'
 }
 
 export default function AppCard({

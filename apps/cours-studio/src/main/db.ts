@@ -10,6 +10,11 @@ function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2)
 }
 
+/** Accès direct à la base (synchro entre PC : lecture/écriture de cours complets). */
+export function getDb(): Database.Database {
+  return db
+}
+
 export function getDbPath(): string {
   return currentDbPath
 }

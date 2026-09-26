@@ -19,6 +19,7 @@ import { existsSync, mkdirSync, writeFileSync, unlinkSync, readFileSync, chmodSy
 import ffmpeg from 'fluent-ffmpeg'
 import { pickAndExtractDocument, extractArticleFromUrl } from './documents'
 import { startReceive, stopReceive, startDiscovery, stopDiscovery, sendTo } from './sync'
+import { getPlan, listPaired, runPlan, sendCourses, startPresence, stopPresence, unpair } from './peerSync'
 import { exportBackup, importBackup, autoBackup, openBackupsFolder, latestBackupInfo, resetAllData, chooseAutoBackupFolder, runAutoBackupToFolder } from './backup'
 import { htmlToMarkdown } from './markdown'
 
@@ -152,6 +153,9 @@ app.whenReady().then(() => {
   } catch { /* no settings file yet, or it's unreadable — nothing to back up to */ }
   registerIpc()
   createWindow()
+  // Retrouve les PC associés sur le réseau local (rien ne tourne s'il n'y en a aucun).
+  startPresence()
+  app.on('before-quit', stopPresence)
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 
   // Nudge the user if flashcards are waiting to be reviewed
@@ -520,7 +524,13 @@ function registerIpc(): void {
   ipcMain.handle('sync:stopReceive', () => { stopReceive(); return true })
   ipcMain.handle('sync:startDiscovery', () => { startDiscovery(); return true })
   ipcMain.handle('sync:stopDiscovery', () => { stopDiscovery(); return true })
-  ipcMain.handle('sync:send', (_, host: string, port: number, code: string) => sendTo(host, port, code))
+  ipcMain.handle('sync:send', (_, host: string, port: number, code: string, pairOnly?: boolean) => sendTo(host, port, code, !!pairOnly))
+  // PC déjà associés : présence, comparaison, échanges au cas par cas
+  ipcMain.handle('peers:list', () => listPaired())
+  ipcMain.handle('peers:unpair', (_, id: string) => { unpair(id); return true })
+  ipcMain.handle('peers:plan', (_, id: string) => getPlan(id))
+  ipcMain.handle('peers:run', (_, id: string, items: unknown[]) => runPlan(id, items as never))
+  ipcMain.handle('peers:send', (_, id: string, courseIds: string[]) => sendCourses(id, courseIds))
 
   ipcMain.handle('backup:export', () => exportBackup(mainWindow))
   ipcMain.handle('backup:import', () => importBackup(mainWindow))

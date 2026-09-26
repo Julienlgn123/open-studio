@@ -54,6 +54,30 @@ export default function App() {
     return cleanup
   }, [])
 
+  // PC associés : liste en direct, cours reçus, proposition de resynchro.
+  useEffect(() => {
+    const { setPaired } = useStore.getState()
+    api.peers.list().then(setPaired).catch(() => {})
+    const offs = [
+      api.peers.on('peers:changed', (list: never) => setPaired(list)),
+      api.peers.on('peersync:received', async (p: { from: string; courseIds: string[]; titles: string[]; live: boolean }) => {
+        await Promise.all([loadSubjects(), loadTags()])
+        useStore.getState().setExternalUpdate({ ids: p.courseIds, from: p.from })
+        if (p.live) {
+          const what = p.titles.length === 1 ? `« ${p.titles[0]} »` : `${p.titles.length} cours`
+          useStore.getState().showToast(`${what} reçu${p.titles.length > 1 ? 's' : ''} de ${p.from}`, 'success')
+        }
+      }),
+      api.peers.on('peersync:proposal', (p: { name: string; count: number }) => {
+        useStore.getState().showToast(
+          `${p.name} est connecté : ${p.count} cours à synchroniser (bouton ${p.name} en haut)`,
+          'info'
+        )
+      })
+    ]
+    return () => offs.forEach((off: () => void) => off())
+  }, [])
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', settings.theme === 'light' ? 'light' : 'dark')
   }, [settings.theme])

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, CheckCircle2, Download, Laptop, Send, TriangleAlert, Wifi, X } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Download, Laptop, Link2, Send, TriangleAlert, Unlink, Wifi, X } from 'lucide-react'
+import { useStore } from '../store'
 import { useEscapeToClose } from '../hooks/useEscapeToClose'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -7,7 +8,7 @@ const api = (window as any).api
 
 interface SyncStatus {
   role: 'receive' | 'send'
-  phase: 'waiting' | 'transferring' | 'applying' | 'done' | 'error'
+  phase: 'waiting' | 'transferring' | 'applying' | 'done' | 'paired' | 'error'
   done?: number
   total?: number
   message?: string
@@ -53,6 +54,7 @@ export default function SyncModal({ onClose }: { onClose: () => void }) {
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
+  const paired = useStore((s) => s.paired)
 
   const busy = sending || status?.phase === 'transferring' || status?.phase === 'applying'
   const close = (): void => {
@@ -105,13 +107,13 @@ export default function SyncModal({ onClose }: { onClose: () => void }) {
     return m ? { name: m[1], host: m[1].replace(/^\[|\]$/g, ''), port: Number(m[2] ?? 47810) } : null
   }
 
-  async function send() {
+  async function send(pairOnly = false) {
     const peer = target ?? manualPeer()
     if (!peer || code.trim().length !== 6) return
     setSending(true)
     setError(null)
     try {
-      await api.sync.send(peer.host, peer.port, code.trim())
+      await api.sync.send(peer.host, peer.port, code.trim(), pairOnly)
     } catch (err) {
       setError((err instanceof Error ? err.message : String(err)).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''))
     } finally {
@@ -119,7 +121,7 @@ export default function SyncModal({ onClose }: { onClose: () => void }) {
     }
   }
 
-  const sendDone = status?.role === 'send' && status.phase === 'done'
+  const sendDone = status?.role === 'send' && (status.phase === 'done' || status.phase === 'paired')
   const recvStatus = status?.role === 'receive' ? status : null
 
   return (
@@ -160,12 +162,39 @@ export default function SyncModal({ onClose }: { onClose: () => void }) {
                 </button>
               </div>
               <p style={{ ...muted, marginTop: 14 }}>Commence par « Recevoir » sur le PC à remplacer, puis « Envoyer » sur l’autre.</p>
+              {paired.length > 0 && (
+                <div style={{ borderTop: '1px solid var(--border)', marginTop: 16, paddingTop: 14 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>PC associés</div>
+                  <p style={{ ...muted, marginBottom: 8 }}>
+                    Quand les deux sont ouverts sur le même réseau, ils se retrouvent : bouton en haut de la fenêtre pour les
+                    resynchroniser, clic droit sur un cours pour l’envoyer.
+                  </p>
+                  {paired.map((p) => (
+                    <div key={p.id} className="sync-peer" style={{ cursor: 'default', marginBottom: 6 }}>
+                      <Laptop size={16} />
+                      <span style={{ flex: 1 }}>{p.name}</span>
+                      <span style={{ fontSize: 11.5, color: p.online ? 'var(--success)' : 'var(--text-tertiary)' }}>
+                        {p.online ? 'connecté' : 'hors ligne'}
+                      </span>
+                      <button className="icon-btn" title="Dissocier" onClick={() => api.peers.unpair(p.id)}>
+                        <Unlink size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </>
           )}
 
           {mode === 'receive' && (
             <>
-              {recvStatus?.phase === 'done' ? (
+              {recvStatus?.phase === 'paired' ? (
+                <div style={{ textAlign: 'center', padding: '12px 0' }}>
+                  <CheckCircle2 size={34} style={{ color: 'var(--success)' }} />
+                  <div style={{ fontWeight: 600, marginTop: 10 }}>Associé à {recvStatus.peer}</div>
+                  <p style={muted}>Aucune donnée n’a été remplacée. Les deux PC se retrouveront tout seuls sur ce réseau.</p>
+                </div>
+              ) : recvStatus?.phase === 'done' ? (
                 <div style={{ textAlign: 'center', padding: '12px 0' }}>
                   <CheckCircle2 size={34} style={{ color: 'var(--success)' }} />
                   <div style={{ fontWeight: 600, marginTop: 10 }}>Données reçues de {recvStatus.peer}</div>
@@ -209,8 +238,14 @@ export default function SyncModal({ onClose }: { onClose: () => void }) {
               {sendDone ? (
                 <div style={{ textAlign: 'center', padding: '12px 0' }}>
                   <CheckCircle2 size={34} style={{ color: 'var(--success)' }} />
-                  <div style={{ fontWeight: 600, marginTop: 10 }}>Envoyé à {status?.peer}</div>
-                  <p style={muted}>{status?.total} fichiers transférés. L’autre PC redémarre avec tes données.</p>
+                  <div style={{ fontWeight: 600, marginTop: 10 }}>
+                    {status?.phase === 'paired' ? `Associé à ${status?.peer}` : `Envoyé à ${status?.peer}`}
+                  </div>
+                  <p style={muted}>
+                    {status?.phase === 'paired'
+                      ? 'Les deux PC se retrouveront tout seuls quand Cours Studio sera ouvert dessus.'
+                      : `${status?.total} fichiers transférés. L’autre PC redémarre avec tes données. Les deux PC restent associés.`}
+                  </p>
                 </div>
               ) : sending ? (
                 <>
@@ -259,7 +294,10 @@ export default function SyncModal({ onClose }: { onClose: () => void }) {
                     onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     onKeyDown={(e) => e.key === 'Enter' && send()}
                   />
-                  <p style={{ ...muted, marginTop: 10 }}>Les données de l’autre PC seront remplacées par celles de ce PC.</p>
+                  <p style={{ ...muted, marginTop: 10 }}>
+                    « Envoyer » remplace les données de l’autre PC par celles de ce PC. « Associer seulement » ne touche à rien :
+                    vous pourrez ensuite synchroniser cours par cours.
+                  </p>
                 </>
               )}
             </>
@@ -278,7 +316,10 @@ export default function SyncModal({ onClose }: { onClose: () => void }) {
             <button className="btn btn-secondary" onClick={back}>
               Annuler
             </button>
-            <button className="btn btn-primary" onClick={send} disabled={code.length !== 6 || (!target && !manualPeer())}>
+            <button className="btn btn-secondary" onClick={() => send(true)} disabled={code.length !== 6 || (!target && !manualPeer())}>
+              <Link2 size={14} /> Associer seulement
+            </button>
+            <button className="btn btn-primary" onClick={() => send()} disabled={code.length !== 6 || (!target && !manualPeer())}>
               <Send size={14} /> Envoyer mes données
             </button>
           </div>

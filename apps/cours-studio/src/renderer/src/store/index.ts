@@ -21,7 +21,22 @@ export interface AITask {
   error?: string
 }
 
+export interface PairedDevice {
+  id: string
+  name: string
+  online: boolean
+  /** Nombre de cours à échanger avec ce PC (null = pas encore comparé). */
+  pending: number | null
+  lastSyncAt: number | null
+}
+
 interface AppStore {
+  /** PC associés pour la synchro continue (voir main/peerSync.ts). */
+  paired: PairedDevice[]
+  setPaired: (p: PairedDevice[]) => void
+  /** Cours modifiés par une synchro : l'éditeur recharge le cours ouvert s'il en fait partie. */
+  externalUpdate: { ids: string[]; from: string; at: number } | null
+  setExternalUpdate: (u: { ids: string[]; from: string }) => void
   subjects: Subject[]
   courses: Course[]
   tags: Tag[]
@@ -126,6 +141,10 @@ interface AppStore {
 const api = (window as any).api
 
 export const useStore = create<AppStore>((set, get) => ({
+  paired: [],
+  setPaired: (paired) => set({ paired }),
+  externalUpdate: null,
+  setExternalUpdate: (u) => set({ externalUpdate: { ...u, at: Date.now() } }),
   subjects: [],
   courses: [],
   tags: [],

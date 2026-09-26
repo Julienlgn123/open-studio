@@ -1,6 +1,7 @@
 import { Sparkles, Settings, HelpCircle, Layers, Search, BarChart3, Timer } from 'lucide-react'
 import { useStore } from '../store'
 import SettingsModal from './SettingsModal'
+import PeerChip from './PeerChip'
 import { useState } from 'react'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -22,6 +23,7 @@ export default function TitleBar() {
         <span className="titlebar-title">Cours Studio</span>
 
         <div className="titlebar-actions">
+          <PeerChip />
           <button
             className="icon-btn"
             onClick={() => window.dispatchEvent(new CustomEvent('open-global-search'))}

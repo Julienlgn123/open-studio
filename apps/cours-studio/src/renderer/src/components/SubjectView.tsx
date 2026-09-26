@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, ArrowLeft, Clock, Mic, Monitor, Edit2, Trash2, FileDown, X } from 'lucide-react'
+import { Plus, Search, ArrowLeft, Clock, Mic, Monitor, Edit2, Trash2, FileDown, X, Send } from 'lucide-react'
 import { useStore } from '../store'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
@@ -217,6 +217,18 @@ export default function SubjectView() {
           items={[
             { label: 'Ouvrir', icon: <Edit2 size={14} />, onClick: () => openCourse(contextMenu.course.id) },
             { label: 'Renommer', icon: <Edit2 size={14} />, onClick: () => { setEditCourse(contextMenu.course); setContextMenu(null) } },
+            ...useStore.getState().paired.filter((p) => p.online).map((p) => ({
+              label: `Envoyer à ${p.name}`,
+              icon: <Send size={14} />,
+              onClick: () => {
+                const c = contextMenu.course
+                setContextMenu(null)
+                ;(window as any).api.peers
+                  .send(p.id, [c.id])
+                  .then(() => useStore.getState().showToast(`« ${c.title} » envoyé à ${p.name}`, 'success'))
+                  .catch((err: Error) => useStore.getState().showToast(err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), 'error'))
+              }
+            })),
             { label: 'Supprimer', icon: <Trash2 size={14} />, danger: true, onClick: () => handleDelete(contextMenu.course.id) }
           ]}
         />

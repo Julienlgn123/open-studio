@@ -1553,3 +1553,43 @@ kbd {
 .sync-peer.on { border-color: var(--accent); background: var(--accent-dim); }
 .sync-pulse { animation: sync-pulse 1.4s ease-in-out infinite; color: var(--accent); }
 @keyframes sync-pulse { 50% { opacity: 0.3; } }
+
+/* ─── PC associés (synchro continue) ────────────────────── */
+.peer-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 9px;
+  margin-right: 4px;
+  border-radius: 13px;
+  border: 1px solid var(--border);
+  background: var(--bg-overlay);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+.peer-chip:hover { color: var(--text-primary); border-color: var(--border-medium); }
+.peer-chip.pending { border-color: rgba(251,191,36,0.35); color: var(--text-primary); }
+.peer-chip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+.peer-chip-name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.peer-chip-count {
+  min-width: 17px; height: 17px; padding: 0 5px; border-radius: 9px;
+  background: var(--warning-dim); color: var(--warning);
+  font-size: 10.5px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
+}
+.peer-muted { font-size: 12.5px; color: var(--text-tertiary); line-height: 1.55; }
+.peer-section {
+  display: flex; align-items: center; gap: 7px; margin-bottom: 6px;
+  font-size: 12px; font-weight: 600; color: var(--text-secondary);
+}
+.peer-section span { color: var(--text-tertiary); font-weight: 500; }
+.peer-row {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px; margin-bottom: 4px;
+  border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-overlay); cursor: pointer;
+}
+.peer-row.conflict { border-color: rgba(251,191,36,0.3); }
+.peer-row-emoji { font-size: 16px; }
+.peer-row-title { display: block; font-size: 13px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.peer-row-reason { display: block; font-size: 11.5px; color: var(--text-tertiary); }

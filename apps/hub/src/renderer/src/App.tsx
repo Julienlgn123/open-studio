@@ -37,7 +37,10 @@ export default function App(): JSX.Element {
       if (!useStore.getState().settings.onboardingSeen) setShowOnboarding(true)
     })()
 
-    const offProgress = window.api.apps.onProgress((p) => setProgress((prev) => ({ ...prev, [p.id]: p })))
+    const offProgress = window.api.apps.onProgress((p) => {
+      if (p.phase === 'done') clearProgress(p.id)
+      else setProgress((prev) => ({ ...prev, [p.id]: p }))
+    })
     const offUpdate = window.api.app.onUpdateReady((p) => setSelfUpdate(p))
     // Mise à jour automatique d'une app gérée (faite en arrière-plan par Open Studio).
     const offAuto = window.api.apps.onAutoUpdated((p) => {

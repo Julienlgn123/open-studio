@@ -24,10 +24,10 @@ export function rewriteMediaPaths(dbPath: string): void {
   try {
     db = new Database(dbPath)
     const rows = db.prepare('SELECT id, audio_path, video_path FROM courses').all() as { id: string; audio_path: string | null; video_path: string | null }[]
-    const fix = (p: string | null): string | null => {
+    const fix = (p: string | null, folder = 'recordings'): string | null => {
       if (!p) return p
       const parts = p.split(/[\\/]+/)
-      const i = parts.lastIndexOf('recordings')
+      const i = parts.lastIndexOf(folder)
       if (i < 0) return p
       const local = join(userData(), ...parts.slice(i))
       return local === p ? p : local
@@ -38,6 +38,12 @@ export function rewriteMediaPaths(dbPath: string): void {
         const audio = fix(r.audio_path)
         const video = fix(r.video_path)
         if (audio !== r.audio_path || video !== r.video_path) update.run(audio, video, r.id)
+      }
+      const atts = db.prepare('SELECT id, file_path FROM attachments').all() as { id: string; file_path: string }[]
+      const updAtt = db.prepare('UPDATE attachments SET file_path = ? WHERE id = ?')
+      for (const a of atts) {
+        const p = fix(a.file_path, 'attachments')
+        if (p !== a.file_path) updAtt.run(p, a.id)
       }
     })()
   } catch {

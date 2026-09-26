@@ -123,6 +123,9 @@ export async function installOrUpdateApp(id: string, opts: { sharedZipPath?: str
     return await doInstallOrUpdate(id, opts)
   } finally {
     busyApps.delete(id)
+    // Toujours signaler la fin : sinon la carte reste sur « Installation… » quand la mise
+    // à jour a été lancée ailleurs que depuis elle (panneau des mises à jour, automatique).
+    emitProgress(id, 'done', 1)
   }
 }
 

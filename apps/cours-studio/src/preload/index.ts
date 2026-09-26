@@ -49,7 +49,8 @@ const api = {
     stopReceive: (): Promise<boolean> => ipcRenderer.invoke('sync:stopReceive'),
     startDiscovery: (): Promise<boolean> => ipcRenderer.invoke('sync:startDiscovery'),
     stopDiscovery: (): Promise<boolean> => ipcRenderer.invoke('sync:stopDiscovery'),
-    send: (host: string, port: number, code: string): Promise<void> => ipcRenderer.invoke('sync:send', host, port, code),
+    send: (host: string, port: number, code: string, pairOnly?: boolean): Promise<void> =>
+      ipcRenderer.invoke('sync:send', host, port, code, pairOnly),
     onStatus: (cb: (s: unknown) => void): (() => void) => {
       const h = (_: unknown, s: unknown): void => cb(s)
       ipcRenderer.on('sync:status', h)
@@ -59,6 +60,18 @@ const api = {
       const h = (_: unknown, p: unknown): void => cb(p)
       ipcRenderer.on('sync:peers', h)
       return () => ipcRenderer.removeListener('sync:peers', h)
+    }
+  },
+  peers: {
+    list: () => ipcRenderer.invoke('peers:list'),
+    unpair: (id: string) => ipcRenderer.invoke('peers:unpair', id),
+    plan: (id: string) => ipcRenderer.invoke('peers:plan', id),
+    run: (id: string, items: unknown[]) => ipcRenderer.invoke('peers:run', id, items),
+    send: (id: string, courseIds: string[]) => ipcRenderer.invoke('peers:send', id, courseIds),
+    on: (channel: 'peers:changed' | 'peersync:progress' | 'peersync:received' | 'peersync:proposal', cb: (p: unknown) => void): (() => void) => {
+      const h = (_: unknown, p: unknown): void => cb(p)
+      ipcRenderer.on(channel, h)
+      return () => ipcRenderer.removeListener(channel, h)
     }
   },
   backup: {

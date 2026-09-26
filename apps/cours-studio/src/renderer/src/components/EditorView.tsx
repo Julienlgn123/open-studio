@@ -99,6 +99,27 @@ export default function EditorView() {
     }
   }, [activeCourseId])
 
+  // Le cours ouvert vient d'être remplacé par une synchro avec un autre PC : on affiche la
+  // nouvelle version (sans l'écraser avec l'ancienne à la prochaine sauvegarde auto).
+  const externalUpdate = useStore((s) => s.externalUpdate)
+  useEffect(() => {
+    if (!externalUpdate || !activeCourseId || !externalUpdate.ids.includes(activeCourseId)) return
+    const fresh = useStore.getState().courses.find((c) => c.id === activeCourseId)
+    if (!fresh) return
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current)
+      saveTimer.current = null
+      // Modifs pas encore enregistrées : gardées dans l'historique plutôt que perdues.
+      if (content !== fresh.content) {
+        api.versions.create({ courseId: activeCourseId, content, label: 'Modifs non enregistrées avant la synchro', source: 'manual' })
+      }
+    }
+    setTitle(fresh.title)
+    setContent(fresh.content)
+    setSaved(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalUpdate])
+
   useEffect(() => {
     if (!showPdf || !activeCourseId) return
     api.attachments.get(activeCourseId).then((all: Attachment[]) => {

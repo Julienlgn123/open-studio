@@ -7,6 +7,7 @@ import { hostname, networkInterfaces } from 'os'
 import { dirname, join } from 'path'
 import { checkpointDb, closeDb } from './db'
 import { DATA_ENTRIES, getBackupsDir, rewriteMediaPaths } from './backup'
+import { addPairing, fingerprints, myDeviceId } from './peerSync'
 
 // Synchronisation directe entre deux PC sur le même réseau (Wi-Fi / câble), sans cloud.
 // Le PC qui REÇOIT affiche un code à 6 chiffres et s'annonce sur le réseau local ; le PC
@@ -24,7 +25,7 @@ const MACHINE_SETTINGS = ['autoBackupFolder']
 
 export interface SyncStatus {
   role: 'receive' | 'send'
-  phase: 'waiting' | 'transferring' | 'applying' | 'done' | 'error'
+  phase: 'waiting' | 'transferring' | 'applying' | 'done' | 'paired' | 'error'
   done?: number
   total?: number
   message?: string
@@ -47,6 +48,8 @@ const userData = (): string => app.getPath('userData')
 function deriveKey(code: string, salt: Buffer): Buffer {
   return scryptSync(code, salt, 32, { N: 2 ** 15, r: 8, p: 1, maxmem: 64 * 1024 * 1024 })
 }
+/** Secret durable de l'association, calculé des deux côtés à partir de la clé de session. */
+const pairSecretOf = (key: Buffer, nonce: string): Buffer => createHmac('sha256', key).update(`pair:${nonce}`).digest()
 const proofOf = (key: Buffer, salt: Buffer): Buffer => createHmac('sha256', key).update(`${MAGIC}:${salt.toString('hex')}`).digest()
 
 function encrypt(key: Buffer, data: Buffer): Buffer {
@@ -117,6 +120,8 @@ interface ReceiveSession {
   staging: string
   received: number
   peer: string
+  peerId: string
+  pairNonce: string
 }
 
 let receiving: ReceiveSession | null = null
@@ -140,7 +145,9 @@ export async function startReceive(): Promise<{ code: string; name: string; port
     attempts: 0,
     staging,
     received: 0,
-    peer: ''
+    peer: '',
+    peerId: '',
+    pairNonce: randomBytes(16).toString('hex')
   }
   const port = await new Promise<number>((resolvePort, reject) => {
     const listen = (p: number): void => {
@@ -193,7 +200,7 @@ async function handle(s: ReceiveSession, req: IncomingMessage, res: ServerRespon
 
   if (req.method === 'POST' && url.pathname === '/auth') {
     if (s.attempts >= MAX_AUTH_ATTEMPTS) return send(res, 429, { error: 'Trop d’essais : relance la réception sur ce PC.' })
-    const { proof, name } = JSON.parse((await readBody(req, 4096)).toString('utf-8')) as { proof?: string; name?: string }
+    const { proof, name, deviceId } = JSON.parse((await readBody(req, 4096)).toString('utf-8')) as { proof?: string; name?: string; deviceId?: string }
     const expected = proofOf(s.key, s.salt)
     const given = Buffer.from(String(proof ?? ''), 'hex')
     if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
@@ -206,8 +213,9 @@ async function handle(s: ReceiveSession, req: IncomingMessage, res: ServerRespon
     }
     s.token = randomBytes(24).toString('hex')
     s.peer = String(name ?? 'un autre PC').slice(0, 80)
+    s.peerId = String(deviceId ?? '').slice(0, 64)
     status({ role: 'receive', phase: 'transferring', done: 0, peer: s.peer })
-    return send(res, 200, { token: s.token })
+    return send(res, 200, { token: s.token, deviceId: myDeviceId(), name: hostname(), pairNonce: s.pairNonce })
   }
 
   if (!s.token || req.headers['x-sync-token'] !== s.token) return send(res, 403, { error: 'Non autorisé.' })
@@ -224,10 +232,21 @@ async function handle(s: ReceiveSession, req: IncomingMessage, res: ServerRespon
     return send(res, 200, { ok: true })
   }
 
+  // Association seule : les deux PC se retiennent, sans rien transférer.
+  if (req.method === 'POST' && url.pathname === '/pair') {
+    if (s.peerId) addPairing(s.peerId, s.peer, pairSecretOf(s.key, s.pairNonce), {})
+    send(res, 200, { ok: true })
+    status({ role: 'receive', phase: 'paired', peer: s.peer })
+    setTimeout(stopReceive, 300)
+    return
+  }
+
   if (req.method === 'POST' && url.pathname === '/commit') {
-    const { count } = JSON.parse((await readBody(req, 4096)).toString('utf-8')) as { count?: number }
+    const { count, fps } = JSON.parse((await readBody(req, 64 * 1024 * 1024)).toString('utf-8')) as { count?: number; fps?: Record<string, string> }
     if (count !== s.received) return send(res, 409, { error: `Transfert incomplet (${s.received}/${count} fichiers).` })
     if (!existsSync(join(s.staging, 'cours-studio.db'))) return send(res, 409, { error: 'La base de données n’a pas été reçue.' })
+    // Après la synchro, les deux PC ont les mêmes cours : c'est le point de départ des synchros suivantes.
+    if (s.peerId) addPairing(s.peerId, s.peer, pairSecretOf(s.key, s.pairNonce), fps ?? {})
     send(res, 200, { ok: true })
     status({ role: 'receive', phase: 'applying', peer: s.peer })
     setTimeout(() => applyStaged(s), 400)
@@ -376,18 +395,29 @@ async function call(url: string, init: RequestInit): Promise<unknown> {
 }
 
 /** Envoie toutes les données de ce PC vers le PC `host:port`, qui les installe à la place des siennes. */
-export async function sendTo(host: string, port: number, code: string): Promise<void> {
+export async function sendTo(host: string, port: number, code: string, pairOnly = false): Promise<void> {
   const base = `http://${host.includes(':') ? `[${host}]` : host}:${port}`
   try {
     const hello = (await call(`${base}/hello`, { method: 'GET' })) as { app?: string; name?: string; salt?: string }
     if (hello.app !== MAGIC || !hello.salt) throw new Error('Ce n’est pas un Cours Studio en réception.')
     const salt = Buffer.from(hello.salt, 'hex')
     const key = deriveKey(code.trim(), salt)
-    const { token } = (await call(`${base}/auth`, {
+    const auth = (await call(`${base}/auth`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ proof: proofOf(key, salt).toString('hex'), name: hostname() })
-    })) as { token: string }
+      body: JSON.stringify({ proof: proofOf(key, salt).toString('hex'), name: hostname(), deviceId: myDeviceId() })
+    })) as { token: string; deviceId?: string; name?: string; pairNonce?: string }
+    const { token } = auth
+    const remember = (baseline: Record<string, string>): void => {
+      if (auth.deviceId && auth.pairNonce) addPairing(auth.deviceId, auth.name ?? hello.name ?? host, pairSecretOf(key, auth.pairNonce), baseline)
+    }
+
+    if (pairOnly) {
+      await call(`${base}/pair`, { method: 'POST', headers: { 'x-sync-token': token, 'Content-Type': 'application/json' }, body: '{}' })
+      remember({})
+      status({ role: 'send', phase: 'paired', peer: auth.name ?? hello.name ?? host })
+      return
+    }
 
     checkpointDb()
     const files = listDataFiles()
@@ -402,11 +432,13 @@ export async function sendTo(host: string, port: number, code: string): Promise<
         body: new Uint8Array(encrypt(key, data))
       })
     }
+    const fps = fingerprints()
     await call(`${base}/commit`, {
       method: 'POST',
       headers: { 'x-sync-token': token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ count: files.length })
+      body: JSON.stringify({ count: files.length, fps })
     })
+    remember(fps)
     status({ role: 'send', phase: 'done', done: files.length, total: files.length, peer })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

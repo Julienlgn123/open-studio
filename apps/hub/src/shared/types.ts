@@ -49,7 +49,8 @@ export interface AppState extends CatalogEntry {
 
 export interface InstallProgress {
   id: string
-  phase: 'uninstalling' | 'downloading' | 'installing'
+  /** `done` : fin de l'opération (réussie ou non), quelle que soit l'origine du clic. */
+  phase: 'uninstalling' | 'downloading' | 'installing' | 'done'
   pct: number
 }
 
