@@ -16,13 +16,13 @@ export interface GhRelease {
 /** Délai au-delà duquel une connexion sans aucune donnée est considérée bloquée. */
 const IDLE_TIMEOUT_MS = 20_000
 
-function getJson<T>(url: string): Promise<T> {
+function getJson<T>(url: string, accept = 'application/vnd.github+json'): Promise<T> {
   return new Promise((resolve, reject) => {
     const req = https
       .get(
         url,
         {
-          headers: { 'User-Agent': 'open-studio', Accept: 'application/vnd.github+json' },
+          headers: { 'User-Agent': 'open-studio', Accept: accept },
           timeout: IDLE_TIMEOUT_MS
         },
         (res) => {
@@ -87,6 +87,31 @@ export async function fetchLatestRelease(owner: string, repo: string): Promise<G
     if (cached) return cached.data
     throw err
   }
+}
+
+/** Nom de l'asset publié par la CI avec la vraie version de chaque app de la suite. */
+export const SUITE_MANIFEST_ASSET = 'suite-versions.json'
+
+/** Version et nouveautés de chaque app du monorepo, pour une release de la suite. */
+export type SuiteManifest = Record<string, { version: string; notes?: string }>
+
+const manifestCache = new Map<string, SuiteManifest | null>()
+
+/**
+ * Manifeste de la release (`suite-versions.json`). Une release de la suite regroupe toutes
+ * les apps : son numéro (v1.7.0) ne dit pas si Cours Studio a changé. `null` pour les
+ * anciennes releases qui n'en ont pas.
+ */
+export async function fetchSuiteManifest(rel: GhRelease): Promise<SuiteManifest | null> {
+  if (manifestCache.has(rel.tag_name)) return manifestCache.get(rel.tag_name) ?? null
+  const asset = rel.assets.find((a) => a.name === SUITE_MANIFEST_ASSET)
+  if (!asset) {
+    manifestCache.set(rel.tag_name, null)
+    return null
+  }
+  const data = await getJson<SuiteManifest>(asset.browser_download_url, 'application/octet-stream')
+  manifestCache.set(rel.tag_name, data)
+  return data
 }
 
 /**

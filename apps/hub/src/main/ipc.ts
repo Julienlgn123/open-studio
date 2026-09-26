@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, shell } from 'electron'
+import { app, ipcMain, BrowserWindow, shell } from 'electron'
 import { getSettings, setTheme, setOnboardingSeen } from './store'
 import { listAppStates, installOrUpdateApp, launchApp, uninstallApp, getInstalledSize } from './install'
 
@@ -14,6 +14,7 @@ export function registerIpc(): void {
     w.isMaximized() ? w.unmaximize() : w.maximize()
   })
   ipcMain.handle('window:close', () => getWin()?.close())
+  ipcMain.handle('app:version', () => app.getVersion())
 
   ipcMain.handle('settings:get', () => getSettings())
   ipcMain.handle('settings:setTheme', (_, theme: 'dark' | 'light') => {

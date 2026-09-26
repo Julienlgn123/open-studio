@@ -1,51 +1,24 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowUpCircle } from 'lucide-react'
+import { Loader2, Search } from 'lucide-react'
 import { useStore } from './store'
 import TitleBar from './components/TitleBar'
+import Sidebar, { type View } from './components/Sidebar'
 import ToastStack from './components/Toast'
 import AppCard from './components/AppCard'
 import UpdateBanner from './components/UpdateBanner'
 import Onboarding from './components/Onboarding'
-import Brandmark from './components/Brandmark'
-import { getCategoryColor } from './lib/categories'
-import type { InstallProgress } from '@shared/types'
+import type { AppState, InstallProgress } from '@shared/types'
 
-type SortMode = 'name' | 'status'
+const byName = (a: AppState, b: AppState): number => a.name.localeCompare(b.name)
 
 export default function App(): JSX.Element {
   const { apps, loading, settings, loadSettings, loadApps, setOnboardingSeen } = useStore()
   const [progress, setProgress] = useState<Record<string, InstallProgress>>({})
   const [dismissedUpdates, setDismissedUpdates] = useState<Set<string>>(new Set())
   const [selfUpdate, setSelfUpdate] = useState<{ version: string } | null>(null)
-  const [activeCategory, setActiveCategory] = useState<string | null>(null)
-  const [sortMode, setSortMode] = useState<SortMode>('name')
+  const [view, setView] = useState<View>({ kind: 'all' })
+  const [query, setQuery] = useState('')
   const [showOnboarding, setShowOnboarding] = useState(false)
-
-  const installedCount = useMemo(() => apps.filter((a) => a.status !== 'not_installed').length, [apps])
-
-  const categories = useMemo(
-    () => Array.from(new Set(apps.map((a) => a.category))).sort(),
-    [apps]
-  )
-
-  const visibleApps = useMemo(() => {
-    const filtered = activeCategory ? apps.filter((a) => a.category === activeCategory) : apps
-    const sorted = [...filtered]
-    if (sortMode === 'name') {
-      sorted.sort((a, b) => a.name.localeCompare(b.name))
-    } else {
-      // Statut : installé/màj d'abord, puis non installé — pratique pour
-      // retrouver vite ce qui est déjà prêt à lancer.
-      const rank: Record<string, number> = {
-        update_available: 0,
-        installed: 0,
-        not_installed: 1,
-        error: 2
-      }
-      sorted.sort((a, b) => (rank[a.status] ?? 1) - (rank[b.status] ?? 1) || a.name.localeCompare(b.name))
-    }
-    return sorted
-  }, [apps, activeCategory, sortMode])
 
   function clearProgress(id: string): void {
     setProgress((prev) => {
@@ -64,19 +37,13 @@ export default function App(): JSX.Element {
       if (!useStore.getState().settings.onboardingSeen) setShowOnboarding(true)
     })()
 
-    const offProgress = window.api.apps.onProgress((p) => {
-      setProgress((prev) => ({ ...prev, [p.id]: p }))
-    })
+    const offProgress = window.api.apps.onProgress((p) => setProgress((prev) => ({ ...prev, [p.id]: p })))
     const offUpdate = window.api.app.onUpdateReady((p) => setSelfUpdate(p))
     // Mise à jour automatique d'une app gérée (faite en arrière-plan par Open Studio).
     const offAuto = window.api.apps.onAutoUpdated((p) => {
-      setProgress((prev) => {
-        const next = { ...prev }
-        delete next[p.id]
-        return next
-      })
+      clearProgress(p.id)
       if (p.error) useStore.getState().toast(`Mise à jour de ${p.name} impossible : ${p.error}`, 'error')
-      else useStore.getState().toast(`${p.name} mis à jour${p.version ? ` (v${p.version})` : ''} ✓`, 'success')
+      else useStore.getState().toast(`${p.name} mis à jour${p.version ? ` (v${p.version})` : ''}`, 'success')
       void loadApps()
     })
     return () => {
@@ -86,101 +53,108 @@ export default function App(): JSX.Element {
     }
   }, [])
 
+  const q = query.trim().toLowerCase()
+  const matches = (a: AppState): boolean =>
+    !q || a.name.toLowerCase().includes(q) || a.description.toLowerCase().includes(q) || a.category.toLowerCase().includes(q)
+
+  const sections = useMemo(() => {
+    const list = apps.filter(matches)
+    const installed = list.filter((a) => a.status !== 'not_installed').sort(byName)
+    const available = list.filter((a) => a.status === 'not_installed').sort(byName)
+    switch (view.kind) {
+      case 'installed':
+        return [{ title: 'Installées', items: installed }]
+      case 'updates':
+        return []
+      case 'category':
+        return [{ title: view.name, items: list.filter((a) => a.category === view.name).sort(byName) }]
+      default:
+        return [
+          { title: 'Installées', items: installed },
+          { title: 'À découvrir', items: available }
+        ].filter((s) => s.items.length)
+    }
+  }, [apps, view, q])
+
+  const head =
+    view.kind === 'installed'
+      ? { title: 'Installées', sub: 'Les apps prêtes à être ouvertes sur cet ordinateur.' }
+      : view.kind === 'updates'
+        ? { title: 'Mises à jour', sub: 'Les nouvelles versions de tes apps.' }
+        : view.kind === 'category'
+          ? { title: view.name, sub: `Les apps de la catégorie ${view.name}.` }
+          : { title: 'Bibliothèque', sub: 'Installe, ouvre et mets à jour les apps de la suite.' }
+
+  let cardIndex = 0
   return (
     <div className="app">
-      <TitleBar onHelp={() => setShowOnboarding(true)} />
+      <TitleBar />
       <div className="app-body">
+        <Sidebar
+          apps={apps}
+          view={view}
+          onView={setView}
+          onHelp={() => setShowOnboarding(true)}
+          selfUpdating={selfUpdate?.version ?? null}
+        />
         <main className="main">
-          <div className="hero">
-            <div className="hero-row">
-              <div className="hero-title">
-                <Brandmark size={34} />
-                <div>
-                  <h1>Catalogue</h1>
-                  <div className="hero-sub">
-                    Installe, lance et mets à jour les apps de la suite depuis un seul endroit.
-                  </div>
-                </div>
+          <div className="main-inner">
+            <div className="page-head">
+              <div>
+                <h1 className="page-title">{head.title}</h1>
+                <div className="page-sub">{head.sub}</div>
               </div>
-              <div className="hero-stats">
-                <strong>{installedCount}</strong>&nbsp;installée{installedCount !== 1 ? 's' : ''} sur{' '}
-                <strong>{apps.length}</strong>
-                {activeCategory && <>&nbsp;· {activeCategory}</>}
-              </div>
-            </div>
-          </div>
-
-          <div className="view-scroll">
-            <div className="view-pad">
-              {selfUpdate && (
-                <div className="update-banner fade-in" style={{ marginBottom: 14 }}>
-                  <ArrowUpCircle size={18} className="update-banner-icon" />
-                  <div className="update-banner-text">
-                    <div className="update-banner-title">
-                      Mise à jour d'Open Studio — v{selfUpdate.version}
-                    </div>
-                    <div className="update-banner-sub muted">
-                      Téléchargée en arrière-plan, installation automatique dans quelques secondes…
-                    </div>
-                  </div>
-                  <div className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
-                </div>
+              {view.kind !== 'updates' && (
+                <label className="search">
+                  <Search size={14} />
+                  <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher une app" />
+                </label>
               )}
+            </div>
+
+            {selfUpdate && (
+              <div className="notice">
+                <Loader2 size={15} className="spin-icon" style={{ animation: 'spin 0.9s linear infinite' }} />
+                Open Studio v{selfUpdate.version} est prêt : redémarrage automatique dans quelques secondes…
+              </div>
+            )}
+
+            {(view.kind === 'all' || view.kind === 'updates') && !loading && (
               <UpdateBanner
                 apps={apps}
-                dismissed={dismissedUpdates}
+                dismissed={view.kind === 'updates' ? new Set() : dismissedUpdates}
                 onDismiss={(id) => setDismissedUpdates((prev) => new Set(prev).add(id))}
+                showEmpty={view.kind === 'updates'}
               />
-              {categories.length > 1 && (
-                <div className="filter-row">
-                  <button
-                    className={`filter-chip${activeCategory === null ? ' active' : ''}`}
-                    onClick={() => setActiveCategory(null)}
-                  >
-                    Tous
-                  </button>
-                  {categories.map((cat) => (
-                    <button
-                      key={cat}
-                      className={`filter-chip${activeCategory === cat ? ' active' : ''}`}
-                      style={{ ['--chip-color' as string]: getCategoryColor(cat) }}
-                      onClick={() => setActiveCategory((prev) => (prev === cat ? null : cat))}
-                    >
-                      <span className="filter-chip-dot" />
-                      {cat}
-                    </button>
-                  ))}
-                  <select
-                    className="sort-select"
-                    value={sortMode}
-                    onChange={(e) => setSortMode(e.target.value as SortMode)}
-                  >
-                    <option value="name">Trier : Nom (A→Z)</option>
-                    <option value="status">Trier : Installées d'abord</option>
-                  </select>
-                </div>
-              )}
-              {loading ? (
-                <div className="empty-state">
-                  <div className="spinner" style={{ width: 24, height: 24 }} />
-                </div>
-              ) : visibleApps.length === 0 ? (
-                <div className="empty-state">
-                  <div className="empty-state-title">Aucune app dans "{activeCategory}"</div>
-                </div>
-              ) : (
-                <div className="card-grid">
-                  {visibleApps.map((a) => (
-                    <AppCard
-                      key={a.id}
-                      app={a}
-                      progress={progress[a.id]}
-                      onDone={() => clearProgress(a.id)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
+            )}
+
+            {loading ? (
+              <div className="grid">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="skeleton" />
+                ))}
+              </div>
+            ) : view.kind === 'updates' ? null : sections.every((s) => !s.items.length) ? (
+              <div className="empty">
+                <div className="empty-title">{q ? `Aucune app ne correspond à « ${query} »` : 'Rien ici pour l’instant'}</div>
+                {q ? 'Essaie un autre mot-clé.' : view.kind === 'installed' ? 'Installe une app depuis la bibliothèque.' : ''}
+              </div>
+            ) : (
+              sections.map((s) => (
+                <section key={s.title}>
+                  {sections.length > 1 && (
+                    <h2 className="section-title">
+                      {s.title} <span>{s.items.length}</span>
+                    </h2>
+                  )}
+                  <div className="grid">
+                    {s.items.map((a) => (
+                      <AppCard key={a.id} app={a} progress={progress[a.id]} onDone={() => clearProgress(a.id)} index={cardIndex++} />
+                    ))}
+                  </div>
+                </section>
+              ))
+            )}
           </div>
         </main>
       </div>

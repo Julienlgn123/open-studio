@@ -35,6 +35,7 @@ const api = {
   },
   app: {
     notifyReady: () => ipcRenderer.send('renderer:ready'),
+    getVersion: (): Promise<string> => ipcRenderer.invoke('app:version'),
     onUpdateReady: (cb: (payload: { version: string }) => void) =>
       on<{ version: string }>('app:updateReady', cb)
   }

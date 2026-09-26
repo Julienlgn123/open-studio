@@ -161,6 +161,9 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Historique et tags complets : suite-manifest.mjs compare avec la release précédente.
+          fetch-depth: 0
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -223,6 +226,11 @@ jobs:
           # chercher un fichier séparé par nom.
           rm -f dist-artifacts/Cours-Studio-* dist-artifacts/Drive-Studio-* dist-artifacts/Local-IA-Studio-*
 
+      # Vraie version de chaque app (le numéro de la release concerne toute la suite) :
+      # Open Studio ne propose une mise à jour que si l'app a réellement changé.
+      - name: Write suite-versions.json
+        run: node .github/scripts/suite-manifest.mjs "${GITHUB_REF_NAME}" dist-artifacts/suite-versions.json
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -261,7 +269,7 @@ jobs:
             mécanisme de mise à jour utilisent automatiquement en arrière-plan —
             pas besoin d'en télécharger un directement, sers-toi des 3 zips au-dessus.
 
-            🔄 Mises à jour automatiques au démarrage (Open Studio uniquement).
+            🔄 Open Studio se met à jour tout seul, et met à jour les apps installées dès qu'elles ont une nouvelle version.
           files: dist-artifacts/**/*
           draft: false
           prerelease: false
@@ -278,7 +286,7 @@ jobs:
         run: |
           TAG="v${{ steps.version.outputs.VERSION }}"
           gh api "repos/${{ github.repository }}/releases/tags/$TAG" --jq \
-            '.assets[] as $a | select(((["Open-Studio-Windows.zip","Open-Studio-macOS.zip","Open-Studio-Linux.zip"] | index($a.name)) or ($a.name | endswith(".yml"))) | not) | $a.id' |
+            '.assets[] as $a | select(((["Open-Studio-Windows.zip","Open-Studio-macOS.zip","Open-Studio-Linux.zip","suite-versions.json"] | index($a.name)) or ($a.name | endswith(".yml"))) | not) | $a.id' |
           while read -r id; do
             gh api -X PATCH "repos/${{ github.repository }}/releases/assets/$id" \
               -f label="Utilisé automatiquement — télécharge plutôt le zip de ton OS"

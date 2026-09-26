@@ -2,7 +2,8 @@ import { app } from 'electron'
 import { existsSync, mkdirSync, rmSync } from 'fs'
 import { join } from 'path'
 import { CATALOG } from '../catalog'
-import { fetchLatestRelease, pickAsset, downloadTo } from '../github'
+import { fetchLatestRelease, fetchSuiteManifest, pickAsset, downloadTo } from '../github'
+import { normalizeVersion, readInstalledVersion } from './version'
 import { getTrackedApp, setTrackedApp, clearTrackedApp } from '../store'
 import { broadcast } from '../events'
 import { winInstaller } from './win'
@@ -43,17 +44,35 @@ export async function listAppStates(): Promise<AppState[]> {
       const { owner, repo } = repoFor(entry)
       let latestVersion: string | null = null
       let latestChangelog: string | null = null
+      // Numéro de la suite (pas de manifeste) : seul le numéro noté à l'install est comparable.
+      let suiteNumbering = false
       try {
         const rel = await fetchLatestRelease(owner, repo)
         latestVersion = rel.tag_name.replace(/^v/, '')
         latestChangelog = rel.body ?? null
+        if (!entry.owner) {
+          // App de la suite : la release (v1.7.0) regroupe toutes les apps, c'est le manifeste
+          // qui donne la vraie version de celle-ci et ce qui a changé pour elle.
+          const manifest = await fetchSuiteManifest(rel).catch(() => null)
+          const own = manifest?.[entry.id]
+          if (own) {
+            latestVersion = own.version
+            latestChangelog = own.notes?.trim() || null
+          } else if (manifest) {
+            latestVersion = null
+          } else {
+            suiteNumbering = true
+          }
+        }
       } catch {
         // Pas de connexion / repo indisponible : on garde le statut connu.
       }
-      const installedVersion = tracked?.installedVersion ?? (execPath ? 'inconnue' : null)
+      // La version lue dans l'app installée fait foi ; celle notée à l'install sert de repli.
+      const realVersion = execPath && !suiteNumbering ? await readInstalledVersion(entry, execPath).catch(() => null) : null
+      const installedVersion = realVersion ?? tracked?.installedVersion ?? (execPath ? 'inconnue' : null)
       const status: AppState['status'] = !execPath
         ? 'not_installed'
-        : latestVersion && installedVersion && latestVersion !== installedVersion
+        : latestVersion && installedVersion && normalizeVersion(latestVersion) !== normalizeVersion(installedVersion)
           ? 'update_available'
           : 'installed'
 
@@ -113,7 +132,8 @@ async function doInstallOrUpdate(id: string, opts: { sharedZipPath?: string }): 
 
   const { owner, repo } = repoFor(entry)
   const rel = await fetchLatestRelease(owner, repo)
-  const version = rel.tag_name.replace(/^v/, '')
+  const manifest = entry.owner ? null : await fetchSuiteManifest(rel).catch(() => null)
+  const version = manifest?.[entry.id]?.version ?? rel.tag_name.replace(/^v/, '')
 
   const dir = managedDir(id)
   const execTargetDir = join(dir, 'install')

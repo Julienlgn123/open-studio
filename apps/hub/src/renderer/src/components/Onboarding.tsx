@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, DownloadCloud, RefreshCw, SlidersHorizontal } from 'lucide-react'
+import { ChevronLeft, ChevronRight, DownloadCloud, LayoutGrid, RefreshCw } from 'lucide-react'
 import Brandmark from './Brandmark'
 
 interface Step {
@@ -12,27 +12,27 @@ interface Step {
 const STEPS: Step[] = [
   {
     label: 'Bienvenue',
-    title: 'Open Studio, le point d’entrée de toute la suite',
-    text: 'Un seul endroit pour découvrir, installer et lancer chaque app de la suite — Cours Studio, Drive Studio et les suivantes. Pas besoin d’aller chercher un installateur sur chaque site.',
-    art: <Brandmark size={56} />
+    title: 'Toute la suite, depuis un seul endroit',
+    text: 'Open Studio rassemble les apps de la suite — Cours Studio, Drive Studio, Local IA Studio… Découvre-les, installe-les et lance-les d’ici, sans chercher d’installateur.',
+    art: <Brandmark size={64} />
   },
   {
     label: 'Installation',
-    title: 'De vrais installateurs, pas des raccourcis',
-    text: 'Quand tu installes une app depuis le catalogue, Open Studio télécharge son vrai installateur natif et l’installe pour de vrai — sans jamais toucher aux données déjà présentes de cette app si tu l’avais installée toi-même avant.',
-    art: <DownloadCloud size={40} strokeWidth={1.6} />
+    title: 'De vraies apps, installées pour de vrai',
+    text: 'Open Studio télécharge l’installateur officiel de chaque app et l’installe proprement. Tes données dans chaque app ne sont jamais touchées, même quand tu désinstalles.',
+    art: <DownloadCloud size={44} strokeWidth={1.5} />
   },
   {
     label: 'Mises à jour',
-    title: 'Les mises à jour, centralisées ici',
-    text: 'Open Studio vérifie les nouvelles versions de chaque app et te propose de les installer en un clic. Les apps elles-mêmes ne se mettent plus à jour toutes seules — tout se passe depuis ce catalogue.',
-    art: <RefreshCw size={40} strokeWidth={1.6} />
+    title: 'Toujours à jour, sans y penser',
+    text: 'Open Studio vérifie les nouvelles versions toutes les 30 minutes. Il se met à jour lui-même, et met à jour tes apps dès qu’elles sont fermées — jamais pendant que tu t’en sers.',
+    art: <RefreshCw size={44} strokeWidth={1.5} />
   },
   {
-    label: 'Catalogue',
-    title: 'Filtre et trie comme tu veux',
-    text: 'Utilise les catégories en haut du catalogue pour filtrer par type d’outil, et le menu de tri pour remonter en premier ce qui est déjà installé. Prêt à explorer ?',
-    art: <SlidersHorizontal size={40} strokeWidth={1.6} />
+    label: 'Bibliothèque',
+    title: 'Retrouve tout en un coup d’œil',
+    text: 'La barre de gauche sépare tes apps installées, les mises à jour et chaque catégorie. Utilise la recherche pour aller droit au but.',
+    art: <LayoutGrid size={44} strokeWidth={1.5} />
   }
 ]
 
@@ -42,40 +42,38 @@ export default function Onboarding({ onClose }: { onClose: () => void }): JSX.El
   const current = STEPS[step]
 
   return (
-    <div className="onboarding-overlay" onClick={onClose}>
-      <div className="onboarding-modal fade-in" onClick={(e) => e.stopPropagation()}>
-        <button className="onboarding-skip" onClick={onClose}>
-          Passer
-        </button>
-        <div className="onboarding-art">{current.art}</div>
-
-        <div className="onboarding-body">
-          <div className="onboarding-step-label">{current.label}</div>
-          <div className="onboarding-title">{current.title}</div>
-          <p className="onboarding-text">{current.text}</p>
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-art" key={step}>
+          {current.art}
         </div>
-
-        <div className="onboarding-footer">
-          <div className="onboarding-dots">
+        <div className="modal-body">
+          <div className="modal-step">
+            {step + 1}/{STEPS.length} · {current.label}
+          </div>
+          <div className="modal-title">{current.title}</div>
+          <p className="modal-text">{current.text}</p>
+        </div>
+        <div className="modal-foot">
+          <div className="dots">
             {STEPS.map((s, i) => (
-              <span key={s.label} className={`onboarding-dot${i === step ? ' active' : ''}`} />
+              <span key={s.label} className={i === step ? 'on' : ''} />
             ))}
           </div>
-          <div className="row" style={{ gap: 8 }}>
-            {step > 0 && (
-              <button className="btn btn-sm btn-secondary" onClick={() => setStep((s) => s - 1)}>
-                <ChevronLeft size={13} />
-                Retour
-              </button>
-            )}
-            <button
-              className="btn btn-sm btn-primary"
-              onClick={() => (isLast ? onClose() : setStep((s) => s + 1))}
-            >
-              {isLast ? 'Commencer' : 'Suivant'}
-              {!isLast && <ChevronRight size={13} />}
+          {step > 0 ? (
+            <button className="btn btn-sm btn-ghost" onClick={() => setStep((s) => s - 1)}>
+              <ChevronLeft size={14} />
+              Retour
             </button>
-          </div>
+          ) : (
+            <button className="btn btn-sm btn-ghost" onClick={onClose}>
+              Passer
+            </button>
+          )}
+          <button className="btn btn-sm btn-primary" onClick={() => (isLast ? onClose() : setStep((s) => s + 1))}>
+            {isLast ? 'Commencer' : 'Suivant'}
+            {!isLast && <ChevronRight size={14} />}
+          </button>
         </div>
       </div>
     </div>
