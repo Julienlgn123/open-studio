@@ -6,7 +6,7 @@ import { isInstalling } from './install'
 import { startManagedAppsAutoUpdate, UPDATE_INTERVAL_MS } from './autoUpdate'
 import { registerIpc } from './ipc'
 import { broadcast } from './events'
-import { hideOnClose, setupTray, showWindow } from './tray'
+import { hideOnClose, iconPath, setupTray, showWindow } from './tray'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -20,6 +20,9 @@ function createWindow(): void {
     frame: false,
     titleBarStyle: 'hidden',
     backgroundColor: '#0d0d0f',
+    // Icône explicite : sinon Windows peut afficher l'icône par défaut d'Electron dans la barre
+    // des tâches (notamment après un redémarrage par la mise à jour automatique).
+    icon: iconPath(),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,

@@ -12,7 +12,7 @@ export const LAUNCHER_SHORTCUT = 'CommandOrControl+Alt+Space'
 let tray: Tray | null = null
 let quitting = false
 
-function iconPath(): string {
+export function iconPath(): string {
   return is.dev ? join(__dirname, '../../resources/icon.png') : join(process.resourcesPath, 'icon.png')
 }
 
