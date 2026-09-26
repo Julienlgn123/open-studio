@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowUpCircle, CircleCheck, HelpCircle, LayoutGrid } from 'lucide-react'
+import { ArrowUpCircle, CircleCheck, HardDrive, HelpCircle, LayoutGrid, Rocket } from 'lucide-react'
 import Brandmark from './Brandmark'
 import { getCategoryColor } from '../lib/categories'
 import type { AppState } from '@shared/types'
@@ -11,12 +11,16 @@ export default function Sidebar({
   view,
   onView,
   onHelp,
+  onStorage,
+  onLauncher,
   selfUpdating
 }: {
   apps: AppState[]
   view: View
   onView: (v: View) => void
   onHelp: () => void
+  onStorage: () => void
+  onLauncher: () => void
   selfUpdating: string | null
 }): JSX.Element {
   const [version, setVersion] = useState('')
@@ -81,6 +85,12 @@ export default function Sidebar({
           <span className={`dot${selfUpdating ? ' busy' : ''}`} />
           {selfUpdating ? `Mise à jour v${selfUpdating}…` : `v${version}`}
         </div>
+        <button className="icon-btn" onClick={onLauncher} title={`Lanceur rapide (Ctrl+K, ou ${/Mac/i.test(navigator.platform) ? '⌘⌥Espace' : 'Ctrl+Alt+Espace'} depuis n’importe où)`}>
+          <Rocket size={15} />
+        </button>
+        <button className="icon-btn" onClick={onStorage} title="Espace disque">
+          <HardDrive size={15} />
+        </button>
         <button className="icon-btn" onClick={onHelp} title="Comment ça marche">
           <HelpCircle size={15} />
         </button>

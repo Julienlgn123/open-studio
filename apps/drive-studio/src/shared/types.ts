@@ -43,6 +43,25 @@ export interface FileMeta {
   webViewLink?: string
   /** Ids des dossiers virtuels contenant ce fichier (calculé). */
   folderIds?: string[]
+  /** Chiffré côté client avant l'envoi (illisible sur Google Drive sans la phrase). */
+  encrypted?: boolean
+}
+
+/** Copie de sauvegarde d'un fichier sur un autre compte. */
+export interface FileReplica {
+  accountId: string
+  driveFileId: string | null
+  replicatedAt: number | null
+}
+
+/** Événement de l'historique d'un fichier (envoi, réplication, téléchargement…). */
+export interface FileHistoryEntry {
+  action: string
+  status: string
+  label: string | null
+  accountId: string | null
+  timestamp: number
+  errorDetails: string | null
 }
 
 export type BackupMode = 'full' | 'incremental'
@@ -171,6 +190,9 @@ export interface AppSettings {
   googleConfigured?: boolean
   /** Lance l'app (masquée, dans la barre système) à la connexion à Windows/macOS/Linux. */
   launchAtStartup?: boolean
+  /** Chiffrer les fichiers avant l'envoi (une phrase de chiffrement doit être enregistrée). */
+  encryptUploads?: boolean
+  hasEncryptionPassphrase?: boolean
 }
 
 export interface DriveRevision {

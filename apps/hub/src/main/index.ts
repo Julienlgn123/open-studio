@@ -6,6 +6,7 @@ import { isInstalling } from './install'
 import { startManagedAppsAutoUpdate, UPDATE_INTERVAL_MS } from './autoUpdate'
 import { registerIpc } from './ipc'
 import { broadcast } from './events'
+import { hideOnClose, setupTray, showWindow } from './tray'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -27,6 +28,7 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => mainWindow?.show())
+  hideOnClose(mainWindow)
 
   if (is.dev) {
     mainWindow.webContents.on(
@@ -77,12 +79,18 @@ app.whenReady().then(() => {
     })
   })
 
+  // Une seule instance : relancer Open Studio remet simplement sa fenêtre au premier plan.
+  if (!app.requestSingleInstanceLock()) {
+    app.quit()
+    return
+  }
+  app.on('second-instance', () => showWindow(() => mainWindow, createWindow))
+
   registerIpc()
   createWindow()
+  setupTray(() => mainWindow, createWindow)
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
-  })
+  app.on('activate', () => showWindow(() => mainWindow, createWindow))
 
   if (app.isPackaged) {
     // `checkForUpdates()` seul ne fait rien de visible : sans écouter ses

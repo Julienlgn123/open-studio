@@ -18,6 +18,9 @@ export default function SettingsModal({ onClose }: Props) {
   const [apiKey, setApiKey] = useState(settings.mistralApiKey ?? '')
   const [model, setModel] = useState(settings.mistralModel ?? 'open-mistral-7b')
   const [showKey, setShowKey] = useState(false)
+  const [provider, setProvider] = useState<'mistral' | 'ollama' | 'lmstudio'>(settings.aiProvider ?? 'mistral')
+  const [localModel, setLocalModel] = useState(settings.localModel ?? '')
+  const [localModels, setLocalModels] = useState<string[] | null | undefined>(undefined)
   const [saving, setSaving] = useState(false)
 
   const [appVersion, setAppVersion] = useState<string>('')
@@ -27,6 +30,17 @@ export default function SettingsModal({ onClose }: Props) {
 
   useEscapeToClose(() => { if (!showSync) onClose() })
 
+  // Modèles installés dans Ollama / LM Studio (null = application locale injoignable).
+  useEffect(() => {
+    if (provider === 'mistral') return
+    setLocalModels(undefined)
+    api.ai.localModels(provider).then((list: string[] | null) => {
+      setLocalModels(list)
+      if (list?.length && !list.includes(localModel)) setLocalModel(list[0])
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provider])
+
   useEffect(() => {
     api.app.version().then(setAppVersion).catch(() => setAppVersion('dev'))
     api.backup.latest().then(setLastBackup).catch(() => setLastBackup(null))
@@ -35,7 +49,7 @@ export default function SettingsModal({ onClose }: Props) {
   async function handleSave() {
     setSaving(true)
     try {
-      await saveSettings({ ...settings, mistralApiKey: apiKey.trim(), mistralModel: model })
+      await saveSettings({ ...settings, mistralApiKey: apiKey.trim(), mistralModel: model, aiProvider: provider, localModel: provider === 'mistral' ? settings.localModel : localModel })
       showToast('Paramètres sauvegardés', 'success')
       onClose()
     } finally {
@@ -93,7 +107,47 @@ export default function SettingsModal({ onClose }: Props) {
 
         <div className="modal-body">
           <div className="field">
-            <label className="field-label">Clé API Mistral</label>
+            <label className="field-label">IA utilisée (résumés, QCM, fiches, Studio IA)</label>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {([['mistral', 'Mistral · cloud'], ['ollama', 'Ollama · local'], ['lmstudio', 'LM Studio · local']] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  className={`btn btn-sm ${provider === id ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ flex: 1 }}
+                  onClick={() => setProvider(id)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {provider !== 'mistral' && (
+              <div style={{ marginTop: 8 }}>
+                {localModels === undefined ? (
+                  <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Recherche des modèles…</div>
+                ) : localModels === null ? (
+                  <div style={{ fontSize: 12, color: 'var(--danger)' }}>
+                    {provider === 'ollama'
+                      ? 'Ollama ne répond pas : installe-le (ollama.com) ou lance-le.'
+                      : 'LM Studio ne répond pas : ouvre-le, onglet Developer → Start Server.'}
+                  </div>
+                ) : localModels.length === 0 ? (
+                  <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Aucun modèle installé dans {provider === 'ollama' ? 'Ollama' : 'LM Studio'}.</div>
+                ) : (
+                  <select className="field-input" value={localModel} onChange={(e) => setLocalModel(e.target.value)}>
+                    {localModels.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                )}
+                <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
+                  100 % sur ton ordinateur, sans clé ni internet. La transcription audio reste faite par Mistral.
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="field">
+            <label className="field-label">Clé API Mistral{provider !== 'mistral' && ' (transcription audio)'}</label>
             <div style={{ position: 'relative' }}>
               <input
                 className="field-input"
@@ -125,6 +179,38 @@ export default function SettingsModal({ onClose }: Props) {
               <option value="mistral-medium-latest">mistral-medium-latest (payant)</option>
               <option value="mistral-large-latest">mistral-large-latest (payant)</option>
             </select>
+          </div>
+
+          <div className="field">
+            <label className="field-label">Révisions</label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 12.5 }}>
+              <span>Objectif</span>
+              <input
+                className="field-input"
+                type="number"
+                min={1}
+                max={500}
+                style={{ width: 80 }}
+                value={settings.dailyReviewGoal ?? 20}
+                onChange={(e) => saveSettings({ ...settings, dailyReviewGoal: Math.max(1, Number(e.target.value) || 20) })}
+              />
+              <span>cartes / jour · rappel à</span>
+              <input
+                className="field-input"
+                type="time"
+                style={{ width: 110 }}
+                value={settings.reviewReminderTime ?? ''}
+                onChange={(e) => saveSettings({ ...settings, reviewReminderTime: e.target.value })}
+              />
+              {settings.reviewReminderTime && (
+                <button className="btn btn-ghost btn-sm" onClick={() => saveSettings({ ...settings, reviewReminderTime: '' })}>
+                  Pas de rappel
+                </button>
+              )}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
+              Une notification te prévient chaque jour à cette heure s’il reste des flashcards à réviser.
+            </div>
           </div>
 
           <div className="field">

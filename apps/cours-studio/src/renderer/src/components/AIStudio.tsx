@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Sparkles, Send, ArrowLeft, BookOpen, CheckCircle, Circle, AlertCircle, MessageSquare, ImagePlus, FileUp, X } from 'lucide-react'
-import { useStore } from '../store'
+import { useStore, aiReady, aiMissingMessage } from '../store'
 import type { AIMessage, AIAction } from '../../../shared/types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -177,7 +177,7 @@ export default function AIStudio() {
   }
 
   async function runAction(action: AIAction, opts?: { skipExamGate?: boolean }) {
-    if (!settings.mistralApiKey) { showToast('Configure ta clé API Mistral dans les paramètres', 'error'); return }
+    if (!aiReady(settings)) { showToast(aiMissingMessage(settings), 'error'); return }
     const hasAttachments = attachedImages.length > 0 || attachedDocs.length > 0
     if (selectedCourseIds.length === 0 && !hasAttachments && action !== 'chat') {
       showToast('Sélectionne au moins un cours ou ajoute une pièce jointe', 'error')
@@ -283,7 +283,7 @@ export default function AIStudio() {
 
   async function sendChat() {
     if (!input.trim() || streaming) return
-    if (!settings.mistralApiKey) { showToast('Configure ta clé API Mistral', 'error'); return }
+    if (!aiReady(settings)) { showToast(aiMissingMessage(settings), 'error'); return }
 
     const userMessage: AIMessage = { role: 'user', content: input.trim() }
     setInput('')
@@ -314,7 +314,7 @@ export default function AIStudio() {
 
   async function sendRefinement() {
     if (!refineInput.trim() || refining || streaming) return
-    if (!settings.mistralApiKey) return
+    if (!aiReady(settings)) return
     const instruction = refineInput.trim()
     setRefineInput('')
     setRefining(true)

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowUp, FileText, FolderSearch, Plus, Square, X } from 'lucide-react'
+import { startRecording, transcribe, type Recorder } from '../lib/voice'
+import { Loader2, Mic, ArrowUp, FileText, FolderSearch, Plus, Square, X } from 'lucide-react'
 import type { Attachment, EngineKind } from '@shared/types'
 import { imageSrc, readAttachment } from '../lib/readAttachment'
 
@@ -42,6 +43,36 @@ export default function Composer({
   fileAccess?: { on: boolean; configured: boolean; onToggle: () => void }
 }): JSX.Element {
   const [value, setValue] = useState('')
+  // Dictée : enregistrement du micro puis transcription locale (Whisper).
+  const [voice, setVoice] = useState<'idle' | 'recording' | 'transcribing'>('idle')
+  const [voiceModelPct, setVoiceModelPct] = useState<number | null>(null)
+  const recorder = useRef<Recorder | null>(null)
+
+  async function toggleDictation(): Promise<void> {
+    if (voice === 'transcribing') return
+    if (voice === 'recording') {
+      const rec = recorder.current
+      recorder.current = null
+      if (!rec) return
+      setVoice('transcribing')
+      try {
+        const text = await transcribe(await rec.stop(), setVoiceModelPct)
+        if (text) setValue((v) => (v.trim() ? `${v.trimEnd()} ${text}` : text))
+      } catch (err) {
+        setError(`Dictée impossible : ${err instanceof Error ? err.message : String(err)}`)
+      } finally {
+        setVoice('idle')
+        setVoiceModelPct(null)
+      }
+      return
+    }
+    try {
+      recorder.current = await startRecording()
+      setVoice('recording')
+    } catch {
+      setError('Micro inaccessible : autorise l’accès au micro pour Local IA Studio dans les réglages du système.')
+    }
+  }
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [error, setError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -221,6 +252,37 @@ export default function Composer({
               Fichiers
             </button>
           )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              void toggleDictation()
+            }}
+            title={
+              voice === 'recording'
+                ? 'Arrêter et transcrire'
+                : voice === 'transcribing'
+                  ? 'Transcription…'
+                  : 'Dicter (reconnaissance vocale 100 % locale)'
+            }
+            className={`flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[13px] transition ${
+              voice === 'recording' ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25' : 'text-base-300 hover:bg-base-800 hover:text-base-100'
+            }`}
+          >
+            {voice === 'transcribing' ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : voice === 'recording' ? (
+              <Square size={12} fill="currentColor" />
+            ) : (
+              <Mic size={14} />
+            )}
+            {voice === 'recording'
+              ? 'Écoute…'
+              : voice === 'transcribing'
+                ? voiceModelPct !== null
+                  ? `Modèle vocal ${Math.round(voiceModelPct * 100)} %`
+                  : 'Transcription…'
+                : null}
+          </button>
           {extraAction && (
             <button
               onClick={(e) => {

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AppSettings, AppState, InstallProgress } from '../shared/types'
+import type { AppSettings, AppState, AppStorage, InstallProgress } from '../shared/types'
 
 function on<T>(channel: string, cb: (payload: T) => void): () => void {
   const handler = (_: unknown, payload: T): void => cb(payload)
@@ -26,9 +26,16 @@ const api = {
     launch: (id: string): Promise<void> => ipcRenderer.invoke('apps:launch', id),
     uninstall: (id: string): Promise<void> => ipcRenderer.invoke('apps:uninstall', id),
     getInstalledSize: (id: string): Promise<number | null> => ipcRenderer.invoke('apps:size', id),
+    previousVersion: (id: string): Promise<string | null> => ipcRenderer.invoke('apps:previousVersion', id),
+    rollback: (id: string): Promise<AppState> => ipcRenderer.invoke('apps:rollback', id),
+    unskip: (id: string): Promise<boolean> => ipcRenderer.invoke('apps:unskip', id),
     onProgress: (cb: (p: InstallProgress) => void) => on<InstallProgress>('apps:progress', cb),
     onAutoUpdated: (cb: (p: { id: string; name: string; version: string | null; error?: string }) => void) =>
       on<{ id: string; name: string; version: string | null; error?: string }>('apps:autoUpdated', cb)
+  },
+  storage: {
+    list: (): Promise<AppStorage[]> => ipcRenderer.invoke('storage:list'),
+    clean: (id: string): Promise<number> => ipcRenderer.invoke('storage:clean', id)
   },
   shell: {
     openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:openExternal', url)
@@ -36,6 +43,7 @@ const api = {
   app: {
     notifyReady: () => ipcRenderer.send('renderer:ready'),
     getVersion: (): Promise<string> => ipcRenderer.invoke('app:version'),
+    onLauncher: (cb: () => void) => on<void>('launcher:open', cb),
     onUpdateReady: (cb: (payload: { version: string }) => void) =>
       on<{ version: string }>('app:updateReady', cb)
   }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Layers, ArrowLeft, BookOpen, Sparkles, RotateCcw, Download, Globe } from 'lucide-react'
-import { useStore } from '../store'
+import ReviewGoal from './ReviewGoal'
+import { useStore, aiReady, aiMissingMessage } from '../store'
 import type { Flashcard } from '../../../shared/types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -10,6 +11,7 @@ const ALL = '__all__'
 
 export default function FlashcardStudio() {
   const { courses, subjects, settings, setView, showToast, flashcardsWantAll, clearFlashcardsWantAll } = useStore()
+  const [reviewedCount, setReviewedCount] = useState(0)
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(flashcardsWantAll ? ALL : null)
   const [allCards, setAllCards] = useState<Flashcard[]>([])
   const [dueCards, setDueCards] = useState<Flashcard[]>([])
@@ -57,7 +59,7 @@ export default function FlashcardStudio() {
 
   async function generate() {
     if (!course) return
-    if (!settings.mistralApiKey) { showToast('Configure ta clé API Mistral dans les paramètres', 'error'); return }
+    if (!aiReady(settings)) { showToast(aiMissingMessage(settings), 'error'); return }
     setGenerating(true)
     try {
       const text = course.content.replace(/<[^>]+>/g, '').trim()
@@ -100,6 +102,7 @@ Règles : une seule idée testable par carte ; le recto est une vraie question (
     const card = dueCards[index]
     if (!card) return
     await api.flashcards.review(card.id, g)
+    setReviewedCount((n) => n + 1)
     if (index + 1 < dueCards.length) {
       setIndex(index + 1)
       setFlipped(false)
@@ -121,6 +124,7 @@ Règles : une seule idée testable par carte ; le recto est une vraie question (
           <h1 className="page-header-title">Flashcards</h1>
         </div>
         <div className="page-header-right">
+          <ReviewGoal refreshKey={reviewedCount} />
           <button className="btn btn-secondary btn-sm" onClick={exportAnki} data-tooltip="Exporter au format Anki" data-tooltip-dir="down">
             <Download size={13} /> Anki
           </button>

@@ -1,8 +1,8 @@
 import { useEffect } from 'react'
-import { FilePen, FilePlus, FolderInput, FolderPlus, Trash2 } from 'lucide-react'
+import { FilePen, FilePlus, FolderInput, FolderPlus, SquareTerminal, Trash2 } from 'lucide-react'
 import type { ApprovalDecision, ToolApproval } from '@shared/types'
 
-const ICONS = { write: FilePlus, edit: FilePen, mkdir: FolderPlus, move: FolderInput, delete: Trash2 }
+const ICONS = { write: FilePlus, edit: FilePen, mkdir: FolderPlus, move: FolderInput, delete: Trash2, command: SquareTerminal }
 
 /** Modification de fichier proposée par le modèle : aperçu + accord de l'utilisateur. */
 export default function ApprovalCard({
@@ -13,18 +13,20 @@ export default function ApprovalCard({
   onAnswer: (d: ApprovalDecision) => void
 }): JSX.Element {
   const Icon = ICONS[approval.kind]
-  const danger = approval.kind === 'delete'
+  const danger = approval.kind === 'delete' || !!approval.danger
+  const isCommand = approval.kind === 'command'
 
   // Entrée = autoriser, Échap = refuser (hors saisie dans le champ de message).
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return
-      if (e.key === 'Enter') onAnswer('allow')
+      // Commande à risque : un vrai clic est exigé, Entrée ne suffit pas.
+      if (e.key === 'Enter' && !danger) onAnswer('allow')
       else if (e.key === 'Escape') onAnswer('deny')
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onAnswer])
+  }, [onAnswer, danger])
 
   return (
     <div className="my-2 overflow-hidden rounded-xl border border-base-700 bg-base-900">
@@ -63,6 +65,7 @@ export default function ApprovalCard({
         >
           Refuser
         </button>
+        {!isCommand && (
         <button
           onClick={() => onAnswer('allow-all')}
           title="Autorise les prochaines modifications de cette réponse sans redemander"
@@ -70,6 +73,7 @@ export default function ApprovalCard({
         >
           Tout autoriser pour cette réponse
         </button>
+        )}
         <button
           onClick={() => onAnswer('allow')}
           className={`rounded-lg px-3 py-1.5 text-xs font-medium text-white ${

@@ -14,7 +14,10 @@ interface TrackedApp {
 interface StoredData {
   theme?: 'dark' | 'light'
   onboardingSeen?: boolean
+  trayHintSeen?: boolean
   apps?: Record<string, TrackedApp>
+  /** Version mise de côté par app après un retour arrière : pas reproposée ni installée seule. */
+  skippedUpdates?: Record<string, string>
 }
 
 function storePath(): string {
@@ -58,6 +61,28 @@ export function setTrackedApp(id: string, data: TrackedApp): void {
   const raw = readRaw()
   raw.apps = raw.apps ?? {}
   raw.apps[id] = data
+  writeRaw(raw)
+}
+
+export function getTrayHintSeen(): boolean {
+  return !!readRaw().trayHintSeen
+}
+
+export function setTrayHintSeen(): void {
+  const raw = readRaw()
+  raw.trayHintSeen = true
+  writeRaw(raw)
+}
+
+export function getSkippedUpdate(id: string): string | null {
+  return readRaw().skippedUpdates?.[id] ?? null
+}
+
+export function setSkippedUpdate(id: string, version: string | null): void {
+  const raw = readRaw()
+  raw.skippedUpdates = raw.skippedUpdates ?? {}
+  if (version) raw.skippedUpdates[id] = version
+  else delete raw.skippedUpdates[id]
   writeRaw(raw)
 }
 

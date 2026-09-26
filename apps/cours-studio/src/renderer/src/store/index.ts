@@ -30,6 +30,16 @@ export interface PairedDevice {
   lastSyncAt: number | null
 }
 
+/** L'IA est-elle utilisable avec les réglages actuels ? */
+export function aiReady(s: { mistralApiKey?: string; aiProvider?: string; localModel?: string }): boolean {
+  return s.aiProvider === 'ollama' || s.aiProvider === 'lmstudio' ? !!s.localModel : !!s.mistralApiKey
+}
+export function aiMissingMessage(s: { aiProvider?: string }): string {
+  return s.aiProvider === 'ollama' || s.aiProvider === 'lmstudio'
+    ? 'Choisis un modèle local dans Paramètres → IA'
+    : 'Configure ta clé API Mistral (ou une IA locale) dans les paramètres'
+}
+
 interface AppStore {
   /** PC associés pour la synchro continue (voir main/peerSync.ts). */
   paired: PairedDevice[]
@@ -60,6 +70,16 @@ interface AppStore {
   settings: {
     mistralApiKey?: string
     mistralModel?: string
+    /** Fournisseur IA : Mistral (cloud, défaut) ou un modèle local via Ollama / LM Studio. */
+    aiProvider?: 'mistral' | 'ollama' | 'lmstudio'
+    localModel?: string
+    /** Résumé + flashcards automatiques après une transcription audio (défaut : oui). */
+    autoStudyFromTranscript?: boolean
+    /** Synchro automatique avec les PC associés dès qu'ils sont connectés. */
+    autoPeerSync?: boolean
+    /** Révisions : objectif de cartes par jour et heure du rappel (« 18:00 », vide = pas de rappel). */
+    dailyReviewGoal?: number
+    reviewReminderTime?: string
     theme?: 'dark' | 'light'
     numberedHeadings?: boolean
     tourCompleted?: boolean

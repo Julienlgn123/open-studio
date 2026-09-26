@@ -4,7 +4,7 @@ import { mkdirSync, rmSync, createReadStream, createWriteStream, statSync } from
 import { v4 as uuid } from 'uuid'
 import JSZip from 'jszip'
 import { addLog, getFile } from './db'
-import { downloadFile } from './google/drive'
+import { downloadPlain } from './filesvc'
 import { emitTransfer } from './events'
 import { sha256File } from './checksum'
 
@@ -79,9 +79,9 @@ export async function exportFiles(
       usedNames.add(name)
 
       const localPath = join(opts.zip ? staging : destPath, name)
-      const dl = await downloadFile(file.accountId, file.driveFileId, localPath, {
-        sizeHint: file.fileSize,
-        onProgress: (done) => {
+      // Fichier chiffré par l'app : déchiffré à l'export (le zip contient les fichiers en clair).
+      const dl = {
+        checksum: await downloadPlain(file, file.accountId, file.driveFileId, localPath, (done) => {
           emitTransfer({
             id: transferId,
             kind: 'download',
@@ -91,8 +91,8 @@ export async function exportFiles(
             speed: 0,
             status: 'active'
           })
-        }
-      })
+        })
+      }
       bytesBase += file.fileSize
 
       // Vérification d'intégrité si on a un SHA-256 de référence.

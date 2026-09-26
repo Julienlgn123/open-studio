@@ -288,6 +288,11 @@ function makeSnippet(content: string, query: string): string {
   return `${start > 0 ? '…' : ''}${flat.slice(start, end)}${end < flat.length ? '…' : ''}`
 }
 
+/** Accès direct à la base (modules annexes : mémoire…). */
+export function getDb(): Database.Database {
+  return db
+}
+
 export function getPreferences(): AppPreferences {
   const row = db.prepare("SELECT value FROM preferences WHERE key = 'app'").get() as { value: string } | undefined
   const parsed = row ? (JSON.parse(row.value) as Partial<AppPreferences>) : {}

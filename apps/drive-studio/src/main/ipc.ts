@@ -5,7 +5,10 @@ import {
   setTheme,
   setGoogleCredentials,
   clearGoogleCredentials,
-  getGoogleCredentials
+  getGoogleCredentials,
+  setEncryptionPassphrase,
+  setEncryptUploads,
+  getEncryptionPassphrase
 } from './settings'
 import {
   addAccount,
@@ -22,7 +25,9 @@ import {
   downloadToDisk,
   deleteFileEverywhere,
   shareFileLink,
-  revokeShare
+  revokeShare,
+  downloadReplica,
+  restoreFromReplica
 } from './filesvc'
 import { listRevisions } from './google/drive'
 import { runBackup, isBackupRunning } from './backup'
@@ -73,6 +78,21 @@ export function registerIpc(): void {
     return getPublicSettings()
   })
   ipcMain.handle('settings:hasGoogle', () => !!getGoogleCredentials())
+  // Chiffrement côté client : la phrase reste dans le process main (trousseau de l'OS).
+  ipcMain.handle('settings:setEncryption', (_, { enabled, passphrase }: { enabled: boolean; passphrase?: string }) => {
+    if (passphrase !== undefined) {
+      if (passphrase.length < 8) throw new Error('La phrase de chiffrement doit faire au moins 8 caractères.')
+      const current = getEncryptionPassphrase()
+      // Changer de phrase rendrait illisibles les fichiers déjà chiffrés : refusé si des fichiers le sont.
+      if (current && current !== passphrase && db.getFiles({}).some((f) => f.encrypted)) {
+        throw new Error('Des fichiers sont déjà chiffrés avec ta phrase actuelle : elle ne peut pas être changée.')
+      }
+      setEncryptionPassphrase(passphrase)
+    }
+    if (enabled && !getEncryptionPassphrase()) throw new Error('Enregistre d’abord une phrase de chiffrement.')
+    setEncryptUploads(enabled)
+    return getPublicSettings()
+  })
 
   // ─── Accounts ────────────────────────────────────────────────────────────
   ipcMain.handle('accounts:list', () => db.getAccounts())
@@ -115,6 +135,10 @@ export function registerIpc(): void {
   ipcMain.handle('files:download', (_, id: string) => downloadToDisk(id))
   ipcMain.handle('files:delete', (_, id: string) => deleteFileEverywhere(id))
   ipcMain.handle('files:export', (_, ids: string[], zip: boolean) => exportFiles(ids, { zip }))
+  ipcMain.handle('files:replicas', (_, id: string) => db.getReplicas(id))
+  ipcMain.handle('files:history', (_, id: string) => db.getFileHistory(id))
+  ipcMain.handle('files:downloadReplica', (_, id: string, accountId: string) => downloadReplica(id, accountId))
+  ipcMain.handle('files:restoreReplica', (_, id: string, accountId: string) => restoreFromReplica(id, accountId))
   ipcMain.handle('files:revisions', (_, id: string) => {
     const f = db.getFile(id)
     if (!f) throw new Error('Fichier introuvable')

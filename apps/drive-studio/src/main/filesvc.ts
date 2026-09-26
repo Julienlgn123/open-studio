@@ -1,6 +1,8 @@
-import { dialog, BrowserWindow, shell } from 'electron'
+import { app, dialog, BrowserWindow, shell } from 'electron'
 import { basename, join } from 'path'
-import { statSync } from 'fs'
+import { mkdirSync, renameSync, rmSync, statSync } from 'fs'
+import { decryptFile, encryptFile, ENCRYPTED_EXT } from './fileCrypt'
+import { encryptUploadsEnabled, getEncryptionPassphrase } from './settings'
 import { v4 as uuid } from 'uuid'
 import { lookup as mimeLookup } from './mime'
 import {
@@ -13,7 +15,9 @@ import {
   getSharedLinkForFile,
   getExpiredSharedLinks,
   createSharedLink,
-  deleteSharedLink
+  deleteSharedLink,
+  getReplicas,
+  promoteReplica
 } from './db'
 import { sha256File } from './checksum'
 import {
@@ -28,6 +32,44 @@ import { syncAccountQuota } from './google/accounts'
 import { emitTransfer } from './events'
 import { mapDriveError } from './google/errors'
 import type { FileMeta, ShareRole } from '@shared/types'
+
+function cryptTmp(): string {
+  const dir = join(app.getPath('userData'), 'crypt-tmp')
+  mkdirSync(dir, { recursive: true })
+  return join(dir, uuid())
+}
+
+function requirePassphrase(): string {
+  const p = getEncryptionPassphrase()
+  if (!p) throw new Error('Ce fichier est chiffré : enregistre ta phrase de chiffrement dans Réglages → Chiffrement.')
+  return p
+}
+
+/**
+ * Télécharge un fichier du Drive vers `destPath`, en le déchiffrant s'il a été chiffré par l'app.
+ * Renvoie le SHA-256 du fichier obtenu (en clair).
+ */
+export async function downloadPlain(
+  file: FileMeta,
+  accountId: string,
+  driveFileId: string,
+  destPath: string,
+  onProgress?: (done: number, total: number) => void
+): Promise<string> {
+  if (!file.encrypted) {
+    const dl = await downloadFile(accountId, driveFileId, destPath, { sizeHint: file.fileSize, onProgress })
+    return dl.checksum
+  }
+  const passphrase = requirePassphrase()
+  const tmp = cryptTmp()
+  try {
+    await downloadFile(accountId, driveFileId, tmp, { sizeHint: file.fileSize, onProgress })
+    await decryptFile(tmp, destPath, passphrase)
+  } finally {
+    rmSync(tmp, { force: true })
+  }
+  return sha256File(destPath)
+}
 
 /** Upload d'un fichier local : choisit le meilleur compte principal puis envoie. */
 export async function uploadLocalFile(localPath: string): Promise<FileMeta> {
@@ -63,10 +105,14 @@ export async function uploadLocalFile(localPath: string): Promise<FileMeta> {
     status: 'active'
   })
 
+  // Chiffrement côté client : Google ne reçoit qu'un fichier illisible sans la phrase.
+  const encrypt = encryptUploadsEnabled()
+  const sendPath = encrypt ? cryptTmp() : localPath
   try {
-    const res = await uploadFile(account.id, localPath, {
-      name,
-      mimeType,
+    if (encrypt) await encryptFile(localPath, sendPath, requirePassphrase())
+    const res = await uploadFile(account.id, sendPath, {
+      name: encrypt ? name + ENCRYPTED_EXT : name,
+      mimeType: encrypt ? 'application/octet-stream' : mimeType,
       onProgress: (done, total) => {
         const elapsed = (Date.now() - startedAt) / 1000
         emitTransfer({
@@ -86,8 +132,9 @@ export async function uploadLocalFile(localPath: string): Promise<FileMeta> {
       accountId: account.id,
       originalFilename: name,
       fileSize: res.size,
-      mimeType: res.mimeType,
-      checksum: checksum // on garde notre SHA-256 (comparable ensuite)
+      mimeType: encrypt ? mimeType : res.mimeType,
+      checksum: checksum, // on garde notre SHA-256 du fichier en clair (comparable ensuite)
+      encrypted: encrypt
     })
 
     emitTransfer({
@@ -105,7 +152,7 @@ export async function uploadLocalFile(localPath: string): Promise<FileMeta> {
       accountId: account.id,
       fileId: meta.id,
       status: 'success',
-      label: `${name} → ${account.email}`
+      label: `${name} → ${account.email}${encrypt ? ' (chiffré)' : ''}`
     })
 
     await syncAccountQuota(account.id).catch(() => null)
@@ -130,6 +177,8 @@ export async function uploadLocalFile(localPath: string): Promise<FileMeta> {
       errorDetails: msg
     })
     throw new Error(msg)
+  } finally {
+    if (encrypt) rmSync(sendPath, { force: true })
   }
 }
 
@@ -167,26 +216,23 @@ export async function downloadToDisk(
   })
 
   try {
-    const dl = await downloadFile(file.accountId, file.driveFileId, destPath, {
-      sizeHint: file.fileSize,
-      onProgress: (done, total) => {
-        const elapsed = (Date.now() - startedAt) / 1000
-        emitTransfer({
-          id: transferId,
-          kind: 'download',
-          filename: file.originalFilename,
-          bytesDone: done,
-          bytesTotal: total,
-          speed: elapsed > 0 ? done / elapsed : 0,
-          status: 'active'
-        })
-      }
+    const plainSha = await downloadPlain(file, file.accountId, file.driveFileId, destPath, (done, total) => {
+      const elapsed = (Date.now() - startedAt) / 1000
+      emitTransfer({
+        id: transferId,
+        kind: 'download',
+        filename: file.originalFilename,
+        bytesDone: done,
+        bytesTotal: total,
+        speed: elapsed > 0 ? done / elapsed : 0,
+        status: 'active'
+      })
     })
 
     let verified = false
     if (file.checksum && file.checksum.length === 64) {
       const local = await sha256File(destPath)
-      verified = local === dl.checksum && local === file.checksum
+      verified = local === plainSha && local === file.checksum
     }
 
     emitTransfer({
@@ -259,6 +305,37 @@ export async function deleteFileEverywhere(fileId: string): Promise<void> {
     label: `${file.originalFilename}${account ? ' @ ' + account.email : ''}`
   })
   await syncAccountQuota(file.accountId).catch(() => null)
+}
+
+/** Télécharge la copie de sauvegarde d'un fichier (sur un compte de backup) vers un dossier choisi. */
+export async function downloadReplica(fileId: string, accountId: string): Promise<{ path: string; verified: boolean } | null> {
+  const file = getFile(fileId)
+  const replica = getReplicas(fileId).find((r) => r.accountId === accountId)
+  if (!file || !replica?.driveFileId) throw new Error('Copie de sauvegarde introuvable (sauvegardée avant la mise à jour de l’app).')
+  const win = BrowserWindow.getAllWindows()[0]
+  const res = await dialog.showOpenDialog(win, { title: 'Dossier où restaurer la copie', properties: ['openDirectory', 'createDirectory'] })
+  if (res.canceled || !res.filePaths.length) return null
+  const destPath = join(res.filePaths[0], file.originalFilename)
+  const tmp = destPath + '.part'
+  try {
+    const sha = await downloadPlain(file, accountId, replica.driveFileId, tmp)
+    const verified = file.checksum.length === 64 && sha === file.checksum
+    renameSync(tmp, destPath)
+    addLog({ action: 'download', accountId, fileId, status: 'success', label: `${file.originalFilename} (copie de sauvegarde${verified ? ', checksum ✓' : ''})` })
+    shell.showItemInFolder(destPath)
+    return { path: destPath, verified }
+  } catch (err) {
+    rmSync(tmp, { force: true })
+    throw new Error(mapDriveError(err))
+  }
+}
+
+/** La copie de sauvegarde devient le fichier principal (l'original a disparu ou est abîmé). */
+export function restoreFromReplica(fileId: string, accountId: string): FileMeta {
+  const file = getFile(fileId)
+  promoteReplica(fileId, accountId)
+  addLog({ action: 'replicate', accountId, fileId, status: 'success', label: `${file?.originalFilename ?? fileId} : copie de sauvegarde restaurée comme original` })
+  return getFile(fileId)!
 }
 
 /** Durée de vie fixe des liens de partage temporaires. */

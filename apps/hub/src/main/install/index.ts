@@ -2,9 +2,11 @@ import { app } from 'electron'
 import { existsSync, mkdirSync, rmSync } from 'fs'
 import { join } from 'path'
 import { CATALOG } from '../catalog'
-import { fetchLatestRelease, fetchSuiteManifest, pickAsset, downloadTo } from '../github'
+import { compareVersions, fetchLatestRelease, fetchReleases, fetchSuiteManifest, pickAsset, downloadTo, type GhRelease } from '../github'
+import { execFile } from 'child_process'
+import { basename } from 'path'
 import { normalizeVersion, readInstalledVersion } from './version'
-import { getTrackedApp, setTrackedApp, clearTrackedApp } from '../store'
+import { getTrackedApp, setTrackedApp, clearTrackedApp, getSkippedUpdate, setSkippedUpdate } from '../store'
 import { broadcast } from '../events'
 import { winInstaller } from './win'
 import { macInstaller } from './mac'
@@ -70,9 +72,12 @@ export async function listAppStates(): Promise<AppState[]> {
       // La version lue dans l'app installée fait foi ; celle notée à l'install sert de repli.
       const realVersion = execPath && !suiteNumbering ? await readInstalledVersion(entry, execPath).catch(() => null) : null
       const installedVersion = realVersion ?? tracked?.installedVersion ?? (execPath ? 'inconnue' : null)
+      // Version mise de côté après un retour arrière : ignorée jusqu'à la suivante.
+      const skipped = getSkippedUpdate(entry.id)
+      const skippedVersion = skipped && latestVersion && normalizeVersion(skipped) === normalizeVersion(latestVersion) ? skipped : null
       const status: AppState['status'] = !execPath
         ? 'not_installed'
-        : latestVersion && installedVersion && normalizeVersion(latestVersion) !== normalizeVersion(installedVersion)
+        : latestVersion && installedVersion && !skippedVersion && normalizeVersion(latestVersion) !== normalizeVersion(installedVersion)
           ? 'update_available'
           : 'installed'
 
@@ -81,6 +86,7 @@ export async function listAppStates(): Promise<AppState[]> {
       return {
         ...entry,
         status,
+        skippedVersion,
         installedVersion,
         latestVersion,
         latestChangelog,
@@ -116,7 +122,67 @@ export async function downloadSuiteZip(): Promise<string> {
   return zipPath
 }
 
-export async function installOrUpdateApp(id: string, opts: { sharedZipPath?: string } = {}): Promise<AppState> {
+/** L'app gérée est-elle ouverte ? (on ne la remplace ni ne la nettoie jamais pendant qu'elle tourne) */
+export async function isAppRunning(id: string): Promise<boolean> {
+  const execPath = await resolveExecPath(id).catch(() => null)
+  if (!execPath) return false
+  return new Promise((resolveRunning) => {
+    if (process.platform === 'win32') {
+      const image = basename(execPath)
+      execFile('tasklist', ['/FI', `IMAGENAME eq ${image}`, '/FO', 'CSV', '/NH'], { windowsHide: true }, (err, stdout) => {
+        // En cas de doute (tasklist indisponible), on considère l'app ouverte : mieux vaut attendre.
+        resolveRunning(err ? true : stdout.toLowerCase().includes(`"${image.toLowerCase()}"`))
+      })
+      return
+    }
+    // macOS : chemin du .app ; Linux : chemin de l'exécutable. pgrep sort en 1 si rien ne tourne.
+    const pattern = process.platform === 'darwin' ? `${execPath}/Contents/MacOS/` : execPath
+    execFile('pgrep', ['-f', pattern], (err) => resolveRunning(!err ? true : (err as { code?: unknown }).code !== 1))
+  })
+}
+
+/** Version précédente disponible dans les releases (celle d'avant la version installée). */
+export async function findPreviousVersion(id: string): Promise<{ version: string; release: GhRelease } | null> {
+  const entry = CATALOG.find((c) => c.id === id)
+  if (!entry) return null
+  const [state] = (await listAppStates()).filter((a) => a.id === id)
+  const current = state?.installedVersion
+  if (!current || current === 'inconnue') return null
+  const { owner, repo } = repoFor(entry)
+  for (const rel of await fetchReleases(owner, repo)) {
+    let version: string | null
+    if (entry.owner) version = rel.tag_name.replace(/^v/, '')
+    else version = (await fetchSuiteManifest(rel).catch(() => null))?.[entry.id]?.version ?? null
+    if (version && compareVersions(version, current) < 0) return { version, release: rel }
+  }
+  return null
+}
+
+/**
+ * Revient à la version précédente d'une app (mise à jour qui pose problème). La version
+ * quittée est mise de côté : ni proposée ni installée automatiquement, jusqu'à la suivante.
+ */
+export async function rollbackApp(id: string): Promise<AppState> {
+  const prev = await findPreviousVersion(id)
+  if (!prev) throw new Error('Aucune version précédente disponible pour cette app.')
+  if (await isAppRunning(id)) throw new Error('Ferme l’app avant de revenir à la version précédente.')
+  const [before] = (await listAppStates()).filter((a) => a.id === id)
+  const state = await installOrUpdateApp(id, { release: prev.release, version: prev.version })
+  const skip = before?.latestVersion ?? before?.installedVersion
+  if (skip) setSkippedUpdate(id, skip)
+  const [after] = (await listAppStates()).filter((a) => a.id === id)
+  return after ?? state
+}
+
+/** Réactive une mise à jour mise de côté après un retour arrière. */
+export function unskipUpdate(id: string): void {
+  setSkippedUpdate(id, null)
+}
+
+export async function installOrUpdateApp(
+  id: string,
+  opts: { sharedZipPath?: string; release?: GhRelease; version?: string } = {}
+): Promise<AppState> {
   if (busyApps.has(id)) throw new Error('Une installation de cette app est déjà en cours.')
   busyApps.add(id)
   try {
@@ -129,14 +195,17 @@ export async function installOrUpdateApp(id: string, opts: { sharedZipPath?: str
   }
 }
 
-async function doInstallOrUpdate(id: string, opts: { sharedZipPath?: string }): Promise<AppState> {
+async function doInstallOrUpdate(id: string, opts: { sharedZipPath?: string; release?: GhRelease; version?: string }): Promise<AppState> {
   const entry = CATALOG.find((c) => c.id === id)
   if (!entry) throw new Error('App inconnue : ' + id)
 
   const { owner, repo } = repoFor(entry)
-  const rel = await fetchLatestRelease(owner, repo)
+  // Une release précise (retour arrière), sinon la dernière.
+  const rel = opts.release ?? (await fetchLatestRelease(owner, repo))
   const manifest = entry.owner ? null : await fetchSuiteManifest(rel).catch(() => null)
-  const version = manifest?.[entry.id]?.version ?? rel.tag_name.replace(/^v/, '')
+  const version = opts.version ?? manifest?.[entry.id]?.version ?? rel.tag_name.replace(/^v/, '')
+  // Mise à jour normale vers la dernière version : plus rien n'est mis de côté.
+  if (!opts.release) setSkippedUpdate(id, null)
 
   const dir = managedDir(id)
   const execTargetDir = join(dir, 'install')

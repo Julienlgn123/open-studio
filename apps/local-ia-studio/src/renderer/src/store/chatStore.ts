@@ -50,6 +50,8 @@ interface ChatState {
   pendingPull: string | null
   preferences: AppPreferences
   modelManagerOpen: boolean
+  compareOpen: boolean
+  setCompareOpen: (v: boolean) => void
   settingsOpen: boolean
   preferencesOpen: boolean
   /** Modèle choisi sur l'écran d'accueil (nouvelle conversation pas encore créée). */
@@ -222,6 +224,8 @@ export const useChatStore = create<ChatState>((set, get) => {
     pendingPull: null,
     preferences: DEFAULT_PREFERENCES,
     modelManagerOpen: false,
+    compareOpen: false,
+    setCompareOpen: (v) => set({ compareOpen: v }),
     settingsOpen: false,
     preferencesOpen: false,
     draft: null,

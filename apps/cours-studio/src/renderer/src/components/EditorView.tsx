@@ -5,7 +5,7 @@ import { getPdfPageCount, renderPdfPageToDataUrl } from '../lib/pdfPage'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const api = (window as any).api
-import { useStore } from '../store'
+import { useStore, aiReady, aiMissingMessage } from '../store'
 import Editor from './Editor'
 import RecordingBar from './RecordingBar'
 import VersionPanel from './VersionPanel'
@@ -197,7 +197,7 @@ export default function EditorView() {
 
   function explainSelection(text: string) {
     if (!text) { showToast('Sélectionne d\'abord un mot ou un passage', 'info'); return }
-    if (!settings.mistralApiKey) { showToast('Configure ta clé API Mistral dans les paramètres', 'error'); return }
+    if (!aiReady(settings)) { showToast(aiMissingMessage(settings), 'error'); return }
     explainCleanup.current?.()
     setExplain({ term: text.length > 60 ? text.slice(0, 60) + '…' : text, text: '', loading: true })
     let acc = ''

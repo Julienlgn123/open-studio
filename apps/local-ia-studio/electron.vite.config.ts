@@ -21,6 +21,11 @@ export default defineConfig({
         '@shared': resolve('src/shared')
       }
     },
+    // Worker ES module : la dictée (Whisper) tourne dans un worker qui importe transformers.js.
+    worker: { format: 'es' },
+    // Le moteur ONNX utilise « await » au niveau du module : cible JavaScript récente (Electron la gère).
+    build: { target: 'esnext' },
+    optimizeDeps: { esbuildOptions: { target: 'esnext' }, exclude: ['@huggingface/transformers', 'onnxruntime-web'] },
     plugins: [react()]
   }
 })

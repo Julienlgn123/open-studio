@@ -55,6 +55,8 @@ export default function SyncModal({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const paired = useStore((s) => s.paired)
+  const settings = useStore((s) => s.settings)
+  const saveSettings = useStore((s) => s.saveSettings)
 
   const busy = sending || status?.phase === 'transferring' || status?.phase === 'applying'
   const close = (): void => {
@@ -169,6 +171,21 @@ export default function SyncModal({ onClose }: { onClose: () => void }) {
                     Quand les deux sont ouverts sur le même réseau, ils se retrouvent : bouton en haut de la fenêtre pour les
                     resynchroniser, clic droit sur un cours pour l’envoyer.
                   </p>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, margin: '4px 0 10px', fontSize: 12.5, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={!!settings.autoPeerSync}
+                      onChange={(e) => saveSettings({ ...settings, autoPeerSync: e.target.checked })}
+                      style={{ marginTop: 2 }}
+                    />
+                    <span>
+                      <strong>Synchro automatique</strong>
+                      <span style={{ display: 'block', color: 'var(--text-tertiary)', fontSize: 12 }}>
+                        Dès que les deux PC sont ouverts, ils se mettent à jour tout seuls (vérifié chaque minute). Les versions
+                        remplacées restent dans l’historique des cours.
+                      </span>
+                    </span>
+                  </label>
                   {paired.map((p) => (
                     <div key={p.id} className="sync-peer" style={{ cursor: 'default', marginBottom: 6 }}>
                       <Laptop size={16} />

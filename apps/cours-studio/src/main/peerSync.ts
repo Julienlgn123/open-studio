@@ -56,11 +56,15 @@ function saveStore(s: PeerStore): void {
 
 export const myDeviceId = (): string => loadStore().deviceId
 
-export function addPairing(peerId: string, name: string, secret: Buffer, baseline: Record<string, string>): void {
+/**
+ * `goOnline = false` : le PC va redémarrer (il vient de recevoir une synchro complète) ; il ne
+ * doit rien accepter d'ici là, sa base est fermée. La présence démarre au relancement.
+ */
+export function addPairing(peerId: string, name: string, secret: Buffer, baseline: Record<string, string>, goOnline = true): void {
   const s = loadStore()
   s.devices[peerId] = { name, secret: secret.toString('hex'), pairedAt: Date.now(), lastSyncAt: Date.now(), baseline }
   saveStore(s)
-  startPresence()
+  if (goOnline) startPresence()
   notifyPeers()
 }
 
@@ -154,7 +158,98 @@ function groupBy(rows: any[]): Map<string, any[]> {
   return m
 }
 
-export const fingerprints = (): Record<string, string> => Object.fromEntries(localState().map((s) => [s.id, s.fp]))
+export interface SubjectState {
+  id: string
+  name: string
+  emoji: string
+  deleted: boolean
+  fp: string
+}
+
+export function subjectState(): SubjectState[] {
+  return (getDb().prepare('SELECT id, name, emoji, color, deleted_at FROM subjects').all() as any[]).map((r) => ({
+    id: r.id,
+    name: r.name,
+    emoji: r.emoji,
+    deleted: !!r.deleted_at,
+    fp: createHash('sha256').update(JSON.stringify([r.name, r.emoji, r.color, !!r.deleted_at])).digest('hex').slice(0, 32)
+  }))
+}
+
+/** Tables où l'on ne fait qu'ajouter (historique) : fusionnées dans les deux sens, sans conflit. */
+const ROW_TABLES = { sessions: 'study_sessions', quizzes: 'quiz_results', reviews: 'flashcard_reviews' } as const
+type RowTable = keyof typeof ROW_TABLES
+
+function rowIds(): Record<RowTable, string[]> {
+  const db = getDb()
+  return {
+    sessions: (db.prepare('SELECT id FROM study_sessions').all() as any[]).map((r) => r.id),
+    quizzes: (db.prepare('SELECT id FROM quiz_results').all() as any[]).map((r) => r.id),
+    reviews: (db.prepare('SELECT id FROM flashcard_reviews').all() as any[]).map((r) => r.id)
+  }
+}
+
+function readRows(table: RowTable, ids: string[]): any[] {
+  if (!ids.length) return []
+  const db = getDb()
+  const out: any[] = []
+  for (let i = 0; i < ids.length; i += 500) {
+    const chunk = ids.slice(i, i + 500)
+    out.push(...(db.prepare(`SELECT * FROM ${ROW_TABLES[table]} WHERE id IN (${chunk.map(() => '?').join(',')})`).all(...chunk) as any[]))
+  }
+  return out
+}
+
+function insertRows(table: RowTable, rows: any[]): void {
+  const db = getDb()
+  const hasCourse = db.prepare('SELECT 1 FROM courses WHERE id = ?')
+  const ins =
+    table === 'sessions'
+      ? db.prepare('INSERT OR IGNORE INTO study_sessions (id, subject_id, seconds, created_at) VALUES (@id, @subject_id, @seconds, @created_at)')
+      : table === 'reviews'
+        ? db.prepare('INSERT OR IGNORE INTO flashcard_reviews (id, card_id, course_id, grade, reviewed_at) VALUES (@id, @card_id, @course_id, @grade, @reviewed_at)')
+        : db.prepare('INSERT OR IGNORE INTO quiz_results (id, course_id, topic, score, total, created_at) VALUES (@id, @course_id, @topic, @score, @total, @created_at)')
+  db.transaction(() => {
+    for (const r of rows) {
+      // Un quiz d'un cours absent ici reste compté, sans lien vers le cours (clé étrangère).
+      ins.run(table === 'quizzes' && r.course_id && !hasCourse.get(r.course_id) ? { ...r, course_id: null } : r)
+    }
+  })()
+}
+
+function applySubjects(rows: any[]): void {
+  const db = getDb()
+  db.transaction(() => {
+    for (const r of rows) {
+      if (db.prepare('SELECT 1 FROM subjects WHERE id = ?').get(r.id)) {
+        db.prepare('UPDATE subjects SET name = ?, emoji = ?, color = ?, deleted_at = ? WHERE id = ?').run(r.name, r.emoji, r.color, r.deleted_at ?? null, r.id)
+      } else {
+        const max = (db.prepare('SELECT MAX(sort_order) AS m FROM subjects').get() as any).m ?? 0
+        db.prepare('INSERT INTO subjects (id, name, emoji, color, created_at, sort_order, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+          r.id, r.name, r.emoji, r.color, r.created_at, max + 1, r.deleted_at ?? null
+        )
+      }
+    }
+  })()
+}
+
+const subjectRows = (ids: string[]): any[] =>
+  ids.length ? (getDb().prepare(`SELECT * FROM subjects WHERE id IN (${ids.map(() => '?').join(',')})`).all(...ids) as any[]) : []
+
+/** Empreintes de tout ce qui se synchronise : cours (id) et matières (« s:id »). */
+export const fingerprints = (): Record<string, string> => ({
+  ...Object.fromEntries(localState().map((s) => [s.id, s.fp])),
+  ...Object.fromEntries(subjectState().map((s) => [`s:${s.id}`, s.fp]))
+})
+
+/** Réglage « synchro automatique » (Paramètres → Synchroniser), lu dans settings.json. */
+function autoSyncEnabled(): boolean {
+  try {
+    return !!JSON.parse(readFileSync(join(app.getPath('userData'), 'settings.json'), 'utf-8')).autoPeerSync
+  } catch {
+    return false
+  }
+}
 
 // ─── Paquet complet d'un cours ───────────────────────────────────────────────
 
@@ -300,13 +395,22 @@ function applyBundle(b: Bundle, from: string): void {
 // ─── Qui donne quoi ──────────────────────────────────────────────────────────
 
 export interface PlanItem {
+  kind: 'course' | 'subject' | 'stats'
   id: string
   title: string
   emoji: string
   subjectName: string
-  direction: 'push' | 'pull'
+  /** `both` : historique (séances, quiz) fusionné dans les deux sens. */
+  direction: 'push' | 'pull' | 'both'
   reason: string
   conflict: boolean
+}
+
+interface RemoteState {
+  state: CourseState[]
+  subjects?: SubjectState[]
+  auto?: boolean
+  rows?: Record<RowTable, string[]>
 }
 
 function plan(local: CourseState[], remote: CourseState[], baseline: Record<string, string>, peerName: string): PlanItem[] {
@@ -314,7 +418,7 @@ function plan(local: CourseState[], remote: CourseState[], baseline: Record<stri
   const R = new Map(remote.map((s) => [s.id, s]))
   const out: PlanItem[] = []
   const item = (s: CourseState, direction: 'push' | 'pull', reason: string, conflict = false): PlanItem => ({
-    id: s.id, title: s.title, emoji: s.emoji, subjectName: s.subjectName, direction, reason, conflict
+    kind: 'course', id: s.id, title: s.title, emoji: s.emoji, subjectName: s.subjectName, direction, reason, conflict
   })
   const when = (s: CourseState): number => Math.max(s.updatedAt ?? 0, s.deletedAt ?? 0)
 
@@ -343,6 +447,62 @@ function plan(local: CourseState[], remote: CourseState[], baseline: Record<stri
     }
   }
   return out.sort((a, b) => a.subjectName.localeCompare(b.subjectName) || a.title.localeCompare(b.title))
+}
+
+/** Matières renommées / recolorées / supprimées (elles n'ont pas de date de modification). */
+function planSubjects(local: SubjectState[], remote: SubjectState[], baseline: Record<string, string>, peerName: string): PlanItem[] {
+  const L = new Map(local.map((s) => [s.id, s]))
+  const R = new Map(remote.map((s) => [s.id, s]))
+  const out: PlanItem[] = []
+  const item = (s: SubjectState, direction: 'push' | 'pull', reason: string, conflict = false): PlanItem => ({
+    kind: 'subject', id: s.id, title: s.name, emoji: s.emoji, subjectName: 'Matière', direction, reason, conflict
+  })
+  for (const id of new Set([...L.keys(), ...R.keys()])) {
+    const l = L.get(id)
+    const r = R.get(id)
+    if (l && r && l.fp === r.fp) continue
+    if (l && !r) {
+      if (!l.deleted) out.push(item(l, 'push', `absente sur ${peerName}`))
+      continue
+    }
+    if (!l && r) {
+      if (!r.deleted) out.push(item(r, 'pull', 'absente ici'))
+      continue
+    }
+    const base = baseline[`s:${id}`]
+    if (base === r!.fp) out.push(item(l!, 'push', l!.deleted ? 'supprimée ici' : 'renommée / modifiée ici'))
+    else if (base === l!.fp) out.push(item(r!, 'pull', r!.deleted ? `supprimée sur ${peerName}` : `renommée / modifiée sur ${peerName}`))
+    // Modifiée des deux côtés, sans date : choix identique sur les deux PC (empreinte la plus grande).
+    else out.push(l!.fp > r!.fp ? item(l!, 'push', 'modifiée des deux côtés', true) : item(r!, 'pull', 'modifiée des deux côtés', true))
+  }
+  return out
+}
+
+function missingRows(remote: Record<RowTable, string[]> | undefined): { give: Record<RowTable, string[]>; take: Record<RowTable, string[]> } {
+  const mine = rowIds()
+  const give = { sessions: [] as string[], quizzes: [] as string[], reviews: [] as string[] }
+  const take = { sessions: [] as string[], quizzes: [] as string[], reviews: [] as string[] }
+  if (!remote) return { give, take }
+  for (const t of Object.keys(ROW_TABLES) as RowTable[]) {
+    const theirs = new Set(remote[t] ?? [])
+    const own = new Set(mine[t])
+    give[t] = mine[t].filter((id) => !theirs.has(id))
+    take[t] = (remote[t] ?? []).filter((id) => !own.has(id))
+  }
+  return { give, take }
+}
+
+function fullPlan(remote: RemoteState, baseline: Record<string, string>, peerName: string): PlanItem[] {
+  const items = [...planSubjects(subjectState(), remote.subjects ?? [], baseline, peerName), ...plan(localState(), remote.state, baseline, peerName)]
+  const { give, take } = missingRows(remote.rows)
+  const n = (Object.keys(ROW_TABLES) as RowTable[]).reduce((sum, t) => sum + give[t].length + take[t].length, 0)
+  if (n) {
+    items.push({
+      kind: 'stats', id: '__stats__', title: 'Statistiques d’étude', emoji: '📊', subjectName: '',
+      direction: 'both', reason: `${n} séance${n > 1 ? 's' : ''}, quiz ou révision${n > 1 ? 's' : ''} à fusionner`, conflict: false
+    })
+  }
+  return items
 }
 
 // ─── Réseau : présence + requêtes signées et chiffrées ───────────────────────
@@ -440,7 +600,18 @@ async function handleRequest(req: IncomingMessage): Promise<{ code: number; body
       markOnline(from, String(req.socket.remoteAddress ?? '').replace(/^::ffff:/, ''), Number(input.port))
       return reply({ ok: true })
     case '/state':
-      return reply({ state: localState() })
+      return reply({ state: localState(), subjects: subjectState(), auto: autoSyncEnabled(), rows: rowIds() })
+    case '/subjects':
+      return reply({ rows: subjectRows(input.ids as string[]) })
+    case '/subjectsPush':
+      applySubjects(input.rows as any[])
+      emit('peersync:received', { from: pairing.name, courseIds: [], titles: [], live: false })
+      return reply({ ok: true })
+    case '/rows':
+      return reply({ rows: readRows(input.table as RowTable, input.ids as string[]) })
+    case '/rowsPush':
+      insertRows(input.table as RowTable, input.rows as any[])
+      return reply({ ok: true })
     case '/pull':
       return reply({ bundles: (input.ids as string[]).map(buildBundle).filter(Boolean) })
     case '/push': {
@@ -488,6 +659,7 @@ export function startPresence(): void {
   }
   listen(PRESENCE_PORT)
 
+  startPendingLoop()
   sweepTimer = setInterval(() => {
     const now = Date.now()
     let changed = false
@@ -577,7 +749,8 @@ function startBeacon(): void {
 export function stopPresence(): void {
   if (beaconTimer) clearInterval(beaconTimer)
   if (sweepTimer) clearInterval(sweepTimer)
-  beaconTimer = sweepTimer = null
+  if (pendingTimer) clearInterval(pendingTimer)
+  beaconTimer = sweepTimer = pendingTimer = null
   for (const sock of [beacon, beaconRx]) {
     try {
       sock?.close()
@@ -619,31 +792,84 @@ async function request<T>(peerId: string, path: string, payload: unknown): Promi
 export async function getPlan(peerId: string): Promise<PlanItem[]> {
   const pairing = loadStore().devices[peerId]
   if (!pairing) throw new Error('Ce PC n’est plus associé.')
-  const { state } = await request<{ state: CourseState[] }>(peerId, '/state', {})
-  const items = plan(localState(), state, pairing.baseline, pairing.name)
+  const remote = await request<RemoteState>(peerId, '/state', {})
+  lastRemote.set(peerId, remote)
+  const items = fullPlan(remote, pairing.baseline, pairing.name)
   const o = online.get(peerId)
   if (o) o.pending = items.length
   notifyPeers()
   return items
 }
 
+const lastRemote = new Map<string, RemoteState>()
+const running = new Set<string>()
+const proposed = new Map<string, number>()
+
 async function refreshPending(peerId: string): Promise<void> {
+  if (running.has(peerId)) return
   try {
     const items = await getPlan(peerId)
-    if (items.length) emit('peersync:proposal', { peerId, name: loadStore().devices[peerId]?.name, count: items.length })
+    if (!items.length) {
+      proposed.delete(peerId)
+      return
+    }
+    const name = loadStore().devices[peerId]?.name ?? 'l’autre PC'
+    const remoteAuto = !!lastRemote.get(peerId)?.auto
+    // Synchro automatique : si les deux PC l'ont activée, un seul s'en charge (le plus petit id).
+    if (autoSyncEnabled() && (!remoteAuto || myDeviceId() < peerId)) {
+      const r = await runPlan(peerId, items)
+      emit('peersync:auto', { peerId, name, ...r })
+      return
+    }
+    // Sinon, proposition (une fois par changement du nombre de cours à échanger).
+    if (proposed.get(peerId) !== items.length) {
+      proposed.set(peerId, items.length)
+      emit('peersync:proposal', { peerId, name, count: items.length })
+    }
   } catch {
-    /* réessayé à la prochaine apparition */
+    /* réessayé au prochain passage */
   }
+}
+
+/** Revérifie régulièrement les PC connectés (synchro auto ou pastille à jour). */
+let pendingTimer: NodeJS.Timeout | null = null
+function startPendingLoop(): void {
+  if (pendingTimer) return
+  pendingTimer = setInterval(() => {
+    for (const id of online.keys()) void refreshPending(id)
+  }, 60_000)
 }
 
 /** Applique les échanges choisis : envoie ce qui part d'ici, récupère ce qui vient de l'autre PC. */
 export async function runPlan(peerId: string, items: PlanItem[]): Promise<{ pushed: number; pulled: number }> {
+  if (running.has(peerId)) throw new Error('Une synchro avec ce PC est déjà en cours.')
+  running.add(peerId)
+  try {
+    return await doRunPlan(peerId, items)
+  } finally {
+    running.delete(peerId)
+  }
+}
+
+async function doRunPlan(peerId: string, items: PlanItem[]): Promise<{ pushed: number; pulled: number }> {
   const name = loadStore().devices[peerId]?.name ?? 'l’autre PC'
-  const push = items.filter((i) => i.direction === 'push').map((i) => i.id)
-  const pull = items.filter((i) => i.direction === 'pull').map((i) => i.id)
-  const total = push.length + pull.length
+  const courses = items.filter((i) => i.kind === 'course')
+  const push = courses.filter((i) => i.direction === 'push').map((i) => i.id)
+  const pull = courses.filter((i) => i.direction === 'pull').map((i) => i.id)
+  const subjPush = items.filter((i) => i.kind === 'subject' && i.direction === 'push').map((i) => i.id)
+  const subjPull = items.filter((i) => i.kind === 'subject' && i.direction === 'pull').map((i) => i.id)
+  const withStats = items.some((i) => i.kind === 'stats')
+  const total = push.length + pull.length + (subjPush.length || subjPull.length ? 1 : 0) + (withStats ? 1 : 0)
   let done = 0
   const progress = (): void => emit('peersync:progress', { peerId, done, total })
+
+  // Matières d'abord : les cours reçus y sont rangés.
+  if (subjPush.length) await request(peerId, '/subjectsPush', { rows: subjectRows(subjPush) })
+  if (subjPull.length) applySubjects((await request<{ rows: any[] }>(peerId, '/subjects', { ids: subjPull })).rows)
+  if (subjPush.length || subjPull.length) {
+    done++
+    progress()
+  }
 
   for (const id of push) {
     const b = buildBundle(id)
@@ -657,9 +883,18 @@ export async function runPlan(peerId: string, items: PlanItem[]): Promise<{ push
     done++
     progress()
   }
-  if (pull.length) emit('peersync:received', { from: name, courseIds: pull, titles: [], live: false })
-  await finish(peerId, [...push, ...pull])
-  return { pushed: push.length, pulled: pull.length }
+  if (withStats) {
+    const { give, take } = missingRows(lastRemote.get(peerId)?.rows)
+    for (const t of Object.keys(ROW_TABLES) as RowTable[]) {
+      if (give[t].length) await request(peerId, '/rowsPush', { table: t, rows: readRows(t, give[t]) })
+      if (take[t].length) insertRows(t, (await request<{ rows: any[] }>(peerId, '/rows', { table: t, ids: take[t] })).rows)
+    }
+    done++
+    progress()
+  }
+  if (pull.length || subjPull.length) emit('peersync:received', { from: name, courseIds: pull, titles: [], live: false })
+  await finish(peerId, [...push, ...pull, ...[...subjPush, ...subjPull].map((id) => `s:${id}`)])
+  return { pushed: push.length + subjPush.length, pulled: pull.length + subjPull.length }
 }
 
 /** Envoie tout de suite des cours à un PC associé (clic droit → « Envoyer à … »). */

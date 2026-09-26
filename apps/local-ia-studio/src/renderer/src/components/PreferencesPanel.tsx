@@ -5,6 +5,7 @@ import ModelPicker from './ModelPicker'
 import SettingsFields, { Field, useContextMax } from './SettingsFields'
 import MistralKeyForm from './MistralKeyForm'
 import { ImportSection, WorkspaceSection } from './PreferencesExtras'
+import MemorySection from './MemorySection'
 import type { AppPreferences } from '@shared/types'
 import { DEFAULT_SETTINGS } from '@shared/types'
 
@@ -69,6 +70,10 @@ export default function PreferencesPanel(): JSX.Element | null {
                 setDraft((d) => ({ ...d, workspaceRoots: saved.workspaceRoots }))
               }}
             />
+          </Field>
+
+          <Field label="Mémoire" hint="ce que le modèle sait de toi">
+            <MemorySection enabled={draft.memoryEnabled} onToggle={(memoryEnabled) => setDraft((d) => ({ ...d, memoryEnabled }))} />
           </Field>
 
           <Field label="Anciennes conversations" hint="Claude · ChatGPT · Codex">

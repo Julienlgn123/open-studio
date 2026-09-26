@@ -10,11 +10,13 @@ import {
   getFiles,
   getLastCompletedJob,
   setFileReplicatedOn,
-  updateBackupJob
+  updateBackupJob,
+  addReplica
 } from './db'
 import { downloadFile, uploadFile } from './google/drive'
 import { syncAccountQuota } from './google/accounts'
 import { emitBackup } from './events'
+import { ENCRYPTED_EXT } from './fileCrypt'
 import type { BackupMode, BackupProgress, FileMeta } from '@shared/types'
 
 let activeRun = false
@@ -202,7 +204,8 @@ async function replicateOne(
       onProgress: (done) => onProgress(done / 2)
     })
 
-    if (verify && file.checksum && dl.checksum && file.checksum.length === 64) {
+    // Fichier chiffré : le checksum connu est celui du fichier en clair, on compare seulement la copie.
+    if (verify && !file.encrypted && file.checksum && dl.checksum && file.checksum.length === 64) {
       // On ne compare que si le checksum stocké est un SHA-256 (upload via l'app).
       if (dl.checksum !== file.checksum) {
         throw new Error('Checksum du téléchargement différent de la source')
@@ -210,8 +213,8 @@ async function replicateOne(
     }
 
     const up = await uploadFile(targetId, localPath, {
-      name: file.originalFilename,
-      mimeType: file.mimeType,
+      name: file.encrypted ? file.originalFilename + ENCRYPTED_EXT : file.originalFilename,
+      mimeType: file.encrypted ? 'application/octet-stream' : file.mimeType,
       onProgress: (done, total) => onProgress(total / 2 + done / 2)
     })
 
@@ -221,9 +224,10 @@ async function replicateOne(
       }
     }
 
-    // Marque le fichier comme répliqué sur la cible.
+    // Marque le fichier comme répliqué sur la cible, et retient où est la copie (restauration).
     const fresh = getFile(file.id)
     setFileReplicatedOn(file.id, [...(fresh?.replicatedOn ?? []), targetId])
+    addReplica(file.id, targetId, up.driveFileId)
   } finally {
     try {
       rmSync(localPath, { force: true })

@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Check, Copy, FileText, Pencil, RefreshCw, Trash2 } from 'lucide-react'
+import {Volume2, VolumeX, Check, Copy, FileText, Pencil, RefreshCw, Trash2 } from 'lucide-react'
 import Markdown from '../lib/Markdown'
+import { speak, stopSpeaking } from '../lib/voice'
 import LogoMark from './LogoMark'
 import ToolTrail from './ToolTrail'
 import type { Attachment, ChatMessage } from '@shared/types'
@@ -75,6 +76,7 @@ export default function MessageBubble({
 }): JSX.Element {
   const isUser = message.role === 'user'
   const [copied, setCopied] = useState(false)
+  const [speaking, setSpeaking] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(message.content)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -143,6 +145,22 @@ export default function MessageBubble({
           >
             {copied ? <Check size={14} /> : <Copy size={14} />}
           </ActionButton>
+          {!isUser && message.content && (
+            <ActionButton
+              title={speaking ? 'Arrêter la lecture' : 'Écouter (voix de l’ordinateur)'}
+              onClick={() => {
+                if (speaking) {
+                  stopSpeaking()
+                  setSpeaking(false)
+                } else {
+                  setSpeaking(true)
+                  speak(message.id, message.content, () => setSpeaking(false))
+                }
+              }}
+            >
+              {speaking ? <VolumeX size={14} /> : <Volume2 size={14} />}
+            </ActionButton>
+          )}
           {canAct && isUser && (
             <ActionButton
               title="Modifier et renvoyer"

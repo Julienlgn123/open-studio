@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { HelpCircle, ArrowLeft, BookOpen, Upload, X, CheckCircle2, XCircle, RotateCcw, FileText, History } from 'lucide-react'
-import { useStore } from '../store'
+import { useStore, aiReady, aiMissingMessage } from '../store'
 import type { QuizQuestion, QuizResult } from '../../../shared/types'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
@@ -62,7 +62,7 @@ export default function QuizStudio() {
   }
 
   async function generateQuiz() {
-    if (!settings.mistralApiKey) { showToast('Configure ta clé API Mistral dans les paramètres', 'error'); return }
+    if (!aiReady(settings)) { showToast(aiMissingMessage(settings), 'error'); return }
     if (!topic.trim() && selectedCourseIds.length === 0 && !docText.trim()) {
       showToast('Indique un sujet, sélectionne un cours ou importe un document', 'error')
       return

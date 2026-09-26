@@ -180,10 +180,27 @@ export const DEFAULT_HIDDEN_TAGS = ['CLAUDE', 'CHATGPT', 'CODEX']
 /** Préférences globales : modèle et réglages appliqués aux nouvelles conversations. */
 export type WriteMode = 'read' | 'ask' | 'auto'
 
+/** Réponse d'un modèle dans la comparaison côte à côte. */
+export interface CompareResult {
+  text: string
+  ms: number
+  firstTokenMs: number | null
+  error: string | null
+  stopped: boolean
+}
+
+export interface MemoryItem {
+  id: string
+  content: string
+  createdAt: number
+}
+
 /** Modification de fichier demandée par le modèle, en attente de l'accord de l'utilisateur. */
 export interface ToolApproval {
   id: string
-  kind: 'write' | 'edit' | 'mkdir' | 'move' | 'delete'
+  kind: 'write' | 'edit' | 'mkdir' | 'move' | 'delete' | 'command'
+  /** Commande à risque (suppression récursive, git push…) : signalée en rouge. */
+  danger?: boolean
   /** Phrase courte : « Créer le fichier », « Modifier »… */
   title: string
   path: string
@@ -214,6 +231,8 @@ export interface AppPreferences {
   hiddenTags: string[]
   /** Ce que le modèle peut faire dans ces dossiers : lire seulement, modifier après accord, ou tout seul. */
   writeMode: WriteMode
+  /** Mémoire longue : faits retenus sur l'utilisateur, donnés au modèle dans chaque conversation. */
+  memoryEnabled: boolean
   defaultEngine: EngineKind | null
   defaultModel: string | null
   defaultSettings: ConversationSettings
@@ -225,6 +244,7 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   workspaceRoots: [],
   hiddenTags: DEFAULT_HIDDEN_TAGS,
   writeMode: 'ask',
+  memoryEnabled: true,
   defaultEngine: null,
   defaultModel: null,
   defaultSettings: { ...DEFAULT_SETTINGS }
@@ -281,6 +301,8 @@ export interface ModelMessage {
 }
 
 export interface ChatSendResult {
+  /** Fait ajouté à la mémoire longue par ce message (« retiens que … »). */
+  memorized?: string | null
   /** Message utilisateur enregistré (null pour une régénération). */
   user: ChatMessage | null
   /** Réponse enregistrée, éventuellement partielle si la génération a été arrêtée. */

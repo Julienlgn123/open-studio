@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CircleCheck, Download, ExternalLink, MoreHorizontal, Play, RefreshCw, Trash2, TriangleAlert } from 'lucide-react'
+import { CircleCheck, Download, ExternalLink, History, MoreHorizontal, Play, RefreshCw, Trash2, TriangleAlert, Undo2 } from 'lucide-react'
 import { useStore } from '../store'
 import ProgressBar from './ProgressBar'
 import { formatBytes } from '../lib/format'
@@ -38,6 +38,7 @@ export default function AppCard({
   const [busy, setBusy] = useState<'primary' | 'uninstall' | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [diskUsage, setDiskUsage] = useState<number | null>(null)
+  const [previous, setPrevious] = useState<string | null | undefined>(undefined)
   const menuRef = useRef<HTMLDivElement>(null)
 
   const isInstalled = app.status === 'installed' || app.status === 'update_available'
@@ -54,6 +55,12 @@ export default function AppCard({
       cancelled = true
     }
   }, [app.id, app.status])
+
+  // Version précédente disponible : cherchée seulement à l'ouverture du menu (appel GitHub).
+  useEffect(() => {
+    if (!menuOpen || !isInstalled || previous !== undefined) return
+    window.api.apps.previousVersion(app.id).then(setPrevious).catch(() => setPrevious(null))
+  }, [menuOpen])
 
   useEffect(() => {
     if (!menuOpen) return
@@ -76,6 +83,28 @@ export default function AppCard({
 
   const onPrimary = (): Promise<void> =>
     run('primary', () => (app.status === 'installed' ? launch(app.id) : hasUpdate ? update(app.id) : install(app.id)))
+
+  const onRollback = (): void => {
+    setMenuOpen(false)
+    if (!previous) return
+    const msg = `Revenir à ${app.name} v${previous} ? La v${app.installedVersion} sera mise de côté (plus proposée ni installée automatiquement) jusqu'à la prochaine version. Tes données restent intactes.`
+    if (!window.confirm(msg)) return
+    void run('primary', async () => {
+      try {
+        await window.api.apps.rollback(app.id)
+        toast(`${app.name} revenu en v${previous}`, 'success')
+      } catch (err) {
+        toast((err instanceof Error ? err.message : String(err)).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), 'error')
+      }
+      setPrevious(undefined)
+      await useStore.getState().loadApps()
+    })
+  }
+
+  const onUnskip = (): void => {
+    setMenuOpen(false)
+    void window.api.apps.unskip(app.id).then(() => useStore.getState().loadApps())
+  }
 
   const onUninstall = (): void => {
     setMenuOpen(false)
@@ -101,7 +130,12 @@ export default function AppCard({
             )}
           </div>
         </div>
-        {app.status === 'installed' && (
+        {app.status === 'installed' && app.skippedVersion && (
+          <span className="badge skipped" title={`La v${app.skippedVersion} est mise de côté (menu ⋯ pour la reproposer)`}>
+            <Undo2 size={11} />v{app.installedVersion}
+          </span>
+        )}
+        {app.status === 'installed' && !app.skippedVersion && (
           <span className="badge installed">
             <CircleCheck size={12} />
             Installée
@@ -170,6 +204,18 @@ export default function AppCard({
                     <ExternalLink size={14} />
                     Voir sur GitHub
                   </button>
+                  {isInstalled && previous && (
+                    <button className="menu-item" onClick={onRollback}>
+                      <Undo2 size={14} />
+                      Revenir à la v{previous}
+                    </button>
+                  )}
+                  {app.skippedVersion && (
+                    <button className="menu-item" onClick={onUnskip}>
+                      <History size={14} />
+                      Reproposer la v{app.skippedVersion}
+                    </button>
+                  )}
                   {isInstalled && (
                     <>
                       <div className="menu-sep" />

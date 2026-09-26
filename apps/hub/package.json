@@ -1,6 +1,6 @@
 {
   "name": "open-studio",
-  "version": "1.7.4",
+  "version": "1.8.0",
   "description": "Hub qui rassemble et lance les apps de la suite (Cours Studio, Drive Studio, ENT Studio...)",
   "author": {
     "name": "Julienlgn123",
@@ -31,6 +31,9 @@
       "!node_modules/**/*.map"
     ],
     "asar": true,
+    "extraResources": [
+      { "from": "resources/icon.png", "to": "icon.png" }
+    ],
     "win": {
       "target": [
         { "target": "nsis", "arch": ["x64"] },

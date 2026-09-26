@@ -8,6 +8,8 @@ import type {
   BackupProgress,
   DashboardStats,
   DriveRevision,
+  FileReplica,
+  FileHistoryEntry,
   FileMeta,
   RecentActivity,
   ScheduleFrequency,
@@ -47,6 +49,8 @@ const api = {
       ipcRenderer.invoke('settings:setGoogle', { clientId, clientSecret }),
     clearGoogle: (): Promise<AppSettings> => ipcRenderer.invoke('settings:clearGoogle'),
     hasGoogle: (): Promise<boolean> => ipcRenderer.invoke('settings:hasGoogle'),
+    setEncryption: (enabled: boolean, passphrase?: string): Promise<AppSettings> =>
+      ipcRenderer.invoke('settings:setEncryption', { enabled, passphrase }),
     setLaunchAtStartup: (enabled: boolean): Promise<AppSettings> =>
       ipcRenderer.invoke('settings:setLaunchAtStartup', enabled)
   },
@@ -98,6 +102,11 @@ const api = {
       ipcRenderer.invoke('files:export', ids, zip),
     revisions: (id: string): Promise<DriveRevision[]> =>
       ipcRenderer.invoke('files:revisions', id),
+    replicas: (id: string): Promise<FileReplica[]> => ipcRenderer.invoke('files:replicas', id),
+    history: (id: string): Promise<FileHistoryEntry[]> => ipcRenderer.invoke('files:history', id),
+    downloadReplica: (id: string, accountId: string): Promise<{ path: string; verified: boolean } | null> =>
+      ipcRenderer.invoke('files:downloadReplica', id, accountId),
+    restoreReplica: (id: string, accountId: string): Promise<FileMeta> => ipcRenderer.invoke('files:restoreReplica', id, accountId),
     // Résout le chemin réel d'un File droppé sur la fenêtre
     pathForFile: (file: File): string => webUtils.getPathForFile(file)
   },

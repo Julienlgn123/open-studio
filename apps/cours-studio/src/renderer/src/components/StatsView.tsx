@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, BarChart3, Clock, Layers, BookOpen, Target, Flame } from 'lucide-react'
 import { useStore } from '../store'
+import { DEFAULT_REVIEW_GOAL, type ReviewStats } from './ReviewGoal'
 import type { QuizResult } from '../../../shared/types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -25,13 +26,18 @@ export default function StatsView() {
   const [quizzes, setQuizzes] = useState<QuizResult[]>([])
   const [due, setDue] = useState(0)
   const [streak, setStreak] = useState({ current: 0, longest: 0 })
+  const [reviews, setReviews] = useState<ReviewStats | null>(null)
+  const goal = useStore((s) => s.settings.dailyReviewGoal) || DEFAULT_REVIEW_GOAL
 
   useEffect(() => {
     api.study.stats().then(setStudy).catch(() => setStudy(null))
     api.quizResults.get().then(setQuizzes).catch(() => setQuizzes([]))
     api.flashcards.dueAll().then((c: unknown[]) => setDue(c.length)).catch(() => setDue(0))
     api.study.streak().then(setStreak).catch(() => setStreak({ current: 0, longest: 0 }))
+    api.review.stats().then(setReviews).catch(() => setReviews(null))
   }, [])
+
+  const maxReviews = Math.max(goal, ...(reviews?.last30.map((d) => d.count) ?? [1]))
 
   const quizAvg = quizzes.length
     ? Math.round(quizzes.reduce((sum, q) => sum + (q.score / q.total) * 100, 0) / quizzes.length)
@@ -101,6 +107,62 @@ export default function StatsView() {
             </div>
           )}
         </section>
+
+        {reviews && (
+          <section style={{ marginBottom: 28 }}>
+            <h2 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>
+              Révisions — 30 derniers jours
+            </h2>
+            <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 14 }}>
+              Aujourd’hui {reviews.today}/{goal} cartes · série de {reviews.streak} jour{reviews.streak !== 1 ? 's' : ''} ·{' '}
+              {reviews.total} révision{reviews.total !== 1 ? 's' : ''} au total
+            </p>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: 3, height: 110 }}>
+              <div
+                title={`Objectif : ${goal} cartes`}
+                style={{ position: 'absolute', left: 0, right: 0, bottom: `${(goal / maxReviews) * 100}%`, borderTop: '1px dashed var(--border-medium)' }}
+              />
+              {reviews.last30.map((d) => (
+                <div
+                  key={d.day}
+                  title={`${d.day} — ${d.count} carte${d.count !== 1 ? 's' : ''} (${d.good} réussie${d.good !== 1 ? 's' : ''})`}
+                  style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
+                >
+                  <div style={{ height: `${(Math.max(0, d.count - d.good) / maxReviews) * 100}%`, background: 'var(--warning)', opacity: 0.7, borderRadius: '3px 3px 0 0' }} />
+                  <div
+                    style={{
+                      height: `${Math.max(d.count ? 0 : 2, (d.good / maxReviews) * 100)}%`,
+                      background: d.count ? (d.count >= goal ? 'var(--success)' : 'var(--accent)') : 'var(--bg-overlay)',
+                      borderRadius: d.count - d.good > 0 ? 0 : '3px 3px 0 0'
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+            {reviews.bySubject.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 20 }}>
+                {reviews.bySubject.map((s) => (
+                  <div key={s.id}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 4 }}>
+                      <span>{s.emoji} {s.name}</span>
+                      <span style={{ color: 'var(--text-tertiary)' }}>
+                        {Math.round((s.mastered / Math.max(1, s.total)) * 100)} % maîtrisé · {s.due} à revoir
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', height: 7, background: 'var(--bg-overlay)', borderRadius: 4, overflow: 'hidden' }}>
+                      <div title={`${s.mastered} maîtrisées`} style={{ width: `${(s.mastered / s.total) * 100}%`, background: 'var(--success)' }} />
+                      <div title={`${s.learning} en cours`} style={{ width: `${(s.learning / s.total) * 100}%`, background: s.color }} />
+                      <div title={`${s.fresh} jamais vues`} style={{ width: `${(s.fresh / s.total) * 100}%`, background: 'var(--border-medium)' }} />
+                    </div>
+                  </div>
+                ))}
+                <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)' }}>
+                  Vert : maîtrisées (revues à plus de 3 semaines) · couleur de la matière : en cours · gris : jamais vues.
+                </p>
+              </div>
+            )}
+          </section>
+        )}
 
         {study && study.bySubject.length > 0 && (
           <section style={{ marginBottom: 28 }}>

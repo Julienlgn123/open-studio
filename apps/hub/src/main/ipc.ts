@@ -1,6 +1,7 @@
 import { app, ipcMain, BrowserWindow, shell } from 'electron'
 import { getSettings, setTheme, setOnboardingSeen } from './store'
-import { listAppStates, installOrUpdateApp, launchApp, uninstallApp, getInstalledSize } from './install'
+import { listAppStates, installOrUpdateApp, launchApp, uninstallApp, getInstalledSize, findPreviousVersion, rollbackApp, unskipUpdate } from './install'
+import { cleanAppStorage, getAppStorage } from './storage'
 
 function getWin(): BrowserWindow {
   return BrowserWindow.getAllWindows()[0]
@@ -31,6 +32,11 @@ export function registerIpc(): void {
   ipcMain.handle('apps:launch', (_, id: string) => launchApp(id))
   ipcMain.handle('apps:uninstall', (_, id: string) => uninstallApp(id))
   ipcMain.handle('apps:size', (_, id: string) => getInstalledSize(id))
+  ipcMain.handle('apps:previousVersion', async (_, id: string) => (await findPreviousVersion(id))?.version ?? null)
+  ipcMain.handle('apps:rollback', (_, id: string) => rollbackApp(id))
+  ipcMain.handle('apps:unskip', (_, id: string) => { unskipUpdate(id); return true })
+  ipcMain.handle('storage:list', () => getAppStorage())
+  ipcMain.handle('storage:clean', (_, id: string) => cleanAppStorage(id))
 
   ipcMain.handle('shell:openExternal', (_, url: string) => shell.openExternal(url))
 }

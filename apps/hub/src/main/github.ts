@@ -89,6 +89,22 @@ export async function fetchLatestRelease(owner: string, repo: string): Promise<G
   }
 }
 
+/** Releases d'un repo, de la plus récente à la plus ancienne (30 dernières). */
+export async function fetchReleases(owner: string, repo: string): Promise<GhRelease[]> {
+  return getJson<GhRelease[]>(`https://api.github.com/repos/${owner}/${repo}/releases?per_page=30`)
+}
+
+/** Compare deux versions « 1.9.0 » : négatif si a < b. */
+export function compareVersions(a: string, b: string): number {
+  const pa = a.replace(/^v/, '').split(/[.-]/).map((x) => parseInt(x, 10) || 0)
+  const pb = b.replace(/^v/, '').split(/[.-]/).map((x) => parseInt(x, 10) || 0)
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0)
+    if (d) return d
+  }
+  return 0
+}
+
 /** Nom de l'asset publié par la CI avec la vraie version de chaque app de la suite. */
 export const SUITE_MANIFEST_ASSET = 'suite-versions.json'
 

@@ -9,6 +9,10 @@ interface StoredSettings {
   googleClientId?: string // chiffré
   googleClientSecret?: string // chiffré
   launchAtStartup?: boolean
+  encryptUploads?: boolean
+  encryptionPassphrase?: string // chiffrée (trousseau de l'OS)
+  /** Dernier seuil d'alerte de stockage notifié par compte (0.9, 0.95, 0.99). */
+  quotaAlerts?: Record<string, number>
 }
 
 function settingsPath(): string {
@@ -33,8 +37,44 @@ export function getPublicSettings(): AppSettings {
   return {
     theme: raw.theme ?? 'dark',
     googleConfigured: !!(raw.googleClientId && raw.googleClientSecret),
-    launchAtStartup: !!raw.launchAtStartup
+    launchAtStartup: !!raw.launchAtStartup,
+    encryptUploads: !!raw.encryptUploads && !!raw.encryptionPassphrase,
+    hasEncryptionPassphrase: !!raw.encryptionPassphrase
   }
+}
+
+/** Phrase de chiffrement (null si aucune). Ne quitte jamais le process main. */
+export function getEncryptionPassphrase(): string | null {
+  const raw = readRaw()
+  return raw.encryptionPassphrase ? decryptString(raw.encryptionPassphrase) || null : null
+}
+
+export function setEncryptionPassphrase(passphrase: string): void {
+  const raw = readRaw()
+  raw.encryptionPassphrase = encryptString(passphrase)
+  writeRaw(raw)
+}
+
+/** Chiffrer les prochains envois ? (jamais sans phrase enregistrée) */
+export function encryptUploadsEnabled(): boolean {
+  const raw = readRaw()
+  return !!raw.encryptUploads && !!raw.encryptionPassphrase
+}
+
+export function setEncryptUploads(enabled: boolean): void {
+  const raw = readRaw()
+  raw.encryptUploads = enabled
+  writeRaw(raw)
+}
+
+export function getQuotaAlertLevel(accountId: string): number {
+  return readRaw().quotaAlerts?.[accountId] ?? 0
+}
+
+export function setQuotaAlertLevel(accountId: string, level: number): void {
+  const raw = readRaw()
+  raw.quotaAlerts = { ...(raw.quotaAlerts ?? {}), [accountId]: level }
+  writeRaw(raw)
 }
 
 export function setTheme(theme: 'dark' | 'light'): void {

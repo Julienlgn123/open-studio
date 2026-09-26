@@ -68,7 +68,7 @@ const api = {
     plan: (id: string) => ipcRenderer.invoke('peers:plan', id),
     run: (id: string, items: unknown[]) => ipcRenderer.invoke('peers:run', id, items),
     send: (id: string, courseIds: string[]) => ipcRenderer.invoke('peers:send', id, courseIds),
-    on: (channel: 'peers:changed' | 'peersync:progress' | 'peersync:received' | 'peersync:proposal', cb: (p: unknown) => void): (() => void) => {
+    on: (channel: 'peers:changed' | 'peersync:progress' | 'peersync:received' | 'peersync:proposal' | 'peersync:auto', cb: (p: unknown) => void): (() => void) => {
       const h = (_: unknown, p: unknown): void => cb(p)
       ipcRenderer.on(channel, h)
       return () => ipcRenderer.removeListener(channel, h)
@@ -99,7 +99,7 @@ const api = {
     importText: (courseId: string): Promise<{ count: number } | null> => ipcRenderer.invoke('flashcards:importText', courseId)
   },
   review: {
-    stats: (): Promise<{ streak: number; today: number; total: number; last14: Array<{ day: string; count: number }> }> => ipcRenderer.invoke('review:stats')
+    stats: () => ipcRenderer.invoke('review:stats')
   },
   trash: {
     subjects: () => ipcRenderer.invoke('trash:subjects'),
@@ -144,7 +144,8 @@ const api = {
       }
     },
     // Non-streaming completion, used by the quiz generator to get a single JSON response
-    complete: (data: unknown): Promise<string> => ipcRenderer.invoke('ai:complete', data)
+    complete: (data: unknown): Promise<string> => ipcRenderer.invoke('ai:complete', data),
+    localModels: (provider: 'ollama' | 'lmstudio'): Promise<string[] | null> => ipcRenderer.invoke('ai:localModels', provider)
   },
   documents: {
     // Opens a native file picker (pdf/docx/odt/txt) and returns the extracted plain text

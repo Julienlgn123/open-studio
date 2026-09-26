@@ -6,6 +6,7 @@ import { headers, mistralError, MISTRAL_BASE_URL, streamMistralChat, toMistralMe
 import { streamLlamaCppChat } from './providers/llamacpp'
 import { LMSTUDIO_CHAT_URL, lmStudioError, streamLmStudioChat, toOpenAiMessages } from './providers/lmstudio'
 import { fileAccessSystemPrompt, runTool, toolDefs, toolLabel, type ToolDef } from './tools'
+import { memoryPrompt } from './memory'
 
 const OLLAMA_URL = 'http://127.0.0.1:11434'
 /** Garde-fou : nombre maximal d'allers-retours outils par réponse. */
@@ -43,6 +44,9 @@ export async function runAttempt(
   writeMode: WriteMode
 ): Promise<AttemptResult> {
   const withTools = settings.fileAccess
+  // Mémoire longue : ce que le modèle sait déjà de l'utilisateur, dans toutes les conversations.
+  const memory = memoryPrompt()
+  if (memory) messages = withSystemNote(messages, memory)
   const options = {
     ...settings,
     contextLength: withTools
@@ -53,17 +57,17 @@ export async function runAttempt(
   const tools: string[] = []
   // « Tout autoriser » vaut pour le reste de cette réponse.
   let allowAll = false
-  const approve = async (req: Omit<ToolApproval, 'id'>): Promise<ApprovalDecision> => {
-    if (allowAll) return 'allow'
+  const approve = async (req: Omit<ToolApproval, 'id'>, always = false): Promise<ApprovalDecision> => {
+    if (allowAll && !always) return 'allow'
     const decision = await cb.onApproval(req)
-    if (decision === 'allow-all') allowAll = true
+    if (decision === 'allow-all' && !always) allowAll = true
     return decision
   }
   const run: RunTool = async (name, args) => {
     const label = toolLabel(name, args)
     tools.push(label)
     cb.onTool(label)
-    const result = await runTool(name, args, { writeMode, approve })
+    const result = await runTool(name, args, { writeMode, approve, signal })
     if (result.startsWith("L'utilisateur a refusé")) {
       tools[tools.length - 1] = `${label} — refusé`
       cb.onTool(`${label} — refusé`)

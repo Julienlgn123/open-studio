@@ -45,6 +45,8 @@ import { completeJsonLlamaCpp } from './providers/llamacpp'
 import { getHardwareInfo } from './hardware'
 import { recommendModel, type InstalledModel, type JsonCompleter } from './advisor'
 import { runAttempt } from './agent'
+import { cancelCompare, keepCompare, runCompare } from './compare'
+import { addMemory, deleteMemory, listMemories, memoryRequest, updateMemory } from './memory'
 import { checkLmStudio, completeJsonLmStudio, downloadMlxRepo, getLmStudioContextLength, listLmStudioModels, mlxRepoSize, searchMlxModels } from './providers/lmstudio'
 import { listServers, openInBrowser, stopAllServers, stopServer } from './webTools'
 import {
@@ -402,6 +404,12 @@ function registerIpc(): void {
 
     const result: ChatSendResult = { user: null, assistant: null, stopped: false, error: null, title: null, fallback: null }
     let fullMessages = req.messages
+    // « Retiens que … » : enregistré tout de suite dans la mémoire longue, quel que soit le modèle.
+    const fact = req.userContent !== undefined && getPreferences().memoryEnabled ? memoryRequest(req.userContent) : null
+    if (fact) {
+      addMemory(fact)
+      result.memorized = fact
+    }
     if (req.userContent !== undefined) {
       result.user = addMessage(req.conversationId, 'user', req.userContent, req.userAttachments)
       fullMessages = [...req.messages, { role: 'user', content: req.userContent, attachments: req.userAttachments }]
@@ -493,6 +501,7 @@ function registerIpc(): void {
     }
     // La conversation a pu être supprimée pendant la génération (clé étrangère).
     if (full.trim() && getConversation(req.conversationId)) {
+      if (fact) notice = [`Retenu dans ta mémoire : « ${fact} » (Préférences → Mémoire).`, notice].filter(Boolean).join(' ')
       result.assistant = addMessage(req.conversationId, 'assistant', full, undefined, { tools, notice: notice ?? undefined })
     }
     return result
@@ -501,6 +510,18 @@ function registerIpc(): void {
   ipcMain.handle('servers:list', () => listServers())
   ipcMain.handle('servers:stop', (_, id: string) => stopServer(id))
   ipcMain.handle('servers:open', (_, url: string) => openInBrowser(url))
+
+  ipcMain.handle('compare:run', (event, slot: string, target: { engine: EngineKind; model: string }, prompt: string) =>
+    runCompare(event.sender, slot, target, prompt)
+  )
+  ipcMain.handle('compare:cancel', (_, slot: string) => cancelCompare(slot))
+  ipcMain.handle('compare:keep', (_, target: { engine: EngineKind; model: string }, prompt: string, answer: string) =>
+    keepCompare(target, prompt, answer)
+  )
+  ipcMain.handle('memory:list', () => listMemories())
+  ipcMain.handle('memory:add', (_, content: string) => addMemory(content))
+  ipcMain.handle('memory:update', (_, id: string, content: string) => { updateMemory(id, content); return true })
+  ipcMain.handle('memory:delete', (_, id: string) => { deleteMemory(id); return true })
 
   ipcMain.handle('chat:approve', (_, id: string, decision: ApprovalDecision) => {
     pendingApprovals.get(id)?.(decision)

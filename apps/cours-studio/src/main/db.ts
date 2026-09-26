@@ -114,6 +114,14 @@ export function initDb(): void {
       created_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS flashcard_reviews (
+      id TEXT PRIMARY KEY,
+      card_id TEXT NOT NULL,
+      course_id TEXT,
+      grade INTEGER NOT NULL,
+      reviewed_at INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS study_sessions (
       id TEXT PRIMARY KEY,
       subject_id TEXT,
@@ -494,6 +502,65 @@ export function reviewFlashcard(id: string, grade: 0 | 1 | 2 | 3): void {
   const dueAt = Date.now() + interval * 24 * 60 * 60 * 1000
   db.prepare('UPDATE flashcards SET interval_days = ?, ease = ?, due_at = ?, reps = reps + 1 WHERE id = ?')
     .run(interval, ease, dueAt, id)
+  // Historique des révisions : objectif du jour, série, courbe de progression.
+  db.prepare('INSERT INTO flashcard_reviews (id, card_id, course_id, grade, reviewed_at) VALUES (?, ?, ?, ?, ?)')
+    .run(generateId(), id, row.course_id, grade, Date.now())
+}
+
+const dayKey = (t: number): string => {
+  const d = new Date(t)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+export interface ReviewStats {
+  today: number
+  streak: number
+  total: number
+  last30: { day: string; count: number; good: number }[]
+  bySubject: { id: string; name: string; emoji: string; color: string; total: number; mastered: number; learning: number; fresh: number; due: number }[]
+}
+
+/** Statistiques de révision : par jour (30 j), série de jours, maîtrise par matière. */
+export function getReviewStats(): ReviewStats {
+  const since = Date.now() - 30 * 24 * 60 * 60 * 1000
+  const rows = db.prepare('SELECT grade, reviewed_at FROM flashcard_reviews WHERE reviewed_at >= ?').all(since) as { grade: number; reviewed_at: number }[]
+  const byDay = new Map<string, { count: number; good: number }>()
+  for (const r of rows) {
+    const k = dayKey(r.reviewed_at)
+    const v = byDay.get(k) ?? { count: 0, good: 0 }
+    v.count++
+    if (r.grade >= 2) v.good++
+    byDay.set(k, v)
+  }
+  const last30: ReviewStats['last30'] = []
+  for (let i = 29; i >= 0; i--) {
+    const k = dayKey(Date.now() - i * 24 * 60 * 60 * 1000)
+    last30.push({ day: k, ...(byDay.get(k) ?? { count: 0, good: 0 }) })
+  }
+  // Série : jours consécutifs avec au moins une révision (aujourd'hui compte s'il y en a déjà une).
+  const days = new Set((db.prepare('SELECT reviewed_at FROM flashcard_reviews').all() as { reviewed_at: number }[]).map((r) => dayKey(r.reviewed_at)))
+  let streak = 0
+  for (let i = days.has(dayKey(Date.now())) ? 0 : 1; days.has(dayKey(Date.now() - i * 86_400_000)); i++) streak++
+  const now = Date.now()
+  const bySubject = (db.prepare(
+    `SELECT s.id, s.name, s.emoji, s.color,
+            COUNT(f.id) AS total,
+            SUM(CASE WHEN f.interval_days >= 21 THEN 1 ELSE 0 END) AS mastered,
+            SUM(CASE WHEN f.reps > 0 AND f.interval_days < 21 THEN 1 ELSE 0 END) AS learning,
+            SUM(CASE WHEN f.reps = 0 THEN 1 ELSE 0 END) AS fresh,
+            SUM(CASE WHEN f.due_at <= ? THEN 1 ELSE 0 END) AS due
+       FROM flashcards f
+       JOIN courses c ON c.id = f.course_id AND c.deleted_at IS NULL
+       JOIN subjects s ON s.id = c.subject_id AND s.deleted_at IS NULL
+      GROUP BY s.id ORDER BY total DESC`
+  ).all(now) as ReviewStats['bySubject'])
+  return {
+    today: byDay.get(dayKey(now))?.count ?? 0,
+    streak,
+    total: (db.prepare('SELECT COUNT(*) AS n FROM flashcard_reviews').get() as { n: number }).n,
+    last30,
+    bySubject
+  }
 }
 
 export function deleteFlashcard(id: string): void {

@@ -246,7 +246,7 @@ async function handle(s: ReceiveSession, req: IncomingMessage, res: ServerRespon
     if (count !== s.received) return send(res, 409, { error: `Transfert incomplet (${s.received}/${count} fichiers).` })
     if (!existsSync(join(s.staging, 'cours-studio.db'))) return send(res, 409, { error: 'La base de données n’a pas été reçue.' })
     // Après la synchro, les deux PC ont les mêmes cours : c'est le point de départ des synchros suivantes.
-    if (s.peerId) addPairing(s.peerId, s.peer, pairSecretOf(s.key, s.pairNonce), fps ?? {})
+    if (s.peerId) addPairing(s.peerId, s.peer, pairSecretOf(s.key, s.pairNonce), fps ?? {}, false)
     send(res, 200, { ok: true })
     status({ role: 'receive', phase: 'applying', peer: s.peer })
     setTimeout(() => applyStaged(s), 400)

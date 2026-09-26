@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar'
 import ChatView from './components/ChatView'
 import SettingsPanel from './components/SettingsPanel'
 import ModelManagerModal from './components/ModelManagerModal'
+import CompareModal from './components/CompareModal'
 import PreferencesPanel from './components/PreferencesPanel'
 import OnboardingModal from './components/OnboardingModal'
 
@@ -41,6 +42,7 @@ export default function App(): JSX.Element {
       </div>
       <SettingsPanel />
       <ModelManagerModal />
+      <CompareModal />
       <PreferencesPanel />
       <OnboardingModal />
     </div>

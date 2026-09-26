@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ArrowUpCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { useStore } from '../store'
 import { AppIcon } from './AppCard'
+import { Markdown } from '../lib/markdown'
 import type { AppState } from '@shared/types'
 
 /**
@@ -89,7 +90,11 @@ export default function UpdateBanner({
                     {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                     Nouveautés
                   </button>
-                  {open && <div className="changelog">{a.latestChangelog}</div>}
+                  {open && (
+                    <div className="changelog">
+                      <Markdown source={a.latestChangelog} />
+                    </div>
+                  )}
                 </>
               )}
             </div>

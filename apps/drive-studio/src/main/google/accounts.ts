@@ -17,6 +17,8 @@ import { getQuota, listFiles } from './drive'
 import { mapDriveError } from './errors'
 import { revokeAccount, runOAuthFlow, getAuthedClient } from './oauth'
 import { broadcast } from '../events'
+import { Notification } from 'electron'
+import { getQuotaAlertLevel, setQuotaAlertLevel } from '../settings'
 import type { Account, AccountRole } from '@shared/types'
 
 /** Lance le flow OAuth et enregistre le compte (ou met à jour s'il existe déjà). */
@@ -154,6 +156,25 @@ export function setAccountRole(accountId: string, role: AccountRole): Account {
 }
 
 /** Rafraîchit le quota d'un compte depuis Drive. */
+const ALERT_LEVELS = [0.9, 0.95, 0.99]
+
+/** Notifie quand un compte franchit 90 %, 95 % puis 99 % de son stockage (une fois par seuil). */
+function checkQuotaAlert(accountId: string, used: number, total: number): void {
+  if (!total) return
+  const ratio = used / total
+  const reached = ALERT_LEVELS.filter((l) => ratio >= l).pop() ?? 0
+  const last = getQuotaAlertLevel(accountId)
+  if (reached === last) return
+  setQuotaAlertLevel(accountId, reached)
+  if (reached <= last || !Notification.isSupported()) return
+  const email = getAccount(accountId)?.email ?? 'Un compte'
+  const free = Math.max(0, total - used) / 1024 ** 3
+  new Notification({
+    title: `Drive Studio — stockage presque plein (${Math.round(ratio * 100)} %)`,
+    body: `${email} : il reste ${free < 1 ? `${Math.round(free * 1024)} Mo` : `${free.toFixed(1)} Go`}. Les nouveaux envois iront sur tes autres comptes ; pense à faire du ménage ou à ajouter un compte.`
+  }).show()
+}
+
 export async function syncAccountQuota(accountId: string): Promise<Account> {
   updateAccount(accountId, { status: 'active' })
   try {
@@ -164,6 +185,7 @@ export async function syncAccountQuota(accountId: string): Promise<Account> {
       lastSync: Date.now(),
       status: 'active'
     })
+    checkQuotaAlert(accountId, q.used, q.total)
   } catch (err) {
     const msg = mapDriveError(err)
     updateAccount(accountId, { status: 'error' })

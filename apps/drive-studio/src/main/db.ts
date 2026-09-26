@@ -158,6 +158,19 @@ export function initDb(): void {
   )
   if (!shareCols.has('expires_at'))
     db.exec('ALTER TABLE shared_links ADD COLUMN expires_at INTEGER NOT NULL DEFAULT 0')
+  if (!(db.prepare('PRAGMA table_info(files_metadata)').all() as { name: string }[]).some((c) => c.name === 'encrypted')) {
+    db.exec('ALTER TABLE files_metadata ADD COLUMN encrypted INTEGER NOT NULL DEFAULT 0')
+  }
+  // Copies de sauvegarde : où (compte + id Drive) chaque fichier a été répliqué, pour pouvoir le restaurer.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS file_replicas (
+      file_id TEXT NOT NULL REFERENCES files_metadata(id) ON DELETE CASCADE,
+      account_id TEXT NOT NULL,
+      drive_file_id TEXT NOT NULL,
+      replicated_at INTEGER NOT NULL,
+      PRIMARY KEY (file_id, account_id)
+    )
+  `)
 }
 
 // ─── Accounts ──────────────────────────────────────────────────────────────
@@ -330,6 +343,7 @@ interface DbFile {
   source: string
   modified_at: number
   web_view_link: string | null
+  encrypted?: number
 }
 
 function rowToFile(row: DbFile): FileMeta {
@@ -358,6 +372,7 @@ function rowToFile(row: DbFile): FileMeta {
     source: (row.source as FileMeta['source']) ?? 'app',
     modifiedAt: row.modified_at || row.uploaded_at,
     webViewLink: row.web_view_link ?? undefined,
+    encrypted: !!row.encrypted,
     folderIds
   }
 }
@@ -427,14 +442,15 @@ export function createFileMeta(data: {
   source?: 'app' | 'drive'
   modifiedAt?: number
   webViewLink?: string
+  encrypted?: boolean
 }): FileMeta {
   const id = uuid()
   const now = Date.now()
   db.prepare(
     `INSERT INTO files_metadata
       (id, drive_file_id, account_id, original_filename, file_size, mime_type, checksum,
-       uploaded_at, replicated_on, status, source, modified_at, web_view_link)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, '[]', 'synced', ?, ?, ?)`
+       uploaded_at, replicated_on, status, source, modified_at, web_view_link, encrypted)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, '[]', 'synced', ?, ?, ?, ?)`
   ).run(
     id,
     data.driveFileId,
@@ -446,7 +462,8 @@ export function createFileMeta(data: {
     now,
     data.source ?? 'app',
     data.modifiedAt ?? now,
-    data.webViewLink ?? null
+    data.webViewLink ?? null,
+    data.encrypted ? 1 : 0
   )
   return getFile(id)!
 }
@@ -527,6 +544,55 @@ export function countFilesBySource(accountId: string): { app: number; drive: num
     else out.app = r.n
   }
   return out
+}
+
+export function addReplica(fileId: string, accountId: string, driveFileId: string): void {
+  db.prepare(
+    'INSERT INTO file_replicas (file_id, account_id, drive_file_id, replicated_at) VALUES (?, ?, ?, ?) ON CONFLICT(file_id, account_id) DO UPDATE SET drive_file_id = excluded.drive_file_id, replicated_at = excluded.replicated_at'
+  ).run(fileId, accountId, driveFileId, Date.now())
+}
+
+export function getReplicas(fileId: string): { accountId: string; driveFileId: string | null; replicatedAt: number | null }[] {
+  const file = getFile(fileId)
+  if (!file) return []
+  const known = new Map(
+    (db.prepare('SELECT account_id, drive_file_id, replicated_at FROM file_replicas WHERE file_id = ?').all(fileId) as {
+      account_id: string
+      drive_file_id: string
+      replicated_at: number
+    }[]).map((r) => [r.account_id, r])
+  )
+  // Réplications antérieures à cette version : compte connu, mais pas l'id de la copie.
+  return file.replicatedOn.map((accountId) => ({
+    accountId,
+    driveFileId: known.get(accountId)?.drive_file_id ?? null,
+    replicatedAt: known.get(accountId)?.replicated_at ?? null
+  }))
+}
+
+/** La copie de sauvegarde devient le fichier principal (l'original est perdu ou abîmé). */
+export function promoteReplica(fileId: string, accountId: string): void {
+  const file = getFile(fileId)
+  const rep = db.prepare('SELECT drive_file_id FROM file_replicas WHERE file_id = ? AND account_id = ?').get(fileId, accountId) as
+    | { drive_file_id: string }
+    | undefined
+  if (!file || !rep) throw new Error('Copie de sauvegarde introuvable.')
+  db.transaction(() => {
+    db.prepare('UPDATE files_metadata SET account_id = ?, drive_file_id = ?, status = ? WHERE id = ?').run(accountId, rep.drive_file_id, 'synced', fileId)
+    db.prepare('DELETE FROM file_replicas WHERE file_id = ? AND account_id = ?').run(fileId, accountId)
+    setFileReplicatedOn(fileId, file.replicatedOn.filter((a) => a !== accountId))
+  })()
+}
+
+export function getFileHistory(fileId: string): { action: string; status: string; label: string | null; accountId: string | null; timestamp: number; errorDetails: string | null }[] {
+  return (db.prepare('SELECT action, status, label, account_id, timestamp, error_details FROM sync_logs WHERE file_id = ? ORDER BY timestamp DESC LIMIT 100').all(fileId) as {
+    action: string
+    status: string
+    label: string | null
+    account_id: string | null
+    timestamp: number
+    error_details: string | null
+  }[]).map((r) => ({ action: r.action, status: r.status, label: r.label, accountId: r.account_id, timestamp: r.timestamp, errorDetails: r.error_details }))
 }
 
 export function setFileReplicatedOn(id: string, accountIds: string[]): void {

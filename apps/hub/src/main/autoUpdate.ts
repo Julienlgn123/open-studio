@@ -1,33 +1,11 @@
-import { execFile } from 'child_process'
 import { rmSync } from 'fs'
-import { basename } from 'path'
 import { broadcast } from './events'
-import { downloadSuiteZip, installOrUpdateApp, isInstalling, listAppStates } from './install'
+import { downloadSuiteZip, installOrUpdateApp, isAppRunning, isInstalling, listAppStates } from './install'
 import { getTrackedApp } from './store'
 
 /** Fréquence des vérifications de mise à jour (Open Studio et apps gérées). */
 export const UPDATE_INTERVAL_MS = 30 * 60_000
 const FIRST_CHECK_DELAY_MS = 45_000
-
-/** L'exécutable d'une app gérée tourne-t-il ? (on ne remplace jamais une app ouverte) */
-function isRunning(execPath: string): Promise<boolean> {
-  return new Promise((resolveRunning) => {
-    if (process.platform === 'win32') {
-      const image = basename(execPath)
-      execFile('tasklist', ['/FI', `IMAGENAME eq ${image}`, '/FO', 'CSV', '/NH'], { windowsHide: true }, (err, stdout) => {
-        // En cas de doute (tasklist indisponible), on considère l'app ouverte : mieux vaut attendre.
-        resolveRunning(err ? true : stdout.toLowerCase().includes(`"${image.toLowerCase()}"`))
-      })
-      return
-    }
-    // macOS : chemin du .app ; Linux : chemin de l'exécutable. pgrep sort en 1 si rien ne tourne.
-    const pattern = process.platform === 'darwin' ? `${execPath}/Contents/MacOS/` : execPath
-    execFile('pgrep', ['-f', pattern], (err) => {
-      // Code de sortie 1 = aucun processus ; toute autre erreur = doute, donc « ouverte ».
-      resolveRunning(!err ? true : (err as { code?: unknown }).code !== 1)
-    })
-  })
-}
 
 let cycleRunning = false
 
@@ -45,8 +23,7 @@ async function runCycle(): Promise<void> {
     const due = states.filter((s) => s.status === 'update_available' && getTrackedApp(s.id))
     const ready = []
     for (const s of due) {
-      const tracked = getTrackedApp(s.id)
-      if (tracked && !(await isRunning(tracked.installPath))) ready.push(s)
+      if (getTrackedApp(s.id) && !(await isAppRunning(s.id))) ready.push(s)
     }
     if (!ready.length) return
 

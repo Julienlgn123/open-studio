@@ -10,7 +10,8 @@ import {
   FolderOpen,
   Trash2,
   Eye,
-  EyeOff
+  EyeOff,
+  Lock
 } from 'lucide-react'
 import { useStore } from '../store'
 import GoogleSetup from '../components/GoogleSetup'
@@ -20,6 +21,28 @@ export default function SettingsView(): JSX.Element {
   const { settings, accounts, lastSyncAt, syncing, setTheme, setLaunchAtStartup, syncQuotas, toast } =
     useStore()
   const [passphrase, setPassphrase] = useState('')
+  const [encPass, setEncPass] = useState('')
+  const [encPass2, setEncPass2] = useState('')
+  const [encBusy, setEncBusy] = useState(false)
+
+  async function saveEncryption(enabled: boolean, withPass: boolean): Promise<void> {
+    if (withPass && encPass !== encPass2) {
+      toast('Les deux phrases ne sont pas identiques.', 'error')
+      return
+    }
+    setEncBusy(true)
+    try {
+      const next = await window.api.settings.setEncryption(enabled, withPass ? encPass : undefined)
+      useStore.setState({ settings: next })
+      setEncPass('')
+      setEncPass2('')
+      toast(enabled ? 'Chiffrement activé pour les prochains envois' : 'Chiffrement désactivé pour les prochains envois', 'success')
+    } catch (err) {
+      toast((err instanceof Error ? err.message : String(err)).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), 'error')
+    } finally {
+      setEncBusy(false)
+    }
+  }
   const [showPass, setShowPass] = useState(false)
   const [transferBusy, setTransferBusy] = useState<'' | 'export' | 'import' | 'reset'>('')
   const [lastBackup, setLastBackup] = useState<{ name: string; at: number } | null>(null)
@@ -104,6 +127,59 @@ export default function SettingsView(): JSX.Element {
           <button className="btn btn-secondary" style={{ alignSelf: 'flex-start' }} onClick={reopenWizard}>
             <Wand2 size={14} /> Ouvrir l'assistant de configuration
           </button>
+        </div>
+
+        {/* Chiffrement côté client */}
+        <div className="card col" style={{ gap: 12 }}>
+          <span className="section-label" style={{ marginBottom: 0 }}>
+            <Lock size={12} style={{ verticalAlign: -1, marginRight: 4 }} />
+            Chiffrement
+          </span>
+          <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.6 }}>
+            Tes fichiers sont chiffrés (AES-256) sur ton PC avant l'envoi : Google ne stocke qu'un contenu illisible. Drive
+            Studio les déchiffre tout seul au téléchargement. <strong>Sans ta phrase de chiffrement, personne ne peut les
+            récupérer — pas même toi</strong> : note-la en lieu sûr.
+          </p>
+          {!settings.hasEncryptionPassphrase ? (
+            <div className="col" style={{ gap: 8 }}>
+              <input
+                className="field-input"
+                type="password"
+                placeholder="Phrase de chiffrement (8 caractères minimum)"
+                value={encPass}
+                onChange={(e) => setEncPass(e.target.value)}
+              />
+              <input
+                className="field-input"
+                type="password"
+                placeholder="Confirme la phrase"
+                value={encPass2}
+                onChange={(e) => setEncPass2(e.target.value)}
+              />
+              <button
+                className="btn btn-primary"
+                style={{ alignSelf: 'flex-start' }}
+                disabled={encBusy || encPass.length < 8}
+                onClick={() => saveEncryption(true, true)}
+              >
+                <Lock size={14} /> Activer le chiffrement
+              </button>
+            </div>
+          ) : (
+            <label className="row" style={{ gap: 8, fontSize: 13, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                className="checkbox"
+                checked={!!settings.encryptUploads}
+                disabled={encBusy}
+                onChange={(e) => saveEncryption(e.target.checked, false)}
+              />
+              Chiffrer les prochains fichiers envoyés
+              <span className="muted" style={{ fontSize: 12 }}>
+                (les fichiers déjà envoyés gardent leur état ; 🔒 dans la liste)
+              </span>
+            </label>
+          )}
         </div>
 
         {/* Thème */}

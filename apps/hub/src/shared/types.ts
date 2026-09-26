@@ -45,6 +45,21 @@ export interface AppState extends CatalogEntry {
   logoUrl: string
   /** Message d'erreur court, si status === 'error'. */
   error?: string
+  /** Mise à jour mise de côté après un retour à la version précédente (null = aucune). */
+  skippedVersion?: string | null
+}
+
+/** Espace disque d'une app de la suite (octets). */
+export interface AppStorage {
+  id: string
+  name: string
+  appBytes: number
+  dataBytes: number
+  backupBytes: number
+  cacheBytes: number
+  /** Caches, anciens installateurs et vieilles sauvegardes : supprimables sans risque. */
+  reclaimableBytes: number
+  dataPath: string | null
 }
 
 export interface InstallProgress {

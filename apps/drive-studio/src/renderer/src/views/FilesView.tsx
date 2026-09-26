@@ -447,6 +447,9 @@ export default function FilesView({ folderId }: Props): JSX.Element {
                       <td>
                         <div className="cell-name">
                           <span>{f.originalFilename}</span>
+                          {f.encrypted && (
+                            <span title="Chiffré sur ton PC avant l'envoi : illisible sur Google Drive sans ta phrase">🔒</span>
+                          )}
                           {f.source === 'drive' && (
                             <span
                               className="badge"

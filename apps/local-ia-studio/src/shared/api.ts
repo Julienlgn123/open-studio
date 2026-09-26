@@ -1,5 +1,7 @@
 import type {
   AppPreferences,
+  CompareResult,
+  MemoryItem,
   LmStudioModel,
   RunningProcess,
   ApprovalDecision,
@@ -56,6 +58,17 @@ export interface Api {
     /** Se résout une fois le fichier téléchargé et ajouté aux modèles locaux (ou annulé / en échec). */
     download: (repo: string, file: string, onProgress: (p: HfDownloadProgress) => void) => Promise<void>
     cancel: (repo: string, file: string) => Promise<void>
+  }
+  compare: {
+    run: (slot: string, target: { engine: EngineKind; model: string }, prompt: string, onChunk: (chunk: string) => void) => Promise<CompareResult>
+    cancel: (slot: string) => Promise<void>
+    keep: (target: { engine: EngineKind; model: string }, prompt: string, answer: string) => Promise<string>
+  }
+  memory: {
+    list: () => Promise<MemoryItem[]>
+    add: (content: string) => Promise<MemoryItem>
+    update: (id: string, content: string) => Promise<boolean>
+    delete: (id: string) => Promise<boolean>
   }
   lmstudio: {
     models: () => Promise<LmStudioModel[]>

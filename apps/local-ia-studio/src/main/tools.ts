@@ -2,9 +2,11 @@ import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'f
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'path'
 import { getMessages, getPreferences, listConversations, searchConversations } from './db'
 import { SOURCE_LABELS } from '@shared/types'
+import { addMemory, forgetMatching } from './memory'
 import type { ApprovalDecision, ToolApproval, WriteMode } from '@shared/types'
 import { prepareWrite, WRITE_TOOL_DEFS, WRITE_TOOL_NAMES } from './fileWrite'
 import { runWebTool, WEB_TOOL_DEFS, WEB_TOOL_NAMES } from './webTools'
+import { COMMAND_TOOL_DEFS, COMMAND_TOOL_NAMES, prepareCommand, runCommand } from './commands'
 
 // Outils donnés au modèle quand l'accès aux fichiers est activé : lecture (ici) et,
 // selon Préférences, écriture (fileWrite.ts, avec accord de l'utilisateur). Tout chemin est ramené à l'intérieur d'un des dossiers autorisés (Préférences) :
@@ -67,6 +69,25 @@ export const TOOL_DEFS: ToolDef[] = [
         path: { type: 'string', description: 'Dossier où chercher (défaut : tous les dossiers autorisés)' }
       },
       required: ['query']
+    }
+  },
+  {
+    name: 'remember',
+    description:
+      "Retient durablement un fait utile sur l'utilisateur (préférence, projet, contexte) pour les prochaines conversations. À utiliser quand il le demande, ou pour une information stable et importante.",
+    parameters: {
+      type: 'object',
+      properties: { fact: { type: 'string', description: 'Le fait à retenir, en une phrase courte' } },
+      required: ['fact']
+    }
+  },
+  {
+    name: 'forget',
+    description: "Oublie un fait retenu (quand l'utilisateur le demande ou qu'il n'est plus vrai).",
+    parameters: {
+      type: 'object',
+      properties: { fact: { type: 'string', description: 'Le fait à oublier (quelques mots suffisent)' } },
+      required: ['fact']
     }
   },
   {
@@ -171,13 +192,14 @@ const str = (v: unknown): string => (typeof v === 'string' ? v : '')
 
 /** Outils proposés au modèle selon le mode choisi dans Préférences. */
 export function toolDefs(writeMode: WriteMode): ToolDef[] {
-  return writeMode === 'read' ? [...TOOL_DEFS, ...WEB_TOOL_DEFS] : [...TOOL_DEFS, ...WRITE_TOOL_DEFS, ...WEB_TOOL_DEFS]
+  return writeMode === 'read' ? [...TOOL_DEFS, ...WEB_TOOL_DEFS] : [...TOOL_DEFS, ...WRITE_TOOL_DEFS, ...COMMAND_TOOL_DEFS, ...WEB_TOOL_DEFS]
 }
 
 export interface ToolContext {
   writeMode: WriteMode
-  /** Demande l'accord de l'utilisateur pour une modification (mode « ask »). */
-  approve: (req: Omit<ToolApproval, 'id'>) => Promise<ApprovalDecision>
+  /** Demande l'accord de l'utilisateur. `always` : même si « Tout autoriser » a été choisi. */
+  approve: (req: Omit<ToolApproval, 'id'>, always?: boolean) => Promise<ApprovalDecision>
+  signal: AbortSignal
 }
 
 /** Exécute un outil ; renvoie toujours du texte (une erreur devient un message que le modèle peut lire). */
@@ -193,6 +215,21 @@ export async function runTool(name: string, args: Record<string, unknown>, ctx: 
         }
       }
       return await prepared.apply()
+    } catch (err) {
+      return `Erreur : ${err instanceof Error ? err.message : String(err)}`
+    }
+  }
+  if (COMMAND_TOOL_NAMES.has(name)) {
+    if (ctx.writeMode === 'read') return "Commandes désactivées : l'utilisateur a choisi la lecture seule."
+    try {
+      const cmd = prepareCommand(args)
+      // Toujours validée une par une, quel que soit le mode (même « autonome »).
+      const decision = await ctx.approve(
+        { kind: 'command', title: cmd.dangerous ? 'Commande à risque' : 'Exécuter la commande', path: cmd.cwd, preview: `$ ${cmd.command}`, danger: cmd.dangerous },
+        true
+      )
+      if (decision === 'deny') return "L'utilisateur a refusé cette commande. Ne la relance pas telle quelle : demande-lui ce qu'il préfère."
+      return await runCommand(cmd, ctx.signal)
     } catch (err) {
       return `Erreur : ${err instanceof Error ? err.message : String(err)}`
     }
@@ -268,6 +305,14 @@ function runReadTool(name: string, args: Record<string, unknown>): string {
         if (!results.length) return `Aucun résultat pour « ${args.query} » (${Math.min(scanned, MAX_SEARCH_FILES)} fichiers parcourus).`
         return results.join('\n') + (results.length >= MAX_SEARCH_RESULTS ? '\n… (résultats tronqués)' : '')
       }
+      case 'remember': {
+        const m = addMemory(str(args.fact))
+        return `Retenu : « ${m.content} »`
+      }
+      case 'forget': {
+        const m = forgetMatching(str(args.fact))
+        return m ? `Oublié : « ${m.content} »` : 'Aucun souvenir ne correspond.'
+      }
       case 'search_conversations': {
         const query = str(args.query)
         const hits = searchConversations(query).slice(0, 8)
@@ -312,6 +357,10 @@ export function toolLabel(name: string, args: Record<string, unknown>): string {
       return `Cherche « ${str(args.query)} »`
     case 'search_conversations':
       return `Fouille les conversations : « ${str(args.query)} »`
+    case 'remember':
+      return `Retient : « ${str(args.fact)} »`
+    case 'forget':
+      return `Oublie : « ${str(args.fact)} »`
     case 'write_file':
       return `Écrit ${short || 'un fichier'}`
     case 'edit_file':
@@ -328,6 +377,8 @@ export function toolLabel(name: string, args: Record<string, unknown>): string {
       return `Arrête le site ${str(args.id)}`
     case 'open_in_browser':
       return `Ouvre ${str(args.url)} dans Chrome`
+    case 'run_command':
+      return `Exécute « ${str(args.command).slice(0, 80)} »`
     default:
       return name
   }
@@ -347,6 +398,7 @@ search_conversations retrouve ce que l'utilisateur a déjà discuté (y compris 
   }
   return `${head}
 Écriture : write_file (créer / remplacer un fichier), edit_file (remplacer un passage exact), create_directory, move_path, delete_path (corbeille).
+Commandes : run_command (npm install, npm run build, git status, tests… — l'utilisateur valide chacune ; pas de commande interactive ni de serveur sans fin : pour voir un site statique, préfère serve_folder).
 ${web}
 
 Tu es un AGENT AUTONOME : quand on te confie une tâche, fais-la entièrement toi-même avec les outils, sans demander de confirmation à chaque étape et sans dire à l'utilisateur de le faire.

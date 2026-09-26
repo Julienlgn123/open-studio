@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   AppPreferences,
+  CompareResult,
+  MemoryItem,
   LmStudioModel,
   RunningProcess,
   ApprovalDecision,
@@ -85,6 +87,32 @@ const api: Api = {
       }
     },
     cancel: (repo: string, file: string): Promise<void> => ipcRenderer.invoke('hf:download:cancel', repo, file)
+  },
+  compare: {
+    run: async (
+      slot: string,
+      target: { engine: EngineKind; model: string },
+      prompt: string,
+      onChunk: (chunk: string) => void
+    ): Promise<CompareResult> => {
+      const channel = `compare:chunk:${slot}`
+      const handler = (_: unknown, chunk: string): void => onChunk(chunk)
+      ipcRenderer.on(channel, handler)
+      try {
+        return await ipcRenderer.invoke('compare:run', slot, target, prompt)
+      } finally {
+        ipcRenderer.removeListener(channel, handler)
+      }
+    },
+    cancel: (slot: string): Promise<void> => ipcRenderer.invoke('compare:cancel', slot),
+    keep: (target: { engine: EngineKind; model: string }, prompt: string, answer: string): Promise<string> =>
+      ipcRenderer.invoke('compare:keep', target, prompt, answer)
+  },
+  memory: {
+    list: (): Promise<MemoryItem[]> => ipcRenderer.invoke('memory:list'),
+    add: (content: string): Promise<MemoryItem> => ipcRenderer.invoke('memory:add', content),
+    update: (id: string, content: string): Promise<boolean> => ipcRenderer.invoke('memory:update', id, content),
+    delete: (id: string): Promise<boolean> => ipcRenderer.invoke('memory:delete', id)
   },
   lmstudio: {
     models: (): Promise<LmStudioModel[]> => ipcRenderer.invoke('lmstudio:models')

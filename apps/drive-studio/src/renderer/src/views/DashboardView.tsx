@@ -90,6 +90,38 @@ export default function DashboardView(): JSX.Element {
       </div>
 
       <div className="view-pad col" style={{ gap: 24 }}>
+        {/* Comptes presque pleins (Drive Studio prévient aussi par notification) */}
+        {accounts
+          .filter((a) => a.quotaTotal > 0 && a.quotaUsed / a.quotaTotal >= 0.9)
+          .map((a) => {
+            const pct = Math.round((a.quotaUsed / a.quotaTotal) * 100)
+            return (
+              <div
+                key={a.id}
+                className="card row"
+                style={{
+                  gap: 10,
+                  borderColor: pct >= 95 ? 'rgba(248,113,113,0.4)' : 'rgba(251,191,36,0.4)',
+                  background: pct >= 95 ? 'var(--danger-dim)' : 'var(--warning-dim, rgba(251,191,36,0.1))'
+                }}
+              >
+                <span style={{ fontSize: 18 }}>{pct >= 95 ? '⛔' : '⚠️'}</span>
+                <div className="col" style={{ gap: 2, flex: 1 }}>
+                  <strong style={{ fontSize: 13 }}>
+                    {a.email} est plein à {pct} %
+                  </strong>
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    Il reste {formatBytes(Math.max(0, a.quotaTotal - a.quotaUsed))}. Les nouveaux envois vont sur tes autres comptes : fais du
+                    ménage ou ajoute un compte.
+                  </span>
+                </div>
+                <button className="btn btn-sm btn-secondary" onClick={() => setView('accounts')}>
+                  Comptes
+                </button>
+              </div>
+            )
+          })}
+
         {/* Stats */}
         <div className="stat-grid">
           <div className="stat-card">

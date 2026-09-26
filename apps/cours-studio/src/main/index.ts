@@ -3,6 +3,7 @@ import { join, extname, dirname } from 'path'
 import { pathToFileURL } from 'url'
 import { tmpdir } from 'os'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { getReviewStats } from './db'
 import { initDb, getSubjects, createSubject, updateSubject, reorderSubjects,
   softDeleteSubject, restoreSubject, getTrashedSubjects, permanentlyDeleteSubject,
   getCoursesBySubject, getCourse, createCourse, updateCourse,
@@ -157,6 +158,27 @@ app.whenReady().then(() => {
   startPresence()
   app.on('before-quit', stopPresence)
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
+
+  // Rappel quotidien de révision à l'heure choisie (Paramètres → Révisions), si des cartes attendent.
+  let lastReminder = ''
+  setInterval(() => {
+    try {
+      const s = JSON.parse(readFileSync(join(app.getPath('userData'), 'settings.json'), 'utf-8')) as { reviewReminderTime?: string }
+      const m = /^(\d{1,2}):(\d{2})$/.exec(s.reviewReminderTime ?? '')
+      if (!m) return
+      const now = new Date()
+      const today = now.toDateString()
+      if (lastReminder === today || now.getHours() * 60 + now.getMinutes() < Number(m[1]) * 60 + Number(m[2])) return
+      lastReminder = today
+      const due = countAllDueFlashcards()
+      if (!due || !Notification.isSupported()) return
+      const n = new Notification({ title: 'Cours Studio — c’est l’heure de réviser', body: `${due} flashcard${due > 1 ? 's' : ''} t’attendent.` })
+      n.on('click', () => {
+        if (mainWindow) { mainWindow.show(); mainWindow.webContents.send('open-review-all') }
+      })
+      n.show()
+    } catch { /* pas de réglages : pas de rappel */ }
+  }, 60_000)
 
   // Nudge the user if flashcards are waiting to be reviewed
   try {
@@ -370,17 +392,55 @@ function registerIpc(): void {
 
   ipcMain.handle('recording:reveal', (_, filePath: string) => shell.showItemInFolder(filePath))
 
-  // Mistral streaming — use model from settings or fallback to mistral-small-latest
+  // IA : Mistral (cloud) par défaut, ou un modèle local via Ollama / LM Studio (Paramètres → IA).
+  // Les deux exposent la même API que Mistral (format OpenAI) : seul le point d'entrée change.
+  function aiTarget(apiKey: string | undefined, model?: string): { url: string; headers: Record<string, string>; model: string; local: string | null } {
+    let s: { aiProvider?: string; localModel?: string } = {}
+    try { s = JSON.parse(readFileSync(join(app.getPath('userData'), 'settings.json'), 'utf-8')) } catch { /* réglages par défaut */ }
+    if (s.aiProvider === 'ollama' || s.aiProvider === 'lmstudio') {
+      if (!s.localModel) throw new Error('Choisis un modèle local dans Paramètres → IA.')
+      const url = s.aiProvider === 'ollama' ? 'http://127.0.0.1:11434/v1/chat/completions' : 'http://127.0.0.1:1234/v1/chat/completions'
+      return { url, headers: { 'Content-Type': 'application/json' }, model: s.localModel, local: s.aiProvider === 'ollama' ? 'Ollama' : 'LM Studio' }
+    }
+    return {
+      url: 'https://api.mistral.ai/v1/chat/completions',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey ?? ''}` },
+      model: model || 'open-mistral-7b',
+      local: null
+    }
+  }
+  async function aiFetch(target: ReturnType<typeof aiTarget>, body: Record<string, unknown>): Promise<Response> {
+    try {
+      return await fetch(target.url, { method: 'POST', headers: target.headers, body: JSON.stringify({ ...body, model: target.model }) })
+    } catch {
+      throw new Error(target.local ? `${target.local} ne répond pas : lance-le (et son serveur local pour LM Studio).` : 'Connexion à Mistral impossible.')
+    }
+  }
+  // Les modèles « qui réfléchissent » (qwen3, deepseek-r1…) écrivent <think>…</think> avant la réponse.
+  const stripThink = (t: string): string => t.replace(/<think>[\s\S]*?<\/think>\s*/g, '')
+
+  ipcMain.handle('ai:localModels', async (_, provider: 'ollama' | 'lmstudio') => {
+    try {
+      if (provider === 'ollama') {
+        const r = await fetch('http://127.0.0.1:11434/api/tags', { signal: AbortSignal.timeout(3000) })
+        const d = await r.json() as { models: { name: string }[] }
+        return d.models.map((m) => m.name)
+      }
+      const r = await fetch('http://127.0.0.1:1234/v1/models', { signal: AbortSignal.timeout(3000) })
+      const d = await r.json() as { data: { id: string }[] }
+      return d.data.map((m) => m.id).filter((id) => !/embed/i.test(id))
+    } catch {
+      return null
+    }
+  })
+
   ipcMain.handle('ai:stream', async (event, { apiKey, messages, model }: {
     apiKey: string; messages: unknown[]; model?: string
   }) => {
-    const selectedModel = model || 'open-mistral-7b'
     try {
-      const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-        body: JSON.stringify({ model: selectedModel, messages, temperature: 0.7, max_tokens: 4096, stream: true })
-      })
+      const target = aiTarget(apiKey, model)
+      const response = await aiFetch(target, { messages, temperature: 0.7, max_tokens: 4096, stream: true })
+      let inThink = false
 
       if (!response.ok) {
         let errText = await response.text()
@@ -409,7 +469,12 @@ function registerIpc(): void {
           if (data === '[DONE]') { event.sender.send('ai:done'); return }
           try {
             const parsed = JSON.parse(data) as { choices: Array<{ delta: { content?: string } }> }
-            const delta = parsed.choices[0]?.delta?.content
+            let delta = parsed.choices[0]?.delta?.content
+            // Masque la réflexion <think>…</think> des modèles locaux qui en produisent.
+            if (delta && (inThink || delta.includes('<think>'))) {
+              if (delta.includes('<think>')) inThink = true
+              if (delta.includes('</think>')) { inThink = false; delta = delta.split('</think>').pop() ?? '' } else delta = ''
+            }
             if (delta) event.sender.send('ai:chunk', delta)
           } catch { /* skip */ }
         }
@@ -424,14 +489,11 @@ function registerIpc(): void {
   ipcMain.handle('ai:complete', async (_, { apiKey, messages, model, json }: {
     apiKey: string; messages: unknown[]; model?: string; json?: boolean
   }) => {
-    const selectedModel = model || 'open-mistral-7b'
-    const body: Record<string, unknown> = { model: selectedModel, messages, temperature: 0.5, max_tokens: 4096 }
-    if (json) body.response_format = { type: 'json_object' }
-    const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify(body)
-    })
+    const target = aiTarget(apiKey, model)
+    const body: Record<string, unknown> = { messages, temperature: 0.5, max_tokens: 4096 }
+    // LM Studio n'accepte pas json_object : on extrait l'objet JSON de la réponse à la place.
+    if (json && target.local !== 'LM Studio') body.response_format = { type: 'json_object' }
+    const response = await aiFetch(target, body)
     if (!response.ok) {
       let errText = await response.text()
       try {
@@ -441,7 +503,11 @@ function registerIpc(): void {
       throw new Error(errText)
     }
     const data = await response.json() as { choices: Array<{ message: { content: string } }> }
-    return data.choices[0]?.message?.content ?? ''
+    const text = stripThink(data.choices[0]?.message?.content ?? '')
+    if (!json) return text
+    const start = text.indexOf('{')
+    const end = text.lastIndexOf('}')
+    return start >= 0 && end > start ? text.slice(start, end + 1) : text
   })
 
   // KaTeX bakes math into <span> soup that relies entirely on katex.min.css
@@ -583,4 +649,5 @@ function registerIpc(): void {
   ipcMain.handle('settings:get', () => { try { return JSON.parse(readFileSync(settingsPath, 'utf-8')) } catch { return {} } })
   ipcMain.handle('settings:set', (_, d) => { writeFileSync(settingsPath, JSON.stringify(d, null, 2)); return true })
   ipcMain.handle('app:version', () => app.getVersion())
+  ipcMain.handle('review:stats', () => getReviewStats())
 }

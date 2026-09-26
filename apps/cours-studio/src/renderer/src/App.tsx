@@ -68,6 +68,10 @@ export default function App() {
           useStore.getState().showToast(`${what} reçu${p.titles.length > 1 ? 's' : ''} de ${p.from}`, 'success')
         }
       }),
+      api.peers.on('peersync:auto', (p: { name: string; pushed: number; pulled: number }) => {
+        const parts = [p.pushed && `${p.pushed} envoyé${p.pushed > 1 ? 's' : ''}`, p.pulled && `${p.pulled} reçu${p.pulled > 1 ? 's' : ''}`].filter(Boolean)
+        useStore.getState().showToast(`Synchronisé avec ${p.name}${parts.length ? ` : ${parts.join(', ')}` : ''}`, 'success')
+      }),
       api.peers.on('peersync:proposal', (p: { name: string; count: number }) => {
         useStore.getState().showToast(
           `${p.name} est connecté : ${p.count} cours à synchroniser (bouton ${p.name} en haut)`,

@@ -7,6 +7,8 @@ import ToastStack from './components/Toast'
 import AppCard from './components/AppCard'
 import UpdateBanner from './components/UpdateBanner'
 import Onboarding from './components/Onboarding'
+import Launcher from './components/Launcher'
+import StorageModal from './components/StorageModal'
 import type { AppState, InstallProgress } from '@shared/types'
 
 const byName = (a: AppState, b: AppState): number => a.name.localeCompare(b.name)
@@ -19,6 +21,8 @@ export default function App(): JSX.Element {
   const [view, setView] = useState<View>({ kind: 'all' })
   const [query, setQuery] = useState('')
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [showLauncher, setShowLauncher] = useState(false)
+  const [showStorage, setShowStorage] = useState(false)
 
   function clearProgress(id: string): void {
     setProgress((prev) => {
@@ -49,10 +53,21 @@ export default function App(): JSX.Element {
       else useStore.getState().toast(`${p.name} mis à jour${p.version ? ` (v${p.version})` : ''}`, 'success')
       void loadApps()
     })
+    // Lanceur : raccourci global (depuis n'importe où) ou Ctrl+K dans Open Studio.
+    const offLauncher = window.api.app.onLauncher(() => setShowLauncher(true))
+    const onKey = (e: KeyboardEvent): void => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setShowLauncher((v) => !v)
+      }
+    }
+    window.addEventListener('keydown', onKey)
     return () => {
       offProgress()
       offUpdate()
       offAuto()
+      offLauncher()
+      window.removeEventListener('keydown', onKey)
     }
   }, [])
 
@@ -98,6 +113,8 @@ export default function App(): JSX.Element {
           view={view}
           onView={setView}
           onHelp={() => setShowOnboarding(true)}
+          onStorage={() => setShowStorage(true)}
+          onLauncher={() => setShowLauncher(true)}
           selfUpdating={selfUpdate?.version ?? null}
         />
         <main className="main">
@@ -163,6 +180,8 @@ export default function App(): JSX.Element {
       </div>
 
       <ToastStack />
+      {showLauncher && <Launcher onClose={() => setShowLauncher(false)} />}
+      {showStorage && <StorageModal onClose={() => setShowStorage(false)} />}
       {showOnboarding && (
         <Onboarding
           onClose={() => {

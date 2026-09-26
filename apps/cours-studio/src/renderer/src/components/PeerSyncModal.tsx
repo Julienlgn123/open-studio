@@ -7,11 +7,12 @@ import { useEscapeToClose } from '../hooks/useEscapeToClose'
 const api = (window as any).api
 
 interface PlanItem {
+  kind: 'course' | 'subject' | 'stats'
   id: string
   title: string
   emoji: string
   subjectName: string
-  direction: 'push' | 'pull'
+  direction: 'push' | 'pull' | 'both'
   reason: string
   conflict: boolean
 }
@@ -79,6 +80,7 @@ export default function PeerSyncModal({ peer, onClose }: { peer: PairedDevice; o
 
   const give = items?.filter((i) => i.direction === 'push') ?? []
   const take = items?.filter((i) => i.direction === 'pull') ?? []
+  const both = items?.filter((i) => i.direction === 'both') ?? []
 
   const Section = ({ list, title, icon }: { list: PlanItem[]; title: string; icon: JSX.Element }) =>
     list.length ? (
@@ -149,6 +151,7 @@ export default function PeerSyncModal({ peer, onClose }: { peer: PairedDevice; o
               </p>
               <Section list={give} title={`Ce PC donne à ${peer.name}`} icon={<ArrowRight size={14} />} />
               <Section list={take} title={`${peer.name} donne à ce PC`} icon={<ArrowLeft size={14} />} />
+              <Section list={both} title="Fusionné dans les deux sens" icon={<RefreshCw size={14} />} />
               {running && (
                 <div style={{ marginTop: 6 }}>
                   <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>
