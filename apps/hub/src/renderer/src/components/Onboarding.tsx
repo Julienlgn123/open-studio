@@ -13,7 +13,7 @@ const STEPS: Step[] = [
   {
     label: 'Bienvenue',
     title: 'Toute la suite, depuis un seul endroit',
-    text: 'Open Studio rassemble les apps de la suite — Cours Studio, Drive Studio, Local IA Studio… Découvre-les, installe-les et lance-les d’ici, sans chercher d’installateur.',
+    text: 'Open Studio rassemble les apps de la suite — Cours Studio, Drive Studio, Local IA Studio, Power Studio… Découvre-les, installe-les et lance-les d’ici, sans chercher d’installateur.',
     art: <Brandmark size={64} />
   },
   {

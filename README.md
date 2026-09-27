@@ -26,8 +26,8 @@ de traquer des installateurs éparpillés sur dix repos.
 
 - **Cours Studio** — prise et gestion de cours en local.
 - **Drive Studio** — gestionnaire multi-comptes Google Drive.
-- **ENT Studio** — suit ton emploi du temps ENT et signale ce qui a changé.
 - **Local IA Studio** — chat avec des modèles IA en local (Ollama ou GGUF depuis Hugging Face).
+- **Power Studio** — profils d'alimentation adaptés au matériel (performance max → économie max) et optimisation du système.
 
 ## Pourquoi Open Studio
 

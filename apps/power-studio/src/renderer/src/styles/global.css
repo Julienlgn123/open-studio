@@ -1,0 +1,156 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Mêmes tokens que les autres apps de la suite (--bg-base, --bg-surface, --accent…),
+   exprimés en canaux RGB pour les classes Tailwind `base-*` / `accent-*`. */
+:root {
+  --base-50: 245 245 247; /* texte fort */
+  --base-100: 242 242 243; /* --text-primary */
+  --base-200: 196 196 200;
+  --base-300: 147 147 151; /* --text-secondary */
+  --base-400: 116 116 121;
+  --base-500: 86 86 91; /* --text-tertiary */
+  --base-600: 62 62 68; /* --border-strong / placeholder */
+  --base-700: 44 44 50; /* --border-medium */
+  --base-800: 34 34 42; /* --bg-overlay */
+  --base-850: 26 26 31; /* --bg-elevated */
+  --base-900: 18 18 21; /* --bg-surface */
+  --base-950: 13 13 15; /* --bg-base */
+
+  --accent-400: 251 191 36;
+  --accent-500: 245 158 11;
+  --accent-600: 217 119 6;
+
+  --shadow-panel: 0 20px 60px rgba(0, 0, 0, 0.7);
+  --shadow-composer: 0 4px 16px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --base-50: 15 15 20;
+  --base-100: 28 28 33;
+  --base-200: 70 70 76;
+  --base-300: 108 108 114;
+  --base-400: 130 130 136;
+  --base-500: 158 158 163;
+  --base-600: 190 191 196;
+  --base-700: 222 223 228;
+  --base-800: 238 240 244;
+  --base-850: 255 255 255;
+  --base-900: 255 255 255;
+  --base-950: 247 247 249;
+
+  --accent-400: 217 119 6;
+  --accent-500: 234 138 8;
+  --accent-600: 180 83 9;
+
+  --shadow-panel: 0 20px 60px rgba(0, 0, 0, 0.18);
+  --shadow-composer: 0 4px 16px rgba(0, 0, 0, 0.1);
+  color-scheme: light;
+}
+
+::selection {
+  background: rgb(var(--accent-500) / 0.15);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  @apply bg-base-950 text-base-100 font-sans antialiased;
+  font-size: 14px;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea,
+[contenteditable='true'],
+.selectable {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+button {
+  cursor: pointer;
+}
+
+.drag {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--base-700));
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--base-600));
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-fade-up {
+  animation: fade-up 280ms ease both;
+}
+
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgb(239 68 68 / 0.45); }
+  70% { box-shadow: 0 0 0 10px rgb(239 68 68 / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(239 68 68 / 0); }
+}
+.animate-pulse-ring {
+  animation: pulse-ring 1.8s ease-out infinite;
+}
+
+@layer components {
+.card {
+  @apply rounded-2xl border border-base-800 bg-base-900;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-medium transition disabled:cursor-not-allowed disabled:opacity-40;
+}
+.btn-primary {
+  @apply btn bg-accent-500 text-black hover:bg-accent-400;
+}
+.btn-ghost {
+  @apply btn border border-base-700 text-base-200 hover:bg-base-100/[0.04] hover:text-base-100;
+}
+.btn-danger {
+  @apply btn bg-red-500 text-white hover:bg-red-400;
+}
+
+.badge {
+  @apply inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide;
+}
+}

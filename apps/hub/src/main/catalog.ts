@@ -38,5 +38,17 @@ export const CATALOG: CatalogEntry[] = [
     assetPrefix: 'Local-IA-Studio',
     fallbackEmoji: '✨',
     accent: '#7c5cff'
+  },
+  {
+    id: 'power-studio',
+    name: 'Power Studio',
+    productName: 'Power Studio',
+    debPackageName: 'power-studio',
+    description:
+      'Profils adaptés à ton matériel (performance max, silencieux, économie max) et optimisation du système : confidentialité, démarrage, nettoyage.',
+    category: 'Système',
+    assetPrefix: 'Power-Studio',
+    fallbackEmoji: '⚡',
+    accent: '#f59e0b'
   }
 ]

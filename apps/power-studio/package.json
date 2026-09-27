@@ -1,0 +1,141 @@
+{
+  "name": "power-studio",
+  "version": "1.0.0",
+  "description": "Profils d'alimentation adaptés à ton matériel (performance max, économie max) et optimisation du système",
+  "author": {
+    "name": "Julienlgn123",
+    "email": "129546749+Julienlgn123@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/Julienlgn123/open-studio/tree/main/apps/power-studio",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "preview": "electron-vite preview",
+    "start": "electron-vite dev",
+    "dist": "electron-vite build && electron-builder --win",
+    "dist:mac": "electron-vite build && electron-builder --mac",
+    "dist:linux": "electron-vite build && electron-builder --linux"
+  },
+  "build": {
+    "appId": "com.power-studio.app",
+    "productName": "Power Studio",
+    "directories": {
+      "output": "dist-installer"
+    },
+    "files": [
+      "out/**/*",
+      "node_modules/**/*",
+      "!node_modules/.cache",
+      "!node_modules/**/*.map"
+    ],
+    "extraResources": [
+      { "from": "resources/icon.png", "to": "icon.png" }
+    ],
+    "afterPack": "scripts/afterPack.js",
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "resources/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": false,
+      "shortcutName": "Power Studio",
+      "license": null,
+      "artifactName": "Power-Studio-Setup-${version}.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "artifactName": "Power-Studio-${version}-${arch}.${ext}",
+      "icon": "resources/icon.png",
+      "category": "public.app-category.utilities",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "title": "Power Studio ${version}",
+      "artifactName": "Power-Studio-${version}-${arch}.dmg",
+      "window": {
+        "width": 540,
+        "height": 400
+      },
+      "contents": [
+        {
+          "x": 130,
+          "y": 150,
+          "type": "file"
+        },
+        {
+          "x": 410,
+          "y": 150,
+          "type": "link",
+          "path": "/Applications"
+        },
+        {
+          "x": 270,
+          "y": 300,
+          "type": "file",
+          "path": "resources/Fix-macOS-Signature.command"
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "resources/icon.png",
+      "category": "Utility"
+    },
+    "deb": {
+      "artifactName": "Power-Studio-${version}.deb"
+    },
+    "publish": null
+  },
+  "dependencies": {
+    "lucide-react": "^0.511.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "systeminformation": "^5.27.7",
+    "zustand": "^5.0.5"
+  },
+  "devDependencies": {
+    "@electron-toolkit/preload": "^3.0.1",
+    "@electron-toolkit/utils": "^3.0.0",
+    "@types/node": "^22.15.29",
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.5.2",
+    "autoprefixer": "^10.4.20",
+    "electron": "35.7.5",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^3.1.0",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.15",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  }
+}
