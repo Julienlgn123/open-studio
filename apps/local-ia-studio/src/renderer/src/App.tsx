@@ -17,6 +17,18 @@ export default function App(): JSX.Element {
     loadInitial()
   }, [loadInitial])
 
+  // Ollama / LM Studio peuvent démarrer après l'app (démarrage du PC) ou être fermés en cours de
+  // route : on revérifie régulièrement et au retour sur la fenêtre.
+  useEffect(() => {
+    const refresh = (): void => void useChatStore.getState().refreshEngines().catch(() => {})
+    const timer = window.setInterval(refresh, 10_000)
+    window.addEventListener('focus', refresh)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refresh)
+    }
+  }, [])
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (!(e.ctrlKey || e.metaKey)) return

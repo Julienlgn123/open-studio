@@ -247,8 +247,12 @@ export const useChatStore = create<ChatState>((set, get) => {
     },
 
     refreshEngines: async () => {
+      const before = get().engineStatus
       const engineStatus = await window.api.engines.status()
       set({ engineStatus })
+      // Moteur apparu (ex. Ollama lancé après l'app au démarrage du PC) : on recharge ses modèles.
+      if (engineStatus.ollama.available && !before?.ollama.available) get().refreshOllamaModels()
+      if (engineStatus.lmstudio.available && !before?.lmstudio?.available) get().refreshLmStudioModels()
     },
 
     refreshOllamaModels: async () => {

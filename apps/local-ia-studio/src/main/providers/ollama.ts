@@ -15,7 +15,7 @@ interface OllamaTagsResponse {
 
 export async function checkOllama(): Promise<{ available: boolean; version: string | null; error: string | null }> {
   try {
-    const res = await fetch(`${BASE_URL}/api/version`, { signal: AbortSignal.timeout(1500) })
+    const res = await fetch(`${BASE_URL}/api/version`, { signal: AbortSignal.timeout(4000) })
     if (!res.ok) return { available: false, version: null, error: `HTTP ${res.status}` }
     const data = (await res.json()) as { version: string }
     return { available: true, version: data.version, error: null }
