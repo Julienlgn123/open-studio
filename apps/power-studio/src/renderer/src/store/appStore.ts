@@ -62,7 +62,6 @@ export const useApp = create<AppState>((set, get) => ({
     const settings = await window.api.settings.set(patch)
     if (patch.theme) applyTheme(settings.theme)
     set({ settings })
-    if ('gpuTuning' in patch) await get().refreshProfiles()
   },
 
   applyProfile: async (id) => {

@@ -122,11 +122,6 @@ function registerIpc(): void {
 
   ipcMain.handle('hw:get', (_, force?: boolean) => getHardware(!!force))
   ipcMain.handle('hw:stats', async () => readStats((await getHardware()).hasBattery))
-  ipcMain.handle('hw:openVendorTool', async (_, id: string) => {
-    const tool = (await getHardware()).vendorTools.find((t) => t.id === id)
-    if (!tool) return false
-    return (await shell.openPath(tool.path)) === ''
-  })
 
   ipcMain.handle('profiles:list', async () => describeProfiles(await getHardware()))
   ipcMain.handle('profiles:active', async () => {
@@ -140,9 +135,9 @@ function registerIpc(): void {
     refreshTray()
     return r
   })
-  ipcMain.handle('profiles:restore', async (_, includeGpu: boolean) => {
+  ipcMain.handle('profiles:restore', async () => {
     try {
-      await restoreDefaults(await getHardware(true), includeGpu)
+      await restoreDefaults(await getHardware(true))
       refreshTray()
       return { ok: true, error: null }
     } catch (err) {

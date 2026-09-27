@@ -1,7 +1,7 @@
 import { FolderOpen, ShieldAlert } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useApp } from '../store/appStore'
-import { ConfirmDanger, PageHeader, Toggle } from '../components/ui'
+import { PageHeader, Toggle } from '../components/ui'
 
 function Row({ title, desc, children }: { title: string; desc: ReactNode; children: ReactNode }): JSX.Element {
   return (
@@ -20,11 +20,9 @@ export default function SettingsView(): JSX.Element {
   const hw = useApp((s) => s.hardware)
   const updateSettings = useApp((s) => s.updateSettings)
   const [version, setVersion] = useState('')
-  const [confirmGpu, setConfirmGpu] = useState(false)
   useEffect(() => {
     void window.api.app.version().then(setVersion)
   }, [])
-  const gpu = hw?.gpus.find((g) => g.powerLimit)
 
   return (
     <>
@@ -36,19 +34,6 @@ export default function SettingsView(): JSX.Element {
         {hw?.os !== 'linux' && (
           <Row title="Lancer au démarrage de l’ordinateur" desc="Démarre réduit dans la zone de notification.">
             <Toggle checked={settings.launchAtLogin} onChange={(v) => void updateSettings({ launchAtLogin: v })} />
-          </Row>
-        )}
-        {gpu && (
-          <Row
-            title="Inclure la carte graphique dans les profils"
-            desc={
-              <>
-                Change la limite de puissance de ta {gpu.model} ({gpu.powerLimit!.min}–{gpu.powerLimit!.max} W, {gpu.powerLimit!.default} W d’usine). Demande les droits administrateur
-                à chaque changement de profil manuel ; revient à {gpu.powerLimit!.default} W au redémarrage.
-              </>
-            }
-          >
-            <Toggle checked={settings.gpuTuning} onChange={(v) => (v ? setConfirmGpu(true) : void updateSettings({ gpuTuning: false }))} />
           </Row>
         )}
         <Row title="Sauvegardes" desc="Exports .reg et journaux d’annulation créés avant chaque optimisation (Documents\Power Studio\Sauvegardes).">
@@ -65,24 +50,6 @@ export default function SettingsView(): JSX.Element {
       <p className="mt-4 text-[12px] text-base-500">
         Power Studio {version} · {hw?.osLabel} · fourni sans garantie, utilise-le à tes risques.
       </p>
-      {confirmGpu && gpu && (
-        <ConfirmDanger
-          title="Régler la puissance de la carte graphique ?"
-          confirmLabel="Activer"
-          ack="Je comprends que la carte graphique chauffera plus en Performance max."
-          onClose={() => setConfirmGpu(false)}
-          onConfirm={() => {
-            setConfirmGpu(false)
-            void updateSettings({ gpuTuning: true })
-          }}
-        >
-          <p>
-            En « Performance max », ta {gpu.model} pourra consommer jusqu’à <b>{gpu.powerLimit!.max} W</b> (au lieu de {gpu.powerLimit!.default} W) : plus de chaleur, plus de bruit,
-            et ton alimentation doit suivre. En « Économie max », elle sera limitée à {gpu.powerLimit!.min} W.
-          </p>
-          <p>Les valeurs restent dans la plage autorisée par NVIDIA pour ta carte.</p>
-        </ConfirmDanger>
-      )}
     </>
   )
 }

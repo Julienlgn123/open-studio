@@ -1,5 +1,4 @@
 import type { HardwareProfile, ProfileAction, ProfileApplyResult, ProfileDef, ProfileId } from '@shared/types'
-import { setGpuPowerLimit } from './gpu'
 import { AdminDeniedError, OS, powershellJson, psq, run, shellElevated } from './platform/exec'
 import { getSettings, getStore, logActivity, setSettings, updateStore } from './store'
 
@@ -33,29 +32,13 @@ interface Plan {
   def: ProfileDef
   /** Réglages powercfg (Windows). */
   power: PowerValue[]
-  gpuWatts: number | null
 }
 
 const PROFILE_META: Record<ProfileId, { name: string; tagline: string; color: string }> = {
-  performance: { name: 'Performance max', tagline: 'Tout à fond : processeur, carte graphique, ventilateurs.', color: '#ef4444' },
+  performance: { name: 'Performance max', tagline: 'Processeur toujours réactif, aucune mise en veille des composants.', color: '#ef4444' },
   balanced: { name: 'Équilibré', tagline: 'Rapide quand il faut, économe le reste du temps.', color: '#3b82f6' },
-  silent: { name: 'Silencieux', tagline: 'Moins de chaleur et de bruit, un peu moins de puissance.', color: '#a855f7' },
+  silent: { name: 'Silencieux', tagline: 'Sans turbo : moins de chaleur, un peu moins de puissance.', color: '#a855f7' },
   eco: { name: 'Économie max', tagline: 'Consommation minimale, batterie qui dure le plus longtemps.', color: '#22c55e' }
-}
-
-function gpuTarget(id: ProfileId, hw: HardwareProfile): { watts: number; gpu: string } | null {
-  const gpu = hw.gpus.find((g) => g.powerLimit)
-  const pl = gpu?.powerLimit
-  if (!gpu || !pl) return null
-  const watts =
-    id === 'performance'
-      ? pl.max
-      : id === 'balanced'
-        ? pl.default
-        : id === 'silent'
-          ? Math.max(pl.min, Math.round(pl.default * 0.75))
-          : pl.min
-  return { watts, gpu: gpu.model }
 }
 
 /** Calcule ce que fait chaque profil sur CETTE machine. */
@@ -78,7 +61,6 @@ export function buildPlan(id: ProfileId, hw: HardwareProfile): Plan {
       set('SUB_PROCESSOR', 'PERFBOOSTMODE', 2, 2)
       set('SUB_PROCESSOR', 'PERFEPP', 0, 0)
       set('SUB_PROCESSOR', 'CPMINCORES', 100, 100)
-      set('SUB_PROCESSOR', 'SYSCOOLPOL', 1, 1)
       set('SUB_DISK', 'DISKIDLE', 0, 0)
       set('SUB_PCIEXPRESS', 'ASPM', 0, 0)
       set(USB[0], USB[1], 0, 0)
@@ -86,33 +68,27 @@ export function buildPlan(id: ProfileId, hw: HardwareProfile): Plan {
       add({ id: 'cpu', label: 'Processeur', value: '100 % en permanence', why: `${cpu} reste à sa fréquence maximale, sans temps de montée.`, admin: false })
       add({ id: 'boost', label: 'Boost', value: 'Agressif', why: 'Le processeur dépasse sa fréquence de base dès qu’il peut (turbo).', admin: false })
       add({ id: 'cores', label: 'Cœurs', value: `${cores} actifs`, why: `Aucun des ${cores} cœurs n’est mis en veille : pas de latence au réveil.`, admin: false })
-      add({ id: 'fans', label: 'Refroidissement', value: 'Actif', why: 'Windows accélère les ventilateurs AVANT de ralentir le processeur.', admin: false })
       add({ id: 'devices', label: 'Disques, USB, PCIe, Wi-Fi', value: 'Jamais en veille', why: 'Aucune économie d’énergie sur les périphériques : pas de micro-coupures.', admin: false })
     } else if (id === 'balanced') {
       set('SUB_PROCESSOR', 'PROCTHROTTLEMIN', 5, 5)
       set('SUB_PROCESSOR', 'PROCTHROTTLEMAX', 100, 100)
       set('SUB_PROCESSOR', 'PERFBOOSTMODE', 2, 1)
       set('SUB_PROCESSOR', 'PERFEPP', 25, 50)
-      set('SUB_PROCESSOR', 'SYSCOOLPOL', 1, laptop ? 0 : 1)
       add({ id: 'cpu', label: 'Processeur', value: '5 → 100 %', why: `${cpu} ralentit au repos et accélère instantanément à la demande.`, admin: false })
       add({ id: 'boost', label: 'Boost', value: laptop ? 'Agressif secteur, normal batterie' : 'Agressif', why: 'Turbo disponible, le processeur redescend dès que la charge baisse.', admin: false })
-      add({ id: 'fans', label: 'Refroidissement', value: laptop ? 'Actif secteur, passif batterie' : 'Actif', why: laptop ? 'Sur batterie, Windows ralentit le processeur avant de faire tourner les ventilateurs.' : 'Les ventilateurs passent en premier pour garder les performances.', admin: false })
     } else if (id === 'silent') {
       set('SUB_PROCESSOR', 'PROCTHROTTLEMIN', 5, 5)
       set('SUB_PROCESSOR', 'PROCTHROTTLEMAX', 99, 90)
       set('SUB_PROCESSOR', 'PERFBOOSTMODE', 0, 0)
       set('SUB_PROCESSOR', 'PERFEPP', 60, 70)
-      set('SUB_PROCESSOR', 'SYSCOOLPOL', 0, 0)
-      add({ id: 'boost', label: 'Boost', value: 'Désactivé', why: `Sans turbo, ${cpu} chauffe beaucoup moins : c'est la source n°1 de bruit des ventilateurs.`, admin: false })
+      add({ id: 'boost', label: 'Boost', value: 'Désactivé', why: `Sans turbo, ${cpu} chauffe beaucoup moins et reste plus discret.`, admin: false })
       add({ id: 'cpu', label: 'Processeur', value: laptop ? '≤ 99 % secteur, ≤ 90 % batterie' : '≤ 99 %', why: 'Plafonner juste sous 100 % coupe le turbo sur la plupart des processeurs.', admin: false })
-      add({ id: 'fans', label: 'Refroidissement', value: 'Passif', why: 'Windows ralentit le processeur avant d’accélérer les ventilateurs.', admin: false })
     } else {
       set('SUB_PROCESSOR', 'PROCTHROTTLEMIN', 0, 0)
       set('SUB_PROCESSOR', 'PROCTHROTTLEMAX', laptop ? 80 : 70, laptop ? 50 : 70)
       set('SUB_PROCESSOR', 'PERFBOOSTMODE', 0, 0)
       set('SUB_PROCESSOR', 'PERFEPP', 100, 100)
       set('SUB_PROCESSOR', 'CPMINCORES', 0, 0)
-      set('SUB_PROCESSOR', 'SYSCOOLPOL', 0, 0)
       set('SUB_PCIEXPRESS', 'ASPM', 2, 2)
       set(USB[0], USB[1], 1, 1)
       set(WIFI[0], WIFI[1], laptop ? 1 : 0, 3)
@@ -124,7 +100,6 @@ export function buildPlan(id: ProfileId, hw: HardwareProfile): Plan {
       add({ id: 'cpu', label: 'Processeur', value: laptop ? '≤ 80 % secteur, ≤ 50 % batterie' : '≤ 70 %', why: `${cpu} est plafonné : moins de watts, moins de chaleur.`, admin: false })
       add({ id: 'boost', label: 'Boost', value: 'Désactivé', why: 'Le turbo consomme énormément pour un gain faible en usage courant.', admin: false })
       add({ id: 'cores', label: 'Cœurs', value: 'Mise en veille autorisée', why: `Les cœurs inutilisés (sur ${cores}) s'endorment.`, admin: false })
-      add({ id: 'fans', label: 'Refroidissement', value: 'Passif', why: 'Ventilateurs au minimum : le processeur ralentit d’abord.', admin: false })
       add({ id: 'devices', label: 'PCIe, USB, Wi-Fi, disques', value: 'Économie maximale', why: 'Les périphériques inactifs se mettent en veille.', admin: false })
       if (laptop) add({ id: 'saver', label: 'Économiseur de batterie', value: 'Toujours sur batterie', why: 'Windows limite les applis en arrière-plan et baisse la luminosité.', admin: false })
     }
@@ -134,11 +109,10 @@ export function buildPlan(id: ProfileId, hw: HardwareProfile): Plan {
     const caps = hw.capabilities
     if (id === 'performance') {
       add({ id: 'lowpower', label: 'Mode économie d’énergie', value: 'Désactivé', why: 'Le Mac peut utiliser toute sa puissance.', admin: true })
-      if (caps.highPowerMode) add({ id: 'highpower', label: 'Mode haute puissance', value: 'Activé (secteur)', why: 'Ventilateurs plus rapides pour tenir les performances sous charge longue.', admin: true })
     } else if (id === 'balanced') {
       add({ id: 'lowpower', label: 'Mode économie d’énergie', value: 'Désactivé', why: 'Réglage automatique de macOS.', admin: true })
     } else {
-      add({ id: 'lowpower', label: 'Mode économie d’énergie', value: id === 'silent' ? 'Activé' : 'Activé partout', why: 'Fréquences réduites : moins de chaleur, ventilateurs discrets, batterie qui dure.', admin: true })
+      add({ id: 'lowpower', label: 'Mode économie d’énergie', value: id === 'silent' ? 'Activé' : 'Activé partout', why: 'Fréquences réduites : moins de chaleur, batterie qui dure.', admin: true })
       if (id === 'eco') add({ id: 'sleep', label: 'Veille écran (batterie)', value: '2 min', why: 'L’écran est le plus gros consommateur d’un portable.', admin: true })
     }
     if (!caps.lowPowerMode) actions.forEach((a) => (a.unavailable = 'Nécessite macOS 12 ou plus récent'))
@@ -151,42 +125,7 @@ export function buildPlan(id: ProfileId, hw: HardwareProfile): Plan {
     add({ id: 'boost', label: 'Boost', value: id === 'silent' || id === 'eco' ? 'Désactivé' : 'Activé', why: 'Le turbo est la plus grosse source de chaleur et de consommation.', admin: true })
   }
 
-  const gpu = gpuTarget(id, hw)
-  const gpuTuning = getSettings().gpuTuning
-  let gpuWatts: number | null = null
-  if (gpu && OS !== 'mac') {
-    const pl = hw.gpus.find((g) => g.powerLimit)!.powerLimit!
-    gpuWatts = gpuTuning ? gpu.watts : null
-    add({
-      id: 'gpu',
-      label: `Carte graphique (${gpu.gpu.replace(/^NVIDIA\s+/i, '')})`,
-      value: `${gpu.watts} W`,
-      why:
-        id === 'performance'
-          ? `Limite poussée au maximum autorisé par NVIDIA (${pl.max} W au lieu de ${pl.default} W).`
-          : id === 'balanced'
-            ? `Limite d'usine (${pl.default} W).`
-            : `Limite réduite (plage ${pl.min}–${pl.max} W) : moins de chaleur et de bruit.`,
-      admin: true,
-      unavailable: gpuTuning ? undefined : 'Désactivé dans les réglages (demande les droits admin à chaque changement)'
-    })
-  }
-
-  if (OS === 'windows') {
-    const fanTool = hw.vendorTools.find((t) => t.fans)
-    add({
-      id: 'fan-curves',
-      label: 'Courbes des ventilateurs',
-      value: fanTool ? `Via ${fanTool.name}` : 'Logiciel du fabricant',
-      why: fanTool
-        ? `Windows ne pilote pas directement les ventilateurs : ${fanTool.name} (détecté) le fait. Power Studio règle la politique de refroidissement.`
-        : 'Windows ne pilote pas directement les ventilateurs : utilise le BIOS ou le logiciel de ta carte mère pour des courbes précises.',
-      admin: false,
-      unavailable: 'Réglage manuel'
-    })
-  }
-
-  return { def: { id, ...PROFILE_META[id], actions }, power, gpuWatts }
+  return { def: { id, ...PROFILE_META[id], actions }, power }
 }
 
 export function describeProfiles(hw: HardwareProfile): ProfileDef[] {
@@ -252,21 +191,21 @@ $ok = $LASTEXITCODE -eq 0
   // Réglages absents sur certains processeurs (ex. PERFEPP) : on ne l'affiche pas comme une erreur.
   const optional = new Set(['PERFEPP', 'CPMINCORES', 'ESBATTTHRESHOLD', WIFI[1], USB[1]])
   return {
-    applied: plan.def.actions.filter((a) => !a.unavailable && a.id !== 'gpu').map((a) => a.id),
+    applied: plan.def.actions.filter((a) => !a.unavailable && true).map((a) => a.id),
     failed: failedSettings.filter((s) => !optional.has(s)).map((s) => ({ id: s, error: 'Réglage refusé par Windows' }))
   }
 }
 
 // ─── macOS ─────────────────────────────────────────────────────────────────
 
-async function applyMac(id: ProfileId, hw: HardwareProfile): Promise<void> {
+async function applyMac(id: ProfileId): Promise<void> {
   const cap = (await run('pmset', ['-g', 'cap'], { timeoutMs: 5000 })).stdout
   const modern = /\bpowermode\b/.test(cap)
   const cmds: string[] = []
   if (modern) {
-    // powermode : 0 automatique, 1 économie, 2 haute puissance.
-    if (id === 'performance') cmds.push(`pmset -b powermode 0`, `pmset -c powermode ${hw.capabilities.highPowerMode ? 2 : 0}`)
-    else if (id === 'balanced') cmds.push('pmset -a powermode 0')
+    // powermode : 0 automatique, 1 économie.
+    // Jamais le mode 2 (haute puissance) : il pousse les ventilateurs.
+    if (id === 'performance' || id === 'balanced') cmds.push('pmset -a powermode 0')
     else cmds.push('pmset -a powermode 1')
   } else {
     cmds.push(`pmset -a lowpowermode ${id === 'silent' || id === 'eco' ? 1 : 0}`)
@@ -299,10 +238,7 @@ async function applyLinux(id: ProfileId, hw: HardwareProfile): Promise<void> {
   if (res.code !== 0) throw new Error(res.stderr.trim() || 'Réglage du processeur refusé')
 }
 
-/**
- * Applique un profil. `manual` : l'utilisateur a cliqué (la limite GPU, qui demande
- * les droits admin, n'est appliquée que dans ce cas — jamais par les règles automatiques).
- */
+/** Applique un profil. `manual` : choisi par l'utilisateur (sinon : règle automatique). */
 export async function applyProfile(id: ProfileId, hw: HardwareProfile, manual: boolean): Promise<ProfileApplyResult> {
   const plan = buildPlan(id, hw)
   const result: ProfileApplyResult = { profile: id, ok: true, applied: [], failed: [], adminDenied: false }
@@ -312,7 +248,7 @@ export async function applyProfile(id: ProfileId, hw: HardwareProfile, manual: b
       result.applied.push(...r.applied)
       result.failed.push(...r.failed)
     } else if (OS === 'mac') {
-      await applyMac(id, hw)
+      await applyMac(id)
       result.applied.push(...plan.def.actions.filter((a) => !a.unavailable).map((a) => a.id))
     } else {
       await applyLinux(id, hw)
@@ -322,18 +258,6 @@ export async function applyProfile(id: ProfileId, hw: HardwareProfile, manual: b
     if (err instanceof AdminDeniedError) result.adminDenied = true
     result.ok = false
     result.failed.push({ id: 'profile', error: err instanceof Error ? err.message : String(err) })
-  }
-
-  if (result.ok && manual && plan.gpuWatts !== null) {
-    try {
-      const pl = hw.gpus.find((g) => g.powerLimit)?.powerLimit
-      if (pl && getStore().originalGpuLimit === null) updateStore((d) => (d.originalGpuLimit = pl.default))
-      await setGpuPowerLimit(plan.gpuWatts)
-      result.applied.push('gpu')
-    } catch (err) {
-      if (err instanceof AdminDeniedError) result.adminDenied = true
-      result.failed.push({ id: 'gpu', error: err instanceof Error ? err.message : String(err) })
-    }
   }
 
   if (result.ok) {
@@ -350,7 +274,7 @@ export function profileName(id: ProfileId): string {
 }
 
 /** Remet le plan d'alimentation d'origine et supprime les plans créés par l'app. */
-export async function restoreDefaults(hw: HardwareProfile, includeGpu: boolean): Promise<void> {
+export async function restoreDefaults(hw: HardwareProfile): Promise<void> {
   const store = getStore()
   if (OS === 'windows') {
     const original = store.originalScheme ?? '381b4222-f694-41f0-9685-ff5bb260df2e'
@@ -365,14 +289,9 @@ export async function restoreDefaults(hw: HardwareProfile, includeGpu: boolean):
       d.originalScheme = null
     })
   } else if (OS === 'mac') {
-    await applyMac('balanced', hw)
+    await applyMac('balanced')
   } else {
     await applyLinux('balanced', hw)
-  }
-  const pl = hw.gpus.find((g) => g.powerLimit)?.powerLimit
-  if (includeGpu && pl && pl.current !== pl.default) {
-    await setGpuPowerLimit(pl.default)
-    updateStore((d) => (d.originalGpuLimit = null))
   }
   setSettings({ activeProfile: null })
   logActivity("Réglages d'alimentation d'origine rétablis", 'profile')

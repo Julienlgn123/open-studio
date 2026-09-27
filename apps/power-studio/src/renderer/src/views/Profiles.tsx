@@ -26,13 +26,11 @@ export default function Profiles(): JSX.Element {
   const restore = async (): Promise<void> => {
     setConfirmRestore(false)
     setRestoring(true)
-    const r = await window.api.profiles.restore(settings.gpuTuning)
+    const r = await window.api.profiles.restore()
     setRestoring(false)
     await refreshProfiles()
     toast(r.ok ? "Réglages d'alimentation d'origine rétablis" : `Échec : ${r.error}`, r.ok ? 'ok' : 'error')
   }
-
-  const gpu = hw?.gpus.find((g) => g.powerLimit)
 
   return (
     <>
@@ -42,9 +40,10 @@ export default function Profiles(): JSX.Element {
         </button>
       </PageHeader>
 
-      <DangerBanner title="Performance max = plus de chaleur, de bruit et de consommation">
-        Ce profil pousse le processeur{gpu ? ' et la carte graphique' : ''} à fond en permanence. Sur un <b>portable</b> ou un PC mal ventilé, surveille les
-        températures. Si ton PC devient instable (écran noir, redémarrage), repasse en « Équilibré » ou clique sur « Rétablir les réglages d’origine ».
+      <DangerBanner title="Performance max = plus de chaleur et de consommation">
+        Ce profil garde le processeur à sa fréquence maximale en permanence. Power Studio ne touche <b>jamais</b> à la tension, à la puissance (W) ni aux
+        ventilateurs : il ne change que les réglages d’alimentation de ton système. Sur un <b>portable</b>, surveille la chaleur ; au moindre doute, repasse en
+        « Équilibré » ou clique sur « Rétablir les réglages d’origine ».
       </DangerBanner>
 
       <div className="grid grid-cols-2 gap-4">
@@ -85,12 +84,6 @@ export default function Profiles(): JSX.Element {
       </div>
 
       <div className="mt-5 space-y-2">
-        {gpu && !settings.gpuTuning && (
-          <InfoBox>
-            La limite de puissance de ta {gpu.model} ({gpu.powerLimit!.min}–{gpu.powerLimit!.max} W) peut être incluse dans les profils : active-la dans Réglages. Windows demandera
-            les droits administrateur à chaque changement de profil, et la limite revient à {gpu.powerLimit!.default} W au redémarrage.
-          </InfoBox>
-        )}
         <InfoBox>
           <Lock size={11} className="mr-1 inline text-amber-400" /> = demande les droits administrateur (une fenêtre de confirmation du système s’affiche).
         </InfoBox>
@@ -114,7 +107,7 @@ export default function Profiles(): JSX.Element {
           onClose={() => setConfirmRestore(false)}
           onConfirm={restore}
         >
-          <p>Ton plan d’alimentation d’avant est réactivé et les plans créés par Power Studio sont supprimés{settings.gpuTuning && gpu ? ` ; la carte graphique revient à ${gpu.powerLimit!.default} W` : ''}.</p>
+          <p>Ton plan d’alimentation d’avant est réactivé et les plans créés par Power Studio sont supprimés.</p>
           <p>Les optimisations de la page « Optimisation » ne sont pas touchées : annule-les depuis cette page.</p>
         </ConfirmDanger>
       )}
@@ -125,8 +118,6 @@ export default function Profiles(): JSX.Element {
 /** Confirmation obligatoire avant « Performance max » (page Profils, tableau de bord, …). */
 export function PerfConfirm({ onClose, onConfirm }: { onClose: () => void; onConfirm: () => void }): JSX.Element {
   const hw = useApp((s) => s.hardware)
-  const gpuTuning = useApp((s) => s.settings.gpuTuning)
-  const gpu = hw?.gpus.find((g) => g.powerLimit)
   return (
     <ConfirmDanger
       title="Activer « Performance max » ?"
@@ -136,10 +127,11 @@ export function PerfConfirm({ onClose, onConfirm }: { onClose: () => void; onCon
       onConfirm={onConfirm}
     >
       <p>
-        Ton processeur restera à sa fréquence maximale en permanence{gpuTuning && gpu ? `, et ta carte graphique pourra consommer jusqu’à ${gpu.powerLimit!.max} W` : ''}.
+        Ton processeur restera à sa fréquence maximale en permanence (aucune mise en veille, turbo agressif).
       </p>
       <ul className="list-disc space-y-1 pl-5">
-        <li>Plus de chaleur et de bruit, facture d’électricité plus élevée.</li>
+        <li>Plus de chaleur, facture d’électricité un peu plus élevée.</li>
+        <li>Tension, puissance (W) et ventilateurs ne sont pas modifiés : seuls les réglages d’alimentation du système changent.</li>
         {hw?.laptop && <li className="font-semibold text-red-300">Portable : la batterie se videra très vite et l’appareil peut devenir très chaud. Garde-le sur une surface dure.</li>}
         <li>Un matériel mal refroidi (poussière, pâte thermique ancienne) peut devenir instable.</li>
       </ul>

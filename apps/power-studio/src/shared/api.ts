@@ -17,12 +17,12 @@ import type {
 export interface Api {
   window: { minimize: () => Promise<void>; maximize: () => Promise<void>; close: () => Promise<void> }
   app: { version: () => Promise<string>; platform: () => Promise<string> }
-  hardware: { get: (force?: boolean) => Promise<HardwareProfile>; stats: () => Promise<LiveStats>; openVendorTool: (id: string) => Promise<boolean> }
+  hardware: { get: (force?: boolean) => Promise<HardwareProfile>; stats: () => Promise<LiveStats> }
   profiles: {
     list: () => Promise<ProfileDef[]>
     active: () => Promise<ProfileId | null>
     apply: (id: ProfileId) => Promise<ProfileApplyResult>
-    restore: (includeGpu: boolean) => Promise<{ ok: boolean; error: string | null }>
+    restore: () => Promise<{ ok: boolean; error: string | null }>
     onChanged: (cb: (r: ProfileApplyResult) => void) => () => void
   }
   tweaks: {

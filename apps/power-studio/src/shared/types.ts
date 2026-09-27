@@ -8,17 +8,6 @@ export interface GpuInfo {
   vramMb: number | null
   /** Carte intégrée au processeur (iGPU) plutôt que dédiée. */
   integrated: boolean
-  /** Limite de puissance réglable (NVIDIA), en watts. */
-  powerLimit: { min: number; max: number; default: number; current: number } | null
-}
-
-/** Logiciel du fabricant qui pilote les ventilateurs / l'éclairage (détecté sur le PC). */
-export interface VendorTool {
-  id: string
-  name: string
-  /** Chemin de l'exécutable (Windows) ou de l'app (Mac) ; null si ouvert via une URL. */
-  path: string
-  fans: boolean
 }
 
 export interface HardwareProfile {
@@ -40,15 +29,11 @@ export interface HardwareProfile {
   gpus: GpuInfo[]
   ramGb: number
   disks: { name: string; type: 'ssd' | 'hdd' | 'nvme' | 'other'; sizeGb: number }[]
-  vendorTools: VendorTool[]
   /** Ce que la plateforme permet vraiment de régler (pour ne pas afficher de faux réglages). */
   capabilities: {
     powerPlans: boolean
     cpuLimit: boolean
-    coolingPolicy: boolean
-    gpuPowerLimit: boolean
     lowPowerMode: boolean
-    highPowerMode: boolean
     powerProfilesDaemon: boolean
   }
   /** Phrase courte qui résume la machine (« PC fixe gamer · Ryzen 7 5800X · RTX 3060 »). */
@@ -66,8 +51,6 @@ export interface LiveStats {
     load: number | null
     temp: number | null
     powerW: number | null
-    powerLimitW: number | null
-    fanPct: number | null
     clockMhz: number | null
     vramUsedMb: number | null
     vramTotalMb: number | null
@@ -192,8 +175,6 @@ export interface ActivityEntry {
 
 export interface AppSettings {
   activeProfile: ProfileId | null
-  /** Inclure la limite de puissance du GPU dans les profils (demande les droits admin). */
-  gpuTuning: boolean
   auto: AutoRules
   /** Garder l'app dans la zone de notification quand on ferme la fenêtre. */
   runInTray: boolean
@@ -208,7 +189,6 @@ export interface AppSettings {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   activeProfile: null,
-  gpuTuning: false,
   auto: { enabled: false, onBattery: 'eco', onAc: null, apps: [] },
   runInTray: true,
   launchAtLogin: false,

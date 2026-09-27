@@ -1,4 +1,4 @@
-import { Battery, Cpu, ExternalLink, Fan, HardDrive, MemoryStick, MonitorSmartphone, RefreshCw, Thermometer, Zap } from 'lucide-react'
+import { Battery, Cpu, HardDrive, MemoryStick, MonitorSmartphone, RefreshCw, Thermometer, Zap } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { ActivityEntry, LiveStats } from '@shared/types'
 import { useApp } from '../store/appStore'
@@ -80,7 +80,6 @@ export default function Dashboard(): JSX.Element {
   }
 
   const gpu = hw.gpus.find((g) => !g.integrated) ?? hw.gpus[0]
-  const fanTool = hw.vendorTools.find((t) => t.fans)
   const g = stats?.gpu
 
   return (
@@ -135,10 +134,9 @@ export default function Dashboard(): JSX.Element {
             {g && (
               <>
                 <Meter label={`Carte graphique · ${gpu?.model.replace(/^NVIDIA\s+/i, '')}`} value={g.load} color="#22c55e" detail={g.clockMhz ? `${g.clockMhz} MHz` : undefined} />
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                   <Meter label="Temp. GPU" value={g.temp} unit="°C" max={95} color="#f97316" />
-                  <Meter label="Conso GPU" value={g.powerW} unit=" W" max={g.powerLimitW ?? 300} color="#eab308" detail={g.powerLimitW ? `/ ${Math.round(g.powerLimitW)} W` : undefined} />
-                  <Meter label="Ventilateur GPU" value={g.fanPct} color="#06b6d4" />
+                  <Meter label="Conso GPU (lecture)" value={g.powerW} unit=" W" max={350} color="#eab308" />
                 </div>
               </>
             )}
@@ -151,7 +149,7 @@ export default function Dashboard(): JSX.Element {
               />
             )}
             {!g && hw.os === 'windows' && <p className="text-[12px] text-base-500">Statistiques détaillées de la carte graphique disponibles avec une carte NVIDIA.</p>}
-            {hw.os === 'windows' && <p className="text-[11.5px] text-base-500">La température du processeur n'est pas accessible sous Windows sans pilote spécial : utilise {fanTool?.name ?? 'le logiciel de ta carte mère'} pour la surveiller.</p>}
+            {hw.os === 'windows' && <p className="text-[11.5px] text-base-500">La température du processeur n'est pas accessible sous Windows sans pilote spécial : utilise le logiciel de ta carte mère pour la surveiller.</p>}
           </div>
         </div>
 
@@ -160,36 +158,12 @@ export default function Dashboard(): JSX.Element {
             <h2 className="text-[14px] font-semibold text-base-50">Ton matériel</h2>
             <Stat icon={Cpu} label="Processeur" value={`${hw.cpu.brand} · ${hw.cpu.cores} cœurs / ${hw.cpu.threads} threads`} />
             {hw.gpus.map((gp) => (
-              <Stat key={gp.model} icon={MonitorSmartphone} label={gp.integrated ? 'GPU intégré' : 'Carte graphique'} value={`${gp.model}${gp.vramMb ? ` · ${Math.round(gp.vramMb / 1024)} Go` : ''}${gp.powerLimit ? ` · ${gp.powerLimit.min}–${gp.powerLimit.max} W` : ''}`} />
+              <Stat key={gp.model} icon={MonitorSmartphone} label={gp.integrated ? 'GPU intégré' : 'Carte graphique'} value={`${gp.model}${gp.vramMb ? ` · ${Math.round(gp.vramMb / 1024)} Go` : ''}`} />
             ))}
             <Stat icon={MemoryStick} label="Mémoire" value={`${hw.ramGb} Go`} />
             <Stat icon={HardDrive} label="Stockage" value={hw.disks.map((d) => `${d.type === 'nvme' ? 'NVMe' : d.type === 'ssd' ? 'SSD' : d.type === 'hdd' ? 'HDD' : 'Disque'} ${d.sizeGb >= 1000 ? `${(d.sizeGb / 1000).toFixed(1)} To` : `${d.sizeGb} Go`}`).join(' · ') || '—'} />
             {hw.hasBattery && <Stat icon={Battery} label="Batterie" value="Oui (portable)" />}
             <Stat icon={Zap} label="Système" value={hw.osLabel} />
-          </div>
-
-          <div className="card p-5">
-            <h2 className="mb-2 flex items-center gap-2 text-[14px] font-semibold text-base-50">
-              <Fan size={15} /> Ventilateurs
-            </h2>
-            {fanTool ? (
-              <>
-                <p className="mb-3 text-[12.5px] leading-5 text-base-300">
-                  Les courbes précises se règlent dans <b className="text-base-100">{fanTool.name}</b> (détecté). Les profils de Power Studio règlent la politique de refroidissement du système.
-                </p>
-                <button className="btn-ghost" onClick={() => window.api.hardware.openVendorTool(fanTool.id)}>
-                  <ExternalLink size={14} /> Ouvrir {fanTool.name}
-                </button>
-              </>
-            ) : (
-              <p className="text-[12.5px] leading-5 text-base-300">
-                {hw.os === 'windows'
-                  ? 'Windows ne permet pas de piloter les ventilateurs directement : les profils règlent la politique de refroidissement (actif / passif). Pour des courbes précises, utilise le BIOS ou le logiciel de ta carte mère.'
-                  : hw.os === 'mac'
-                    ? 'macOS gère les ventilateurs automatiquement. Le mode haute puissance (sur les puces Max) les laisse tourner plus vite.'
-                    : 'Les ventilateurs suivent le profil du système. Pour des courbes précises : fancontrol (lm-sensors) ou le BIOS.'}
-              </p>
-            )}
           </div>
 
           <div className="card p-5">

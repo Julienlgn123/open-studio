@@ -14,14 +14,13 @@ const api: Api = {
   },
   hardware: {
     get: (force) => ipcRenderer.invoke('hw:get', force),
-    stats: () => ipcRenderer.invoke('hw:stats'),
-    openVendorTool: (id) => ipcRenderer.invoke('hw:openVendorTool', id)
+    stats: () => ipcRenderer.invoke('hw:stats')
   },
   profiles: {
     list: () => ipcRenderer.invoke('profiles:list'),
     active: () => ipcRenderer.invoke('profiles:active'),
     apply: (id) => ipcRenderer.invoke('profiles:apply', id),
-    restore: (includeGpu) => ipcRenderer.invoke('profiles:restore', includeGpu),
+    restore: () => ipcRenderer.invoke('profiles:restore'),
     onChanged: (cb) => {
       const listener = (_: unknown, r: ProfileApplyResult): void => cb(r)
       ipcRenderer.on('profiles:changed', listener)

@@ -14,8 +14,6 @@ interface StoreData {
   powerSchemes: Record<string, string>
   /** Plan actif avant le premier profil appliqué, pour « Rétablir les réglages Windows ». */
   originalScheme: string | null
-  /** Limite de puissance GPU d'origine (W). */
-  originalGpuLimit: number | null
   activity: ActivityEntry[]
   /** macOS : éléments de connexion retirés par l'app (nom → chemin), pour pouvoir les remettre. */
   disabledLoginItems?: Record<string, string>
@@ -26,7 +24,6 @@ const EMPTY: StoreData = {
   tweakJournal: {},
   powerSchemes: {},
   originalScheme: null,
-  originalGpuLimit: null,
   activity: []
 }
 

@@ -43,14 +43,14 @@ export default function Disclaimer({ onAccept }: { onAccept?: () => void }): JSX
 
         <div className="space-y-3 text-[13.5px] leading-6 text-base-200">
           <p>
-            Cette app change des réglages que Windows, macOS ou Linux cachent normalement : <b>plans d’alimentation, limite de puissance de la carte graphique,
-            registre, services système, programmes au démarrage, apps préinstallées, fichiers temporaires</b>.
+            Cette app change des réglages que Windows, macOS ou Linux cachent normalement : <b>plans d’alimentation, registre, services système, programmes au démarrage,
+            apps préinstallées, fichiers temporaires</b>. Elle ne touche <b>jamais</b> à la tension, à la puissance (W) ni aux ventilateurs.
           </p>
           <div className="rounded-2xl border border-red-500/40 bg-red-500/[0.07] p-4">
             <div className="mb-2 font-bold uppercase tracking-wide text-red-400">Ce qui peut mal se passer</div>
             <ul className="list-disc space-y-1 pl-5">
               <li>Une fonction de Windows qui ne marche plus (impression, Xbox / Game Pass, recherche, géolocalisation…) si tu désactives le service qui va avec.</li>
-              <li>Un PC qui chauffe plus, fait plus de bruit ou consomme plus en « Performance max » — surtout un portable ou un PC mal ventilé.</li>
+              <li>Un PC qui chauffe ou consomme un peu plus en « Performance max » — surtout un portable.</li>
               <li>Une batterie qui se vide plus vite, ou des performances réduites en « Économie max ».</li>
               <li>Des fichiers supprimés définitivement par le nettoyage (corbeille, temporaires).</li>
               <li>Dans le pire des cas, un système instable qu’il faudra restaurer.</li>

@@ -31,17 +31,15 @@ async function gpuStats(): Promise<LiveStats['gpu']> {
   if (!smi) return null
   const res = await run(
     smi,
-    ['--query-gpu=utilization.gpu,temperature.gpu,power.draw,power.limit,fan.speed,clocks.gr,memory.used,memory.total', '--format=csv,noheader,nounits'],
+    ['--query-gpu=utilization.gpu,temperature.gpu,power.draw,clocks.gr,memory.used,memory.total', '--format=csv,noheader,nounits'],
     { timeoutMs: 5000 }
   )
   if (res.code !== 0) return null
-  const [load, temp, power, limit, fan, clock, used, total] = res.stdout.split('\n')[0].split(',')
+  const [load, temp, power, clock, used, total] = res.stdout.split('\n')[0].split(',')
   return {
     load: num(load),
     temp: num(temp),
     powerW: num(power),
-    powerLimitW: num(limit),
-    fanPct: num(fan),
     clockMhz: num(clock),
     vramUsedMb: num(used),
     vramTotalMb: num(total)

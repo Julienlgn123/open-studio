@@ -87,10 +87,8 @@ export default function App(): JSX.Element {
       case 'category':
         return [{ title: view.name, items: list.filter((a) => a.category === view.name).sort(byName) }]
       default:
-        return [
-          { title: 'Installées', items: installed },
-          { title: 'À découvrir', items: available }
-        ].filter((s) => s.items.length)
+        // Une seule grille (installées d'abord) : pas de trou quand une rangée n'est pas pleine.
+        return [{ title: 'Bibliothèque', items: [...installed, ...available] }]
     }
   }, [apps, view, q])
 
