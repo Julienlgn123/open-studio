@@ -98,7 +98,7 @@ function dataRel(p: string | null | undefined): string | null {
   const i = Math.max(parts.lastIndexOf('attachments'), parts.lastIndexOf('recordings'))
   return i < 0 ? null : parts.slice(i).join('/')
 }
-const localPath = (rel: string | null): string | null => (rel ? join(app.getPath('userData'), ...rel.split('/')) : null)
+export const localPath = (rel: string | null): string | null => (rel ? join(app.getPath('userData'), ...rel.split('/')) : null)
 
 export function localState(): CourseState[] {
   const db = getDb()
@@ -217,7 +217,7 @@ function insertRows(table: RowTable, rows: any[]): void {
   })()
 }
 
-function applySubjects(rows: any[]): void {
+export function applySubjects(rows: any[]): void {
   const db = getDb()
   db.transaction(() => {
     for (const r of rows) {
@@ -233,7 +233,7 @@ function applySubjects(rows: any[]): void {
   })()
 }
 
-const subjectRows = (ids: string[]): any[] =>
+export const subjectRows = (ids: string[]): any[] =>
   ids.length ? (getDb().prepare(`SELECT * FROM subjects WHERE id IN (${ids.map(() => '?').join(',')})`).all(...ids) as any[]) : []
 
 /** Empreintes de tout ce qui se synchronise : cours (id) et matières (« s:id »). */
@@ -253,7 +253,7 @@ function autoSyncEnabled(): boolean {
 
 // ─── Paquet complet d'un cours ───────────────────────────────────────────────
 
-interface Bundle {
+export interface Bundle {
   subject: any
   course: any
   versions: any[]
@@ -265,14 +265,15 @@ interface Bundle {
   files: { rel: string; data: string }[]
 }
 
-function buildBundle(courseId: string): Bundle | null {
+/** `withData = false` : liste seulement les fichiers (leur contenu part à part, pour les gros enregistrements). */
+export function buildBundle(courseId: string, withData = true): Bundle | null {
   const db = getDb()
   const course = db.prepare('SELECT * FROM courses WHERE id = ?').get(courseId) as any
   if (!course) return null
   const files: { rel: string; data: string }[] = []
   const addFile = (rel: string): void => {
     const abs = localPath(rel)
-    if (abs && existsSync(abs) && statSync(abs).isFile()) files.push({ rel, data: readFileSync(abs).toString('base64') })
+    if (abs && existsSync(abs) && statSync(abs).isFile()) files.push({ rel, data: withData ? readFileSync(abs).toString('base64') : '' })
   }
   const walk = (rel: string): void => {
     const abs = localPath(rel)!
@@ -302,11 +303,11 @@ function buildBundle(courseId: string): Bundle | null {
   }
 }
 
-const safeRel = (rel: string): boolean =>
+export const safeRel = (rel: string): boolean =>
   /^(attachments|recordings)\//.test(rel) && !rel.split('/').some((p) => p === '..' || p === '')
 
 /** Installe un cours reçu : remplace la version locale (gardée dans l'historique du cours). */
-function applyBundle(b: Bundle, from: string): void {
+export function applyBundle(b: Bundle, from: string): void {
   const db = getDb()
   const id = b.course.id as string
   for (const f of b.files) {
@@ -613,7 +614,7 @@ async function handleRequest(req: IncomingMessage): Promise<{ code: number; body
       insertRows(input.table as RowTable, input.rows as any[])
       return reply({ ok: true })
     case '/pull':
-      return reply({ bundles: (input.ids as string[]).map(buildBundle).filter(Boolean) })
+      return reply({ bundles: (input.ids as string[]).map((id) => buildBundle(id)).filter(Boolean) })
     case '/push': {
       const bundles = input.bundles as Bundle[]
       for (const b of bundles) applyBundle(b, pairing.name)
@@ -899,7 +900,7 @@ async function doRunPlan(peerId: string, items: PlanItem[]): Promise<{ pushed: n
 
 /** Envoie tout de suite des cours à un PC associé (clic droit → « Envoyer à … »). */
 export async function sendCourses(peerId: string, courseIds: string[]): Promise<void> {
-  const bundles = courseIds.map(buildBundle).filter(Boolean)
+  const bundles = courseIds.map((id) => buildBundle(id)).filter(Boolean)
   await request(peerId, '/push', { bundles, live: true })
   await finish(peerId, courseIds)
 }

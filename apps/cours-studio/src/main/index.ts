@@ -19,7 +19,7 @@ import { initDb, getSubjects, createSubject, updateSubject, reorderSubjects,
 import { existsSync, mkdirSync, writeFileSync, unlinkSync, readFileSync, chmodSync, copyFileSync, statSync, rmSync } from 'fs'
 import ffmpeg from 'fluent-ffmpeg'
 import { pickAndExtractDocument, extractArticleFromUrl } from './documents'
-import { startReceive, stopReceive, startDiscovery, stopDiscovery, sendTo } from './sync'
+import { startReceive, stopReceive, startDiscovery, stopDiscovery, sendTo, shareTo, shareables } from './sync'
 import { getPlan, listPaired, runPlan, sendCourses, startPresence, stopPresence, unpair } from './peerSync'
 import { exportBackup, importBackup, autoBackup, openBackupsFolder, latestBackupInfo, resetAllData, chooseAutoBackupFolder, runAutoBackupToFolder } from './backup'
 import { htmlToMarkdown } from './markdown'
@@ -591,6 +591,8 @@ function registerIpc(): void {
   ipcMain.handle('sync:startDiscovery', () => { startDiscovery(); return true })
   ipcMain.handle('sync:stopDiscovery', () => { stopDiscovery(); return true })
   ipcMain.handle('sync:send', (_, host: string, port: number, code: string, pairOnly?: boolean) => sendTo(host, port, code, !!pairOnly))
+  ipcMain.handle('sync:shareables', () => shareables())
+  ipcMain.handle('sync:share', (_, host: string, port: number, code: string, courseIds: string[], subjectIds: string[]) => shareTo(host, port, code, courseIds, subjectIds))
   // PC déjà associés : présence, comparaison, échanges au cas par cas
   ipcMain.handle('peers:list', () => listPaired())
   ipcMain.handle('peers:unpair', (_, id: string) => { unpair(id); return true })

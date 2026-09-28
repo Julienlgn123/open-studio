@@ -5,9 +5,11 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'fs'
 import { hostname, networkInterfaces } from 'os'
 import { dirname, join } from 'path'
-import { checkpointDb, closeDb } from './db'
+import { checkpointDb, closeDb, getDb } from './db'
 import { DATA_ENTRIES, getBackupsDir, rewriteMediaPaths } from './backup'
-import { addPairing, fingerprints, myDeviceId } from './peerSync'
+import {
+  addPairing, applyBundle, applySubjects, buildBundle, fingerprints, localPath, myDeviceId, safeRel, subjectRows, type Bundle
+} from './peerSync'
 
 // Synchronisation directe entre deux PC sur le même réseau (Wi-Fi / câble), sans cloud.
 // Le PC qui REÇOIT affiche un code à 6 chiffres et s'annonce sur le réseau local ; le PC
@@ -15,6 +17,9 @@ import { addPairing, fingerprints, myDeviceId } from './peerSync'
 // jointes, enregistrements, réglages) passent chiffrés (AES-256-GCM, clé dérivée du code).
 // Le receveur met ses anciennes données de côté (dossier backups), installe les nouvelles
 // et redémarre : ses données sont remplacées par celles de l'envoyeur.
+// Partage d'une sélection : même mise en relation (code), mais seuls les cours choisis
+// passent ; ils s'ajoutent à ceux du receveur (ou remplacent sa version du même cours,
+// gardée dans l'historique), sans redémarrage ni association des deux PC.
 
 const SYNC_PORT = 47810
 const DISCOVERY_PORT = 47811
@@ -25,7 +30,7 @@ const MACHINE_SETTINGS = ['autoBackupFolder']
 
 export interface SyncStatus {
   role: 'receive' | 'send'
-  phase: 'waiting' | 'transferring' | 'applying' | 'done' | 'paired' | 'error'
+  phase: 'waiting' | 'transferring' | 'applying' | 'done' | 'paired' | 'shared' | 'error'
   done?: number
   total?: number
   message?: string
@@ -122,6 +127,8 @@ interface ReceiveSession {
   peer: string
   peerId: string
   pairNonce: string
+  /** Cours reçus par partage (sélection). */
+  shared: { id: string; title: string }[]
 }
 
 let receiving: ReceiveSession | null = null
@@ -147,7 +154,8 @@ export async function startReceive(): Promise<{ code: string; name: string; port
     received: 0,
     peer: '',
     peerId: '',
-    pairNonce: randomBytes(16).toString('hex')
+    pairNonce: randomBytes(16).toString('hex'),
+    shared: []
   }
   const port = await new Promise<number>((resolvePort, reject) => {
     const listen = (p: number): void => {
@@ -241,6 +249,44 @@ async function handle(s: ReceiveSession, req: IncomingMessage, res: ServerRespon
     return
   }
 
+  // ─── Partage d'une sélection : ajouté aux données actuelles, sans redémarrer ───
+  if (req.method === 'PUT' && url.pathname === '/shareFile') {
+    const rel = url.searchParams.get('path') ?? ''
+    if (!safeRel(rel)) return send(res, 400, { error: 'Chemin refusé.' })
+    const dest = localPath(rel)!
+    mkdirSync(dirname(dest), { recursive: true })
+    writeFileSync(dest, decrypt(s.key, await readBody(req, 4 * 1024 * 1024 * 1024)))
+    return send(res, 200, { ok: true })
+  }
+
+  if (req.method === 'POST' && url.pathname === '/share') {
+    const { subjects, bundle, total } = JSON.parse(decrypt(s.key, await readBody(req, 256 * 1024 * 1024)).toString('utf-8')) as {
+      subjects?: any[]
+      bundle?: Bundle
+      total?: number
+    }
+    // Matières vides choisies : créées seulement si ce PC n'en a pas déjà une du même nom.
+    if (subjects?.length) applySubjects(subjects.filter((r) => adoptSubject(r).id === r.id).map((r) => ({ ...r, deleted_at: null })))
+    if (bundle?.course?.id) {
+      if (bundle.subject) {
+        bundle.subject = adoptSubject(bundle.subject)
+        bundle.course.subject_id = bundle.subject.id
+      }
+      applyBundle({ ...bundle, files: [] }, s.peer)
+      s.shared.push({ id: bundle.course.id, title: String(bundle.course.title ?? '') })
+    }
+    status({ role: 'receive', phase: 'transferring', done: s.shared.length, total: total || undefined, peer: s.peer })
+    return send(res, 200, { ok: true })
+  }
+
+  if (req.method === 'POST' && url.pathname === '/shareDone') {
+    send(res, 200, { ok: true })
+    status({ role: 'receive', phase: 'shared', done: s.shared.length, peer: s.peer })
+    emit('peersync:received', { from: s.peer, courseIds: s.shared.map((c) => c.id), titles: s.shared.map((c) => c.title), live: true })
+    setTimeout(stopReceive, 300)
+    return
+  }
+
   if (req.method === 'POST' && url.pathname === '/commit') {
     const { count, fps } = JSON.parse((await readBody(req, 64 * 1024 * 1024)).toString('utf-8')) as { count?: number; fps?: Record<string, string> }
     if (count !== s.received) return send(res, 409, { error: `Transfert incomplet (${s.received}/${count} fichiers).` })
@@ -254,6 +300,16 @@ async function handle(s: ReceiveSession, req: IncomingMessage, res: ServerRespon
   }
 
   send(res, 404, { error: 'Inconnu.' })
+}
+
+/**
+ * Deux PC jamais synchronisés ont chacun leur « Maths » (identifiants différents) : un cours
+ * partagé est rangé dans la matière de même nom déjà présente ici plutôt que d'en créer une deuxième.
+ */
+function adoptSubject(row: any): any {
+  const db = getDb()
+  if (db.prepare('SELECT 1 FROM subjects WHERE id = ?').get(row.id)) return row
+  return db.prepare('SELECT * FROM subjects WHERE deleted_at IS NULL AND lower(name) = lower(?) LIMIT 1').get(String(row.name ?? '')) ?? row
 }
 
 /** Met les données actuelles de côté, installe celles reçues, puis redémarre. */
@@ -394,20 +450,25 @@ async function call(url: string, init: RequestInit): Promise<unknown> {
   return body
 }
 
+/** Trouve le PC en réception et s'authentifie avec son code. */
+async function connect(host: string, port: number, code: string) {
+  const base = `http://${host.includes(':') ? `[${host}]` : host}:${port}`
+  const hello = (await call(`${base}/hello`, { method: 'GET' })) as { app?: string; name?: string; salt?: string }
+  if (hello.app !== MAGIC || !hello.salt) throw new Error('Ce n’est pas un Cours Studio en réception.')
+  const salt = Buffer.from(hello.salt, 'hex')
+  const key = deriveKey(code.trim(), salt)
+  const auth = (await call(`${base}/auth`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ proof: proofOf(key, salt).toString('hex'), name: hostname(), deviceId: myDeviceId() })
+  })) as { token: string; deviceId?: string; name?: string; pairNonce?: string }
+  return { base, key, hello, auth, token: auth.token }
+}
+
 /** Envoie toutes les données de ce PC vers le PC `host:port`, qui les installe à la place des siennes. */
 export async function sendTo(host: string, port: number, code: string, pairOnly = false): Promise<void> {
-  const base = `http://${host.includes(':') ? `[${host}]` : host}:${port}`
   try {
-    const hello = (await call(`${base}/hello`, { method: 'GET' })) as { app?: string; name?: string; salt?: string }
-    if (hello.app !== MAGIC || !hello.salt) throw new Error('Ce n’est pas un Cours Studio en réception.')
-    const salt = Buffer.from(hello.salt, 'hex')
-    const key = deriveKey(code.trim(), salt)
-    const auth = (await call(`${base}/auth`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ proof: proofOf(key, salt).toString('hex'), name: hostname(), deviceId: myDeviceId() })
-    })) as { token: string; deviceId?: string; name?: string; pairNonce?: string }
-    const { token } = auth
+    const { base, key, hello, auth, token } = await connect(host, port, code)
     const remember = (baseline: Record<string, string>): void => {
       if (auth.deviceId && auth.pairNonce) addPairing(auth.deviceId, auth.name ?? hello.name ?? host, pairSecretOf(key, auth.pairNonce), baseline)
     }
@@ -440,6 +501,67 @@ export async function sendTo(host: string, port: number, code: string, pairOnly 
     })
     remember(fps)
     status({ role: 'send', phase: 'done', done: files.length, total: files.length, peer })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    status({ role: 'send', phase: 'error', message })
+    throw new Error(message)
+  }
+}
+
+/** Ce qu'on peut partager : matières et cours hors corbeille. */
+export function shareables(): { id: string; name: string; emoji: string; courses: { id: string; title: string; emoji: string }[] }[] {
+  const db = getDb()
+  const subjects = db.prepare('SELECT id, name, emoji FROM subjects WHERE deleted_at IS NULL ORDER BY sort_order, created_at').all() as any[]
+  const courses = db.prepare('SELECT id, subject_id, title, emoji FROM courses WHERE deleted_at IS NULL ORDER BY title COLLATE NOCASE').all() as any[]
+  return subjects.map((s) => ({
+    id: s.id,
+    name: s.name,
+    emoji: s.emoji,
+    courses: courses.filter((c) => c.subject_id === s.id).map((c) => ({ id: c.id, title: c.title, emoji: c.emoji }))
+  }))
+}
+
+/**
+ * Partage seulement les cours / matières choisis avec le PC `host:port` : ils s'ajoutent à ses
+ * données (rien d'autre n'est touché, pas de redémarrage). `subjectIds` : matières à créer même
+ * vides. Renvoie le nombre de cours partagés.
+ */
+export async function shareTo(host: string, port: number, code: string, courseIds: string[], subjectIds: string[]): Promise<number> {
+  try {
+    const { base, key, hello, auth, token } = await connect(host, port, code)
+    const peer = auth.name ?? hello.name ?? host
+    const post = (path: string, data: unknown): Promise<unknown> =>
+      call(`${base}${path}`, {
+        method: 'POST',
+        headers: { 'x-sync-token': token, 'Content-Type': 'application/octet-stream' },
+        body: new Uint8Array(encrypt(key, Buffer.from(JSON.stringify(data))))
+      })
+
+    const total = courseIds.length
+    status({ role: 'send', phase: 'transferring', done: 0, total, peer })
+    if (subjectIds.length) await post('/share', { subjects: subjectRows(subjectIds), total })
+    let done = 0
+    for (const id of courseIds) {
+      const b = buildBundle(id, false)
+      if (b) {
+        // Fichiers (pièces jointes, enregistrements) un par un : les vidéos peuvent être lourdes.
+        for (const f of b.files) {
+          const abs = localPath(f.rel)
+          if (!abs || !existsSync(abs)) continue
+          await call(`${base}/shareFile?path=${encodeURIComponent(f.rel)}`, {
+            method: 'PUT',
+            headers: { 'x-sync-token': token, 'Content-Type': 'application/octet-stream' },
+            body: new Uint8Array(encrypt(key, readFileSync(abs)))
+          })
+        }
+        await post('/share', { bundle: { ...b, files: [] }, total })
+        done++
+      }
+      status({ role: 'send', phase: 'transferring', done, total, peer })
+    }
+    await post('/shareDone', {})
+    status({ role: 'send', phase: 'shared', done, total, peer })
+    return done
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     status({ role: 'send', phase: 'error', message })
