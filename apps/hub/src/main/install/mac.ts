@@ -2,7 +2,7 @@ import { spawn } from 'child_process'
 import { existsSync, mkdtempSync, readdirSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import type { CatalogEntry } from '@shared/types'
+import type { CatalogEntry } from '@shared/legacy'
 import type { PlatformInstaller } from './types'
 import { dirSize } from './dirSize'
 

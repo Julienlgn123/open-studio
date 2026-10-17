@@ -1,193 +1,88 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Loader2, Search } from 'lucide-react'
-import { useStore } from './store'
+import { useEffect, useState } from 'react'
+import { Loader2 } from 'lucide-react'
+import { isInstalled, useStore } from './store'
 import TitleBar from './components/TitleBar'
-import Sidebar, { type View } from './components/Sidebar'
-import ToastStack from './components/Toast'
-import AppCard from './components/AppCard'
-import UpdateBanner from './components/UpdateBanner'
-import Onboarding from './components/Onboarding'
+import Rail from './components/Rail'
+import HomeView from './components/HomeView'
+import StoreView from './components/StoreView'
+import SettingsView from './components/SettingsView'
+import ModuleFrames from './components/ModuleFrames'
 import Launcher from './components/Launcher'
-import StorageModal from './components/StorageModal'
-import type { AppState, InstallProgress } from '@shared/types'
-
-const byName = (a: AppState, b: AppState): number => a.name.localeCompare(b.name)
+import ToastStack from './components/Toast'
+import ConfirmDialog from './components/ConfirmDialog'
 
 export default function App(): JSX.Element {
-  const { apps, loading, settings, loadSettings, loadApps, setOnboardingSeen } = useStore()
-  const [progress, setProgress] = useState<Record<string, InstallProgress>>({})
-  const [dismissedUpdates, setDismissedUpdates] = useState<Set<string>>(new Set())
-  const [selfUpdate, setSelfUpdate] = useState<{ version: string } | null>(null)
-  const [view, setView] = useState<View>({ kind: 'all' })
-  const [query, setQuery] = useState('')
-  const [showOnboarding, setShowOnboarding] = useState(false)
-  const [showLauncher, setShowLauncher] = useState(false)
-  const [showStorage, setShowStorage] = useState(false)
-
-  function clearProgress(id: string): void {
-    setProgress((prev) => {
-      if (!(id in prev)) return prev
-      const next = { ...prev }
-      delete next[id]
-      return next
-    })
-  }
+  const { view, loadSettings, loadModules, setProgress, applyTheme, openModule, go } = useStore()
+  const [palette, setPalette] = useState(false)
+  const [selfUpdate, setSelfUpdate] = useState<string | null>(null)
 
   useEffect(() => {
     ;(async () => {
       await loadSettings()
-      await loadApps()
+      await loadModules()
       window.api.app.notifyReady()
-      if (!useStore.getState().settings.onboardingSeen) setShowOnboarding(true)
+      // Reprend là où on s'était arrêté.
+      const last = useStore.getState().settings.lastModule
+      if (last) openModule(last)
     })()
 
-    const offProgress = window.api.apps.onProgress((p) => {
-      if (p.phase === 'done') clearProgress(p.id)
-      else setProgress((prev) => ({ ...prev, [p.id]: p }))
-    })
-    const offUpdate = window.api.app.onUpdateReady((p) => setSelfUpdate(p))
-    // Mise à jour automatique d'une app gérée (faite en arrière-plan par Open Studio).
-    const offAuto = window.api.apps.onAutoUpdated((p) => {
-      clearProgress(p.id)
-      if (p.error) useStore.getState().toast(`Mise à jour de ${p.name} impossible : ${p.error}`, 'error')
-      else useStore.getState().toast(`${p.name} mis à jour${p.version ? ` (v${p.version})` : ''}`, 'success')
-      void loadApps()
-    })
-    // Lanceur : raccourci global (depuis n'importe où) ou Ctrl+K dans Open Studio.
-    const offLauncher = window.api.app.onLauncher(() => setShowLauncher(true))
+    /** Ctrl+0 accueil, Ctrl+1…9 modules de la barre de gauche. */
+    const digit = (key: string): void => {
+      const n = Number(key)
+      if (n === 0) return go({ kind: 'home' })
+      const m = useStore.getState().modules.filter(isInstalled)[n - 1]
+      if (m) go({ kind: 'module', id: m.id })
+    }
     const onKey = (e: KeyboardEvent): void => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return
+      if (e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        setShowLauncher((v) => !v)
+        setPalette((v) => !v)
+      } else if (/^[0-9]$/.test(e.key)) {
+        e.preventDefault()
+        digit(e.key)
       }
     }
     window.addEventListener('keydown', onKey)
+
+    const offs = [
+      window.api.modules.onProgress(setProgress),
+      window.api.modules.onChanged(() => void loadModules()),
+      window.api.modules.onAutoUpdated((p) => useStore.getState().toast(`${p.name} mis à jour${p.version ? ` (v${p.version})` : ''}`, 'success')),
+      window.api.settings.onTheme(applyTheme),
+      window.api.app.onNavigate(openModule),
+      window.api.app.onLauncher(() => setPalette(true)),
+      window.api.app.onShortcut((k) => k.startsWith('digit:') && digit(k.slice(6))),
+      window.api.app.onUpdateReady((p) => setSelfUpdate(p.version))
+    ]
     return () => {
-      offProgress()
-      offUpdate()
-      offAuto()
-      offLauncher()
       window.removeEventListener('keydown', onKey)
+      offs.forEach((off) => off())
     }
   }, [])
 
-  const q = query.trim().toLowerCase()
-  const matches = (a: AppState): boolean =>
-    !q || a.name.toLowerCase().includes(q) || a.description.toLowerCase().includes(q) || a.category.toLowerCase().includes(q)
-
-  const sections = useMemo(() => {
-    const list = apps.filter(matches)
-    const installed = list.filter((a) => a.status !== 'not_installed').sort(byName)
-    const available = list.filter((a) => a.status === 'not_installed').sort(byName)
-    switch (view.kind) {
-      case 'installed':
-        return [{ title: 'Installées', items: installed }]
-      case 'updates':
-        return []
-      case 'category':
-        return [{ title: view.name, items: list.filter((a) => a.category === view.name).sort(byName) }]
-      default:
-        // Une seule grille (installées d'abord) : pas de trou quand une rangée n'est pas pleine.
-        return [{ title: 'Bibliothèque', items: [...installed, ...available] }]
-    }
-  }, [apps, view, q])
-
-  const head =
-    view.kind === 'installed'
-      ? { title: 'Installées', sub: 'Les apps prêtes à être ouvertes sur cet ordinateur.' }
-      : view.kind === 'updates'
-        ? { title: 'Mises à jour', sub: 'Les nouvelles versions de tes apps.' }
-        : view.kind === 'category'
-          ? { title: view.name, sub: `Les apps de la catégorie ${view.name}.` }
-          : { title: 'Bibliothèque', sub: 'Installe, ouvre et mets à jour les apps de la suite.' }
-
-  let cardIndex = 0
   return (
     <div className="app">
-      <TitleBar />
+      <TitleBar onPalette={() => setPalette(true)} />
       <div className="app-body">
-        <Sidebar
-          apps={apps}
-          view={view}
-          onView={setView}
-          onHelp={() => setShowOnboarding(true)}
-          onStorage={() => setShowStorage(true)}
-          onLauncher={() => setShowLauncher(true)}
-          selfUpdating={selfUpdate?.version ?? null}
-        />
+        <Rail />
         <main className="main">
-          <div className="main-inner">
-            <div className="page-head">
-              <div>
-                <h1 className="page-title">{head.title}</h1>
-                <div className="page-sub">{head.sub}</div>
-              </div>
-              {view.kind !== 'updates' && (
-                <label className="search">
-                  <Search size={14} />
-                  <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher une app" />
-                </label>
-              )}
-            </div>
-
-            {selfUpdate && (
-              <div className="notice">
-                <Loader2 size={15} className="spin-icon" style={{ animation: 'spin 0.9s linear infinite' }} />
-                Open Studio v{selfUpdate.version} est prêt : redémarrage automatique dans quelques secondes…
-              </div>
-            )}
-
-            {(view.kind === 'all' || view.kind === 'updates') && !loading && (
-              <UpdateBanner
-                apps={apps}
-                dismissed={view.kind === 'updates' ? new Set() : dismissedUpdates}
-                onDismiss={(id) => setDismissedUpdates((prev) => new Set(prev).add(id))}
-                showEmpty={view.kind === 'updates'}
-              />
-            )}
-
-            {loading ? (
-              <div className="grid">
-                {[0, 1, 2].map((i) => (
-                  <div key={i} className="skeleton" />
-                ))}
-              </div>
-            ) : view.kind === 'updates' ? null : sections.every((s) => !s.items.length) ? (
-              <div className="empty">
-                <div className="empty-title">{q ? `Aucune app ne correspond à « ${query} »` : 'Rien ici pour l’instant'}</div>
-                {q ? 'Essaie un autre mot-clé.' : view.kind === 'installed' ? 'Installe une app depuis la bibliothèque.' : ''}
-              </div>
-            ) : (
-              sections.map((s) => (
-                <section key={s.title}>
-                  {sections.length > 1 && (
-                    <h2 className="section-title">
-                      {s.title} <span>{s.items.length}</span>
-                    </h2>
-                  )}
-                  <div className="grid">
-                    {s.items.map((a) => (
-                      <AppCard key={a.id} app={a} progress={progress[a.id]} onDone={() => clearProgress(a.id)} index={cardIndex++} />
-                    ))}
-                  </div>
-                </section>
-              ))
-            )}
-          </div>
+          {view.kind === 'home' && <HomeView />}
+          {view.kind === 'store' && <StoreView />}
+          {view.kind === 'settings' && <SettingsView />}
+          <ModuleFrames />
         </main>
       </div>
 
-      <ToastStack />
-      {showLauncher && <Launcher onClose={() => setShowLauncher(false)} />}
-      {showStorage && <StorageModal onClose={() => setShowStorage(false)} />}
-      {showOnboarding && (
-        <Onboarding
-          onClose={() => {
-            setShowOnboarding(false)
-            if (!settings.onboardingSeen) setOnboardingSeen(true)
-          }}
-        />
+      {selfUpdate && (
+        <div className="update-pill">
+          <Loader2 size={14} className="spin-icon" />
+          Open Studio v{selfUpdate} est prêt : redémarrage dans quelques secondes…
+        </div>
       )}
+      <ToastStack />
+      <ConfirmDialog />
+      {palette && <Launcher onClose={() => setPalette(false)} />}
     </div>
   )
 }

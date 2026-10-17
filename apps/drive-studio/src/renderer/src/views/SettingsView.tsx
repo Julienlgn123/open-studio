@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react'
 import {
-  Moon,
-  Sun,
   Wand2,
   RefreshCw,
   Power,
@@ -18,7 +16,7 @@ import GoogleSetup from '../components/GoogleSetup'
 import { formatRelative } from '../lib/format'
 
 export default function SettingsView(): JSX.Element {
-  const { settings, accounts, lastSyncAt, syncing, setTheme, setLaunchAtStartup, syncQuotas, toast } =
+  const { settings, accounts, lastSyncAt, syncing, setLaunchAtStartup, syncQuotas, toast } =
     useStore()
   const [passphrase, setPassphrase] = useState('')
   const [encPass, setEncPass] = useState('')
@@ -182,27 +180,6 @@ export default function SettingsView(): JSX.Element {
           )}
         </div>
 
-        {/* Thème */}
-        <div className="card col" style={{ gap: 12 }}>
-          <span className="section-label" style={{ marginBottom: 0 }}>
-            Apparence
-          </span>
-          <div className="row" style={{ gap: 8 }}>
-            <button
-              className={`btn ${settings.theme !== 'light' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setTheme('dark')}
-            >
-              <Moon size={14} /> Sombre
-            </button>
-            <button
-              className={`btn ${settings.theme === 'light' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setTheme('light')}
-            >
-              <Sun size={14} /> Clair
-            </button>
-          </div>
-        </div>
-
         {/* Synchronisation */}
         <div className="card col" style={{ gap: 12 }}>
           <span className="section-label" style={{ marginBottom: 0 }}>
@@ -230,10 +207,9 @@ export default function SettingsView(): JSX.Element {
             Démarrage
           </span>
           <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.6 }}>
-            Tes comptes Google sont automatiquement reconnectés à chaque ouverture de l'app —
-            ça évite qu'un compte peu utilisé finisse par expirer. Active cette option pour que
-            l'app démarre aussi (réduite dans la barre système) à la connexion à ton PC, sans
-            action de ta part.
+            Tes comptes Google sont reconnectés à chaque démarrage — ça évite qu'un compte peu
+            utilisé finisse par expirer. Active cette option pour qu'Open Studio démarre avec ton
+            PC (discrètement, près de l'horloge) : les backups planifiés tournent sans rien ouvrir.
           </p>
           <label className="row" style={{ gap: 10, alignItems: 'center', cursor: 'pointer' }}>
             <input
@@ -243,7 +219,7 @@ export default function SettingsView(): JSX.Element {
               onChange={toggleLaunchAtStartup}
             />
             <Power size={14} />
-            Lancer au démarrage du PC
+            Lancer Open Studio au démarrage du PC
           </label>
         </div>
 

@@ -1,11 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AppSettings, AppState, AppStorage, InstallProgress } from '../shared/types'
+import type { AppSettings, CatalogState, ModuleInfo, ModuleProgress, Theme, ThemeSetting } from '../shared/types'
 
 function on<T>(channel: string, cb: (payload: T) => void): () => void {
   const handler = (_: unknown, payload: T): void => cb(payload)
   ipcRenderer.on(channel, handler)
   return () => ipcRenderer.removeListener(channel, handler)
 }
+
+type Settings = AppSettings & { effectiveTheme: Theme }
 
 const api = {
   window: {
@@ -14,28 +16,22 @@ const api = {
     close: () => ipcRenderer.invoke('window:close')
   },
   settings: {
-    get: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),
-    setTheme: (theme: 'dark' | 'light'): Promise<AppSettings> =>
-      ipcRenderer.invoke('settings:setTheme', theme),
-    setOnboardingSeen: (seen: boolean): Promise<AppSettings> =>
-      ipcRenderer.invoke('settings:setOnboardingSeen', seen)
+    get: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
+    setTheme: (theme: ThemeSetting): Promise<Settings> => ipcRenderer.invoke('settings:setTheme', theme),
+    setLaunchAtStartup: (enabled: boolean): Promise<Settings> => ipcRenderer.invoke('settings:setLaunchAtStartup', enabled),
+    onTheme: (cb: (t: Theme) => void) => on<Theme>('studio:theme', cb)
   },
-  apps: {
-    list: (): Promise<AppState[]> => ipcRenderer.invoke('apps:list'),
-    install: (id: string): Promise<AppState> => ipcRenderer.invoke('apps:install', id),
-    launch: (id: string): Promise<void> => ipcRenderer.invoke('apps:launch', id),
-    uninstall: (id: string): Promise<void> => ipcRenderer.invoke('apps:uninstall', id),
-    getInstalledSize: (id: string): Promise<number | null> => ipcRenderer.invoke('apps:size', id),
-    previousVersion: (id: string): Promise<string | null> => ipcRenderer.invoke('apps:previousVersion', id),
-    rollback: (id: string): Promise<AppState> => ipcRenderer.invoke('apps:rollback', id),
-    unskip: (id: string): Promise<boolean> => ipcRenderer.invoke('apps:unskip', id),
-    onProgress: (cb: (p: InstallProgress) => void) => on<InstallProgress>('apps:progress', cb),
-    onAutoUpdated: (cb: (p: { id: string; name: string; version: string | null; error?: string }) => void) =>
-      on<{ id: string; name: string; version: string | null; error?: string }>('apps:autoUpdated', cb)
-  },
-  storage: {
-    list: (): Promise<AppStorage[]> => ipcRenderer.invoke('storage:list'),
-    clean: (id: string): Promise<number> => ipcRenderer.invoke('storage:clean', id)
+  modules: {
+    list: (refresh?: boolean): Promise<ModuleInfo[]> => ipcRenderer.invoke('modules:list', refresh),
+    catalogState: (): Promise<CatalogState> => ipcRenderer.invoke('modules:catalogState'),
+    install: (id: string): Promise<void> => ipcRenderer.invoke('modules:install', id),
+    uninstall: (id: string): Promise<void> => ipcRenderer.invoke('modules:uninstall', id),
+    removeLegacy: (id: string): Promise<void> => ipcRenderer.invoke('modules:removeLegacy', id),
+    setCurrent: (id: string | null) => ipcRenderer.send('modules:current', id),
+    onProgress: (cb: (p: ModuleProgress) => void) => on<ModuleProgress>('modules:progress', cb),
+    onChanged: (cb: () => void) => on<null>('modules:changed', cb),
+    onAutoUpdated: (cb: (p: { id: string; name: string; version: string | null }) => void) =>
+      on<{ id: string; name: string; version: string | null }>('modules:autoUpdated', cb)
   },
   shell: {
     openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:openExternal', url)
@@ -44,8 +40,10 @@ const api = {
     notifyReady: () => ipcRenderer.send('renderer:ready'),
     getVersion: (): Promise<string> => ipcRenderer.invoke('app:version'),
     onLauncher: (cb: () => void) => on<void>('launcher:open', cb),
-    onUpdateReady: (cb: (payload: { version: string }) => void) =>
-      on<{ version: string }>('app:updateReady', cb)
+    /** Demande d'ouverture d'un module (menu de l'icône, notification, autre module). */
+    onNavigate: (cb: (id: string | null) => void) => on<string | null>('studio:navigate', cb),
+    onShortcut: (cb: (key: string) => void) => on<string>('studio:shortcut', cb),
+    onUpdateReady: (cb: (payload: { version: string }) => void) => on<{ version: string }>('app:updateReady', cb)
   }
 }
 

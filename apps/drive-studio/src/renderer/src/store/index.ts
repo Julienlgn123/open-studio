@@ -173,10 +173,8 @@ export const useStore = create<AppStore>((set, get) => ({
     set({ stats, recent })
   },
 
-  applyTheme: () => {
-    const t = get().settings.theme === 'light' ? 'light' : 'dark'
-    document.documentElement.setAttribute('data-theme', t)
-  },
+  // Le thème est celui d'Open Studio (appliqué à la page par le preload du module).
+  applyTheme: () => {},
 
   setTheme: async (t) => {
     const settings = await api.settings.setTheme(t)

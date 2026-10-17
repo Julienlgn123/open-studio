@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events'
-import { BrowserWindow } from 'electron'
+import { host } from '@open-studio/module'
 import type { TransferProgress, BackupProgress } from '@shared/types'
 
 // Bus d'événements interne au main. ipc.ts relaie vers le renderer.
@@ -17,8 +17,7 @@ export function emitBackup(p: BackupProgress): void {
   broadcast('backup:progress', p)
 }
 
+/** Vers l'interface du module (si elle est ouverte dans Open Studio). */
 export function broadcast(channel: string, payload: unknown): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    win.webContents.send(channel, payload)
-  }
+  host.send(channel, payload)
 }

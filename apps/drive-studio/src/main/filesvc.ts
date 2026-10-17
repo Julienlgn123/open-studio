@@ -1,4 +1,5 @@
 import { app, dialog, BrowserWindow, shell } from 'electron'
+import { host } from '@open-studio/module'
 import { basename, join } from 'path'
 import { mkdirSync, renameSync, rmSync, statSync } from 'fs'
 import { decryptFile, encryptFile, ENCRYPTED_EXT } from './fileCrypt'
@@ -192,7 +193,7 @@ export async function downloadToDisk(
 
   let dir = destDir
   if (!dir) {
-    const win = BrowserWindow.getAllWindows()[0]
+    const win = (host.window() as BrowserWindow)
     const res = await dialog.showOpenDialog(win, {
       title: 'Choisir le dossier de destination',
       properties: ['openDirectory', 'createDirectory']
@@ -312,7 +313,7 @@ export async function downloadReplica(fileId: string, accountId: string): Promis
   const file = getFile(fileId)
   const replica = getReplicas(fileId).find((r) => r.accountId === accountId)
   if (!file || !replica?.driveFileId) throw new Error('Copie de sauvegarde introuvable (sauvegardée avant la mise à jour de l’app).')
-  const win = BrowserWindow.getAllWindows()[0]
+  const win = (host.window() as BrowserWindow)
   const res = await dialog.showOpenDialog(win, { title: 'Dossier où restaurer la copie', properties: ['openDirectory', 'createDirectory'] })
   if (res.canceled || !res.filePaths.length) return null
   const destPath = join(res.filePaths[0], file.originalFilename)

@@ -1,23 +1,16 @@
-import { app } from 'electron'
+import { app, nativeTheme } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync } from 'fs'
-import type { AppSettings } from '@shared/types'
+import type { AppSettings, Theme, ThemeSetting } from '@shared/types'
 
-// Ne contient QUE le suivi propre à Open Studio (quelle app est installée, où,
-// quelle version) — jamais les données des apps gérées, qui restent dans
-// leur propre dossier userData habituel (%APPDATA%/<leur-nom>).
-interface TrackedApp {
-  installPath: string
-  installedVersion: string
-}
+// Réglages d'Open Studio. Les données des modules n'y sont jamais : chacun garde son propre
+// dossier (celui de l'ancienne app quand il y en avait une).
 
 interface StoredData {
-  theme?: 'dark' | 'light'
-  onboardingSeen?: boolean
+  theme?: ThemeSetting
+  launchAtStartup?: boolean
+  lastModule?: string | null
   trayHintSeen?: boolean
-  apps?: Record<string, TrackedApp>
-  /** Version mise de côté par app après un retour arrière : pas reproposée ni installée seule. */
-  skippedUpdates?: Record<string, string>
 }
 
 function storePath(): string {
@@ -32,36 +25,48 @@ function readRaw(): StoredData {
   }
 }
 
-function writeRaw(s: StoredData): void {
-  writeFileSync(storePath(), JSON.stringify(s, null, 2))
+function patch(p: Partial<StoredData>): void {
+  writeFileSync(storePath(), JSON.stringify({ ...readRaw(), ...p }, null, 2))
 }
 
 export function getSettings(): AppSettings {
   const raw = readRaw()
-  return { theme: raw.theme ?? 'dark', onboardingSeen: raw.onboardingSeen ?? false }
+  return {
+    theme: raw.theme ?? 'dark',
+    launchAtStartup: raw.launchAtStartup ?? false,
+    lastModule: raw.lastModule ?? null
+  }
 }
 
-export function setTheme(theme: 'dark' | 'light'): void {
-  const raw = readRaw()
-  raw.theme = theme
-  writeRaw(raw)
+export function setTheme(theme: ThemeSetting): void {
+  patch({ theme })
 }
 
-export function setOnboardingSeen(seen: boolean): void {
-  const raw = readRaw()
-  raw.onboardingSeen = seen
-  writeRaw(raw)
+/** Thème réellement affiché (« système » résolu). */
+export function effectiveTheme(): Theme {
+  const t = getSettings().theme
+  if (t === 'system') return nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
+  return t
 }
 
-export function getTrackedApp(id: string): TrackedApp | null {
-  return readRaw().apps?.[id] ?? null
+export function setLastModule(id: string | null): void {
+  patch({ lastModule: id })
 }
 
-export function setTrackedApp(id: string, data: TrackedApp): void {
-  const raw = readRaw()
-  raw.apps = raw.apps ?? {}
-  raw.apps[id] = data
-  writeRaw(raw)
+export function getLaunchAtStartup(): boolean {
+  return getSettings().launchAtStartup
+}
+
+/** Lancement à l'ouverture de session, fenêtre cachée (les modules tournent en arrière-plan). */
+export function setLaunchAtStartup(enabled: boolean): void {
+  patch({ launchAtStartup: enabled })
+  syncLoginItem()
+}
+
+export function syncLoginItem(): void {
+  if (!app.isPackaged) return
+  const enabled = getLaunchAtStartup()
+  app.setLoginItemSettings({ openAtLogin: enabled, args: enabled ? ['--hidden'] : [] })
 }
 
 export function getTrayHintSeen(): boolean {
@@ -69,27 +74,5 @@ export function getTrayHintSeen(): boolean {
 }
 
 export function setTrayHintSeen(): void {
-  const raw = readRaw()
-  raw.trayHintSeen = true
-  writeRaw(raw)
-}
-
-export function getSkippedUpdate(id: string): string | null {
-  return readRaw().skippedUpdates?.[id] ?? null
-}
-
-export function setSkippedUpdate(id: string, version: string | null): void {
-  const raw = readRaw()
-  raw.skippedUpdates = raw.skippedUpdates ?? {}
-  if (version) raw.skippedUpdates[id] = version
-  else delete raw.skippedUpdates[id]
-  writeRaw(raw)
-}
-
-export function clearTrackedApp(id: string): void {
-  const raw = readRaw()
-  if (raw.apps?.[id]) {
-    delete raw.apps[id]
-    writeRaw(raw)
-  }
+  patch({ trayHintSeen: true })
 }

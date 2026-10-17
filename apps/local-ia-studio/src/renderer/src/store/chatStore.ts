@@ -99,18 +99,10 @@ interface ChatState {
 
 export type Theme = 'dark' | 'light'
 
+// Thème d'Open Studio : appliqué à la page par le preload, la valeur sert aux composants.
 function initialTheme(): Theme {
-  try {
-    return localStorage.getItem('theme') === 'light' ? 'light' : 'dark'
-  } catch {
-    return 'dark'
-  }
+  return window.studio?.getTheme() ?? 'dark'
 }
-
-function applyTheme(t: Theme): void {
-  document.documentElement.dataset.theme = t
-}
-applyTheme(initialTheme())
 
 function toModelMessages(conv: Conversation, msgs: ChatMessage[]): ChatStreamRequest['messages'] {
   const history: ChatStreamRequest['messages'] = msgs.map((m) => ({
@@ -507,14 +499,9 @@ export const useChatStore = create<ChatState>((set, get) => {
     setSettingsOpen: (v: boolean) => set({ settingsOpen: v }),
     setPreferencesOpen: (v: boolean) => set({ preferencesOpen: v }),
     toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
-    setTheme: (theme) => {
-      try {
-        localStorage.setItem('theme', theme)
-      } catch {
-        /* préférence locale seulement */
-      }
-      applyTheme(theme)
-      set({ theme })
-    }
+    setTheme: (theme) => set({ theme })
   }
 })
+
+// Changement de thème dans Open Studio.
+window.studio?.onTheme((theme) => useChatStore.getState().setTheme(theme))

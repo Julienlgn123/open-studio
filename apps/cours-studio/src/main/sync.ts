@@ -1,4 +1,5 @@
-import { app, BrowserWindow } from 'electron'
+import { app } from 'electron'
+import { host } from '@open-studio/module'
 import { createCipheriv, createDecipheriv, createHmac, randomBytes, randomInt, scryptSync, timingSafeEqual } from 'crypto'
 import { createSocket, type Socket } from 'dgram'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'http'
@@ -38,8 +39,9 @@ export interface SyncPeer {
   port: number
 }
 
+/** Vers l'interface du module (si elle est ouverte dans Open Studio). */
 function emit(channel: string, payload: unknown): void {
-  for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(channel, payload)
+  host.send(channel, payload)
 }
 const status = (s: SyncStatus): void => emit('sync:status', s)
 

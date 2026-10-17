@@ -9,11 +9,13 @@ import {
   Share2,
   Plus,
   Trash2,
-  Pencil
+  Pencil,
+  RefreshCw
 } from 'lucide-react'
 import { useStore, type ViewName } from '../store'
 import ContextMenu from './ContextMenu'
 import FolderModal from './FolderModal'
+import { formatRelative } from '../lib/format'
 import type { VirtualFolder } from '@shared/types'
 
 const NAV: { view: ViewName; label: string; icon: JSX.Element }[] = [
@@ -27,7 +29,7 @@ const NAV: { view: ViewName; label: string; icon: JSX.Element }[] = [
 ]
 
 export default function Sidebar(): JSX.Element {
-  const { view, activeFolderId, setView, folders, accounts, loadFolders, toast } = useStore()
+  const { view, activeFolderId, setView, folders, accounts, loadFolders, toast, syncing, lastSyncAt, syncQuotas } = useStore()
   const [showNew, setShowNew] = useState(false)
   const [editFolder, setEditFolder] = useState<VirtualFolder | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; folder: VirtualFolder } | null>(null)
@@ -93,12 +95,23 @@ export default function Sidebar(): JSX.Element {
         </div>
 
         <div className="sidebar-footer">
-          <div className="row" style={{ padding: '4px 8px', fontSize: 12, color: 'var(--text-tertiary)' }}>
+          <div className="row" style={{ padding: '2px 2px 2px 8px', gap: 8, fontSize: 12, color: 'var(--text-tertiary)' }}>
             <span
               className="legend-dot"
               style={{ background: accounts.some((a) => a.status === 'error') ? 'var(--danger)' : 'var(--success)' }}
             />
-            {accounts.length} compte{accounts.length !== 1 ? 's' : ''} lié{accounts.length !== 1 ? 's' : ''}
+            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {accounts.length} compte{accounts.length !== 1 ? 's' : ''}
+              {accounts.length > 0 && <> · {syncing ? 'synchro…' : formatRelative(lastSyncAt)}</>}
+            </span>
+            <button
+              className="icon-btn"
+              onClick={() => syncQuotas()}
+              disabled={syncing || accounts.length === 0}
+              data-tooltip="Synchroniser maintenant"
+            >
+              <RefreshCw size={13} style={syncing ? { animation: 'spin 0.7s linear infinite' } : undefined} />
+            </button>
           </div>
         </div>
       </nav>

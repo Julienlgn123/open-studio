@@ -1,4 +1,5 @@
 import { statSync } from 'fs'
+import { host } from '@open-studio/module'
 import { basename } from 'path'
 import type { LocalModelFile, ModelMessage } from '@shared/types'
 import type { ToolDef } from '../tools'
@@ -38,7 +39,7 @@ function runExclusive<T>(fn: () => Promise<T>): Promise<T> {
 async function getLlamaInstance(): Promise<Llama> {
   if (!llamaInstance) {
     try {
-      const { getLlama } = await import('node-llama-cpp')
+      const { getLlama } = await host.importHost<typeof import('node-llama-cpp')>('node-llama-cpp')
       llamaInstance = await getLlama()
       llamaLoadError = null
     } catch (err) {
@@ -76,7 +77,7 @@ export function fileToModelInfo(path: string): LocalModelFile {
 export async function getGgufContextLength(modelPath: string): Promise<number | null> {
   if (loadedModel?.path === modelPath) return loadedModel.model.trainContextSize
   try {
-    const { readGgufFileInfo } = await import('node-llama-cpp')
+    const { readGgufFileInfo } = await host.importHost<typeof import('node-llama-cpp')>('node-llama-cpp')
     const info = await readGgufFileInfo(modelPath, { readTensorInfo: false })
     const metadata = info.metadata as unknown as Record<string, { context_length?: number } | undefined> & {
       general: { architecture: string }
@@ -105,7 +106,7 @@ async function disposeAll(): Promise<void> {
 }
 
 async function ensureLoaded(modelPath: string, requestedContext: number): Promise<LoadedContext> {
-  const { LlamaChatSession } = await import('node-llama-cpp')
+  const { LlamaChatSession } = await host.importHost<typeof import('node-llama-cpp')>('node-llama-cpp')
 
   if (loadedModel && loadedModel.path !== modelPath) await disposeAll()
   if (!loadedModel) {
@@ -173,7 +174,7 @@ async function buildFunctions(tools: {
   defs: ToolDef[]
   run: (name: string, args: Record<string, unknown>) => Promise<string>
 }): Promise<ChatSessionModelFunctions> {
-  const { defineChatSessionFunction } = await import('node-llama-cpp')
+  const { defineChatSessionFunction } = await host.importHost<typeof import('node-llama-cpp')>('node-llama-cpp')
   const entries = tools.defs.map((d) => {
     const props = Object.fromEntries(
       d.parameters.required.map((k) => [k, { type: d.parameters.properties[k].type === 'number' ? 'number' : 'string' }])

@@ -1,13 +1,11 @@
-import { app, ipcMain, BrowserWindow, shell } from 'electron'
-import { getSettings, setTheme, setOnboardingSeen } from './store'
-import { listAppStates, installOrUpdateApp, launchApp, uninstallApp, getInstalledSize, findPreviousVersion, rollbackApp, unskipUpdate } from './install'
-import { cleanAppStorage, getAppStorage } from './storage'
+import { app, ipcMain, BrowserWindow, shell, nativeTheme } from 'electron'
+import type { ThemeSetting } from '@shared/types'
+import { effectiveTheme, getSettings, setLastModule, setLaunchAtStartup, setTheme } from './store'
+import { getCatalogState, installModule, listModules, removeLegacyApp, uninstallModule } from './modules/manager'
+import { broadcastTheme, setCurrentModule } from './modules/runtime'
+import { broadcast } from './events'
 
-function getWin(): BrowserWindow {
-  return BrowserWindow.getAllWindows()[0]
-}
-
-export function registerIpc(): void {
+export function registerIpc(getWin: () => BrowserWindow | null, onModulesChanged: () => void, open: (id: string | null) => void): void {
   ipcMain.handle('window:minimize', () => getWin()?.minimize())
   ipcMain.handle('window:maximize', () => {
     const w = getWin()
@@ -17,26 +15,50 @@ export function registerIpc(): void {
   ipcMain.handle('window:close', () => getWin()?.close())
   ipcMain.handle('app:version', () => app.getVersion())
 
-  ipcMain.handle('settings:get', () => getSettings())
-  ipcMain.handle('settings:setTheme', (_, theme: 'dark' | 'light') => {
+  ipcMain.handle('settings:get', () => ({ ...getSettings(), effectiveTheme: effectiveTheme() }))
+  ipcMain.handle('settings:setTheme', (_, theme: ThemeSetting) => {
     setTheme(theme)
-    return getSettings()
+    applyTheme()
+    return { ...getSettings(), effectiveTheme: effectiveTheme() }
   })
-  ipcMain.handle('settings:setOnboardingSeen', (_, seen: boolean) => {
-    setOnboardingSeen(seen)
-    return getSettings()
+  ipcMain.handle('settings:setLaunchAtStartup', (_, enabled: boolean) => {
+    setLaunchAtStartup(enabled)
+    return { ...getSettings(), effectiveTheme: effectiveTheme() }
+  })
+  nativeTheme.on('updated', () => {
+    if (getSettings().theme === 'system') applyTheme()
   })
 
-  ipcMain.handle('apps:list', () => listAppStates())
-  ipcMain.handle('apps:install', (_, id: string) => installOrUpdateApp(id))
-  ipcMain.handle('apps:launch', (_, id: string) => launchApp(id))
-  ipcMain.handle('apps:uninstall', (_, id: string) => uninstallApp(id))
-  ipcMain.handle('apps:size', (_, id: string) => getInstalledSize(id))
-  ipcMain.handle('apps:previousVersion', async (_, id: string) => (await findPreviousVersion(id))?.version ?? null)
-  ipcMain.handle('apps:rollback', (_, id: string) => rollbackApp(id))
-  ipcMain.handle('apps:unskip', (_, id: string) => { unskipUpdate(id); return true })
-  ipcMain.handle('storage:list', () => getAppStorage())
-  ipcMain.handle('storage:clean', (_, id: string) => cleanAppStorage(id))
+  ipcMain.handle('modules:list', (_, refresh?: boolean) => listModules({ refresh }))
+  ipcMain.handle('modules:catalogState', () => getCatalogState())
+  ipcMain.handle('modules:install', async (_, id: string) => {
+    await installModule(id)
+    onModulesChanged()
+  })
+  ipcMain.handle('modules:uninstall', async (_, id: string) => {
+    await uninstallModule(id)
+    onModulesChanged()
+  })
+  ipcMain.handle('modules:removeLegacy', (_, id: string) => removeLegacyApp(id))
+  // Module affiché à l'écran : rouvert au prochain lancement, et pas mis à jour sous les yeux.
+  ipcMain.on('modules:current', (_, id: string | null) => {
+    setCurrentModule(id)
+    setLastModule(id)
+  })
 
-  ipcMain.handle('shell:openExternal', (_, url: string) => shell.openExternal(url))
+  // Une interface de module demande à ouvrir un autre module (ou l'accueil).
+  ipcMain.on('studio:open', (_, id: string | null) => open(id))
+  // Thème courant, lu de façon synchrone par le preload des modules (pas de flash au chargement).
+  ipcMain.on('studio:theme', (e) => {
+    e.returnValue = effectiveTheme()
+  })
+
+  ipcMain.handle('shell:openExternal', (_, url: string) => {
+    if (/^https?:/.test(url)) return shell.openExternal(url)
+  })
+}
+
+function applyTheme(): void {
+  broadcast('studio:theme', effectiveTheme())
+  broadcastTheme()
 }

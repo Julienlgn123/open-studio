@@ -1,4 +1,5 @@
 import { safeStorage } from 'electron'
+import { host } from '@open-studio/module'
 import { deleteRawPreference, getRawPreference, setRawPreference } from './db'
 import type { MistralStatus } from '@shared/types'
 
@@ -11,10 +12,12 @@ export function getMistralKey(): string | null {
   if (!raw) return null
   const [kind, payload] = raw.split(':', 2)
   if (kind === 'enc') {
+    const buf = Buffer.from(payload, 'base64')
     try {
-      return safeStorage.decryptString(Buffer.from(payload, 'base64'))
+      return safeStorage.decryptString(buf)
     } catch {
-      return null
+      // Clé enregistrée par l'ancienne app Local IA Studio (autre clé que celle d'Open Studio).
+      return host.decryptLegacy(buf)
     }
   }
   return kind === 'plain' ? payload : null

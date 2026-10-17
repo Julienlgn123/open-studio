@@ -10,7 +10,9 @@
     "dev:hub": "npm run dev -w apps/hub",
     "dev:local-ia-studio": "npm run dev -w apps/local-ia-studio",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run build --workspaces --if-present",
+    "build:modules": "node scripts/build-modules.mjs",
+    "dev": "npm run dev -w apps/hub"
   },
   "allowScripts": {
     "better-sqlite3@11.10.0": true,

@@ -1,4 +1,5 @@
 import { app } from 'electron'
+import { host } from '@open-studio/module'
 import { join } from 'path'
 import { readFileSync, writeFileSync } from 'fs'
 import { encryptString, decryptString } from './crypto'
@@ -37,7 +38,7 @@ export function getPublicSettings(): AppSettings {
   return {
     theme: raw.theme ?? 'dark',
     googleConfigured: !!(raw.googleClientId && raw.googleClientSecret),
-    launchAtStartup: !!raw.launchAtStartup,
+    launchAtStartup: getLaunchAtStartup(),
     encryptUploads: !!raw.encryptUploads && !!raw.encryptionPassphrase,
     hasEncryptionPassphrase: !!raw.encryptionPassphrase
   }
@@ -83,14 +84,13 @@ export function setTheme(theme: 'dark' | 'light'): void {
   writeRaw(raw)
 }
 
+// Démarrage avec le PC : c'est Open Studio qui démarre, et fait tourner le module.
 export function getLaunchAtStartup(): boolean {
-  return !!readRaw().launchAtStartup
+  return host.getLaunchAtStartup()
 }
 
 export function setLaunchAtStartup(enabled: boolean): void {
-  const raw = readRaw()
-  raw.launchAtStartup = enabled
-  writeRaw(raw)
+  host.setLaunchAtStartup(enabled)
 }
 
 export function setGoogleCredentials(clientId: string, clientSecret: string): void {

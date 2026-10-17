@@ -1,4 +1,5 @@
 import { safeStorage } from 'electron'
+import { host } from '@open-studio/module'
 
 // Chiffrement des secrets (tokens OAuth, client secret Google) au repos.
 // safeStorage s'appuie sur le trousseau de l'OS :
@@ -34,7 +35,14 @@ export function decryptString(stored: string | null | undefined): string {
   if (!stored) return ''
   if (stored.startsWith(ENC_PREFIX)) {
     const buf = Buffer.from(stored.slice(ENC_PREFIX.length), 'base64')
-    return safeStorage.decryptString(buf)
+    try {
+      return safeStorage.decryptString(buf)
+    } catch (err) {
+      // Secret écrit par l'ancienne app Drive Studio (autre clé que celle d'Open Studio).
+      const legacy = host.decryptLegacy(buf)
+      if (legacy !== null) return legacy
+      throw err
+    }
   }
   if (stored.startsWith(RAW_PREFIX)) {
     return Buffer.from(stored.slice(RAW_PREFIX.length), 'base64').toString('utf-8')

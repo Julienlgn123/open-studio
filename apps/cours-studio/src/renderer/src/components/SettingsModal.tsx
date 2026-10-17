@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Eye, EyeOff, Sun, Moon, Upload, FolderOpen, Save, Trash2, Wifi } from 'lucide-react'
+import { X, Eye, EyeOff, Upload, FolderOpen, Save, Trash2, Wifi } from 'lucide-react'
 import SyncModal from './SyncModal'
 import { useStore } from '../store'
 import { format } from 'date-fns'
@@ -210,26 +210,6 @@ export default function SettingsModal({ onClose }: Props) {
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
               Une notification te prévient chaque jour à cette heure s’il reste des flashcards à réviser.
-            </div>
-          </div>
-
-          <div className="field">
-            <label className="field-label">Apparence</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                className="btn btn-sm"
-                onClick={() => saveSettings({ ...settings, theme: 'dark' })}
-                style={{ flex: 1, justifyContent: 'center', background: (settings.theme ?? 'dark') === 'dark' ? 'var(--accent-dim)' : 'var(--bg-overlay)', color: (settings.theme ?? 'dark') === 'dark' ? 'var(--accent-light)' : 'var(--text-secondary)' }}
-              >
-                <Moon size={13} /> Sombre
-              </button>
-              <button
-                className="btn btn-sm"
-                onClick={() => saveSettings({ ...settings, theme: 'light' })}
-                style={{ flex: 1, justifyContent: 'center', background: settings.theme === 'light' ? 'var(--accent-dim)' : 'var(--bg-overlay)', color: settings.theme === 'light' ? 'var(--accent-light)' : 'var(--text-secondary)' }}
-              >
-                <Sun size={13} /> Clair
-              </button>
             </div>
           </div>
 

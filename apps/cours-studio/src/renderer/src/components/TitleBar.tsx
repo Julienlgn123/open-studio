@@ -4,9 +4,6 @@ import SettingsModal from './SettingsModal'
 import PeerChip from './PeerChip'
 import { useState } from 'react'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const api = (window as any).api
-
 export default function TitleBar() {
   const { view, setView, pomodoroOpen, togglePomodoro } = useStore()
   const [showSettings, setShowSettings] = useState(false)
@@ -14,24 +11,14 @@ export default function TitleBar() {
   return (
     <>
       <div className="titlebar">
-        <div className="titlebar-controls">
-          <div className="titlebar-btn close" onClick={() => api.window.close()} />
-          <div className="titlebar-btn minimize" onClick={() => api.window.minimize()} />
-          <div className="titlebar-btn maximize" onClick={() => api.window.maximize()} />
-        </div>
-
-        <span className="titlebar-title">Cours Studio</span>
+        <button className="titlebar-search" onClick={() => window.dispatchEvent(new CustomEvent('open-global-search'))}>
+          <Search size={13} />
+          Rechercher dans tes cours…
+          <kbd>Ctrl K</kbd>
+        </button>
 
         <div className="titlebar-actions">
           <PeerChip />
-          <button
-            className="icon-btn"
-            onClick={() => window.dispatchEvent(new CustomEvent('open-global-search'))}
-            data-tooltip="Rechercher (Ctrl+K)"
-            data-tooltip-dir="left-down"
-          >
-            <Search size={15} />
-          </button>
           <button
             className={`icon-btn ${view === 'flashcards' ? 'active' : ''}`}
             onClick={() => setView(view === 'flashcards' ? 'home' : 'flashcards')}

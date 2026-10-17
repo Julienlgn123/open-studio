@@ -5,6 +5,7 @@ import Composer from './Composer'
 import ModelPicker from './ModelPicker'
 import LogoMark from './LogoMark'
 import AdviceCard from './AdviceCard'
+import { SidebarToggle } from './TitleBar'
 import type { ModelAdvice } from '@shared/types'
 
 const SUGGESTIONS = [
@@ -87,7 +88,10 @@ export default function WelcomeView(): JSX.Element {
   }
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+    <div className="relative flex min-w-0 flex-1 flex-col overflow-y-auto">
+      <div className="absolute left-3 top-2.5">
+        <SidebarToggle />
+      </div>
       <div className="m-auto w-full max-w-[720px] px-6 py-10">
         <div className="animate-fade-up mb-7 flex flex-col items-center gap-3 text-center">
           <LogoMark size={44} />

@@ -1,8 +1,8 @@
 import { randomUUID } from 'crypto'
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
+import { app, ipcMain, dialog, type BrowserWindow } from 'electron'
+import { host } from '@open-studio/module'
 import { rmSync, writeFileSync } from 'fs'
 import { basename, join } from 'path'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import {
   initDb,
   listConversations,
@@ -78,69 +78,32 @@ import type {
 } from '@shared/types'
 import { DEFAULT_TITLE, autoTitle } from '@shared/types'
 
-let mainWindow: BrowserWindow
 const activeStreams = new Map<string, AbortController>()
 /** Modifications de fichiers en attente de l'accord de l'utilisateur, par id. */
 const pendingApprovals = new Map<string, (d: ApprovalDecision) => void>()
 
-function createWindow(): void {
-  mainWindow = new BrowserWindow({
-    width: 1360,
-    height: 880,
-    minWidth: 880,
-    minHeight: 560,
-    show: false,
-    frame: false,
-    titleBarStyle: 'hidden',
-    backgroundColor: '#0d0d0f',
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
-      contextIsolation: true
-    }
-  })
-  mainWindow.on('ready-to-show', () => mainWindow.show())
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
-    return { action: 'deny' }
-  })
+/** Fenêtre d'Open Studio : parent des boîtes de dialogue. */
+const win = (): BrowserWindow => host.window() as BrowserWindow
 
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
-  }
-}
-
-app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.local-ia-studio')
-  app.on('browser-window-created', (_, w) => optimizer.watchWindowShortcuts(w))
-
+/** Démarrage du module dans Open Studio. */
+export function activate(): void {
   initDb()
   registerIpc()
-  createWindow()
+  app.on('before-quit', shutdown)
+}
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
-  })
-})
+/** Arrêt du module (mise à jour, retrait) : serveurs lancés par l'agent, modèle chargé. */
+export async function deactivate(): Promise<void> {
+  for (const c of activeStreams.values()) c.abort()
+  shutdown()
+}
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
-})
-
-app.on('before-quit', () => {
+function shutdown(): void {
   stopAllServers()
   unloadLlamaCppModel().catch(() => {})
-})
+}
 
 function registerIpc(): void {
-  ipcMain.handle('window:minimize', () => mainWindow.minimize())
-  ipcMain.handle('window:maximize', () => {
-    mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize()
-  })
-  ipcMain.handle('window:close', () => mainWindow.close())
-
   // --- Engine status ---
   ipcMain.handle('engines:status', async () => {
     const [ollama, lmstudio] = await Promise.all([checkOllama(), checkLmStudio()])
@@ -215,7 +178,7 @@ function registerIpc(): void {
 
   // --- Dossiers accessibles au modèle (lecture seule) ---
   ipcMain.handle('workspace:addRoot', async () => {
-    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win(), {
       title: 'Autoriser la lecture d’un dossier',
       properties: ['openDirectory']
     })
@@ -236,7 +199,7 @@ function registerIpc(): void {
   ipcMain.handle('import:claudeCodeCount', () => countClaudeCodeSessions())
   ipcMain.handle('import:claudeCode', (_, target: Target) => importClaudeCode(target))
   ipcMain.handle('import:claudeAi', async (_, target: Target) => {
-    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win(), {
       title: 'Choisir l’export claude.ai (.zip ou conversations.json)',
       properties: ['openFile'],
       filters: [{ name: 'Export Claude', extensions: ['zip', 'json'] }]
@@ -245,7 +208,7 @@ function registerIpc(): void {
     return importClaudeAiExport(filePaths[0], target)
   })
   ipcMain.handle('import:chatgpt', async (_, target: Target) => {
-    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win(), {
       title: 'Choisir l’export ChatGPT (.zip ou conversations.json)',
       properties: ['openFile'],
       filters: [{ name: 'Export ChatGPT', extensions: ['zip', 'json'] }]
@@ -288,7 +251,7 @@ function registerIpc(): void {
   // --- llama.cpp local models ---
   ipcMain.handle('llamacpp:list', () => listLlamaCppModels().map((m) => ({ ...m, downloaded: isInModelsDir(m.path) })))
   ipcMain.handle('llamacpp:add', async () => {
-    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win(), {
       title: 'Ajouter un modèle GGUF',
       properties: ['openFile'],
       filters: [{ name: 'Modèles GGUF', extensions: ['gguf'] }]
@@ -376,7 +339,7 @@ function registerIpc(): void {
     const conv = getConversation(id)
     if (!conv) return null
     const messages = getMessages(id)
-    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+    const { canceled, filePath } = await dialog.showSaveDialog(win(), {
       title: 'Exporter la conversation',
       defaultPath: exportFileName(conv.title, format),
       filters:

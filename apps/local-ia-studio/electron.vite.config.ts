@@ -1,19 +1,12 @@
 import { resolve } from 'path'
-import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
+import { defineConfig } from 'electron-vite'
 import react from '@vitejs/plugin-react'
+import { moduleMainConfig, modulePreloadConfig } from '../../packages/module-api/vite'
 
+// Module d'Open Studio : le main et le preload sont chargés par Open Studio (voir packages/module-api).
 export default defineConfig({
-  main: {
-    plugins: [externalizeDepsPlugin()],
-    resolve: {
-      alias: {
-        '@shared': resolve('src/shared')
-      }
-    }
-  },
-  preload: {
-    plugins: [externalizeDepsPlugin()]
-  },
+  main: moduleMainConfig({ '@shared': resolve('src/shared') }),
+  preload: modulePreloadConfig({ '@shared': resolve('src/shared') }),
   renderer: {
     resolve: {
       alias: {

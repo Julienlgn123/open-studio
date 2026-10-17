@@ -1,6 +1,6 @@
 {
   "name": "cours-studio",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "Application locale de prise et gestion de cours",
   "author": {
     "name": "Julienlgn123",
@@ -189,5 +189,18 @@
     "electron-vite": "^3.1.0",
     "typescript": "^5.8.3",
     "vite": "^6.3.5"
+  },
+  "openStudioModule": {
+    "id": "cours-studio",
+    "name": "Cours Studio",
+    "tagline": "Tes cours, résumés, flashcards et révisions.",
+    "description": "Prise de notes riche (formules, schémas, tableaux), enregistrement audio et vidéo, résumés, quiz et flashcards par IA, révisions espacées et synchro entre tes PC.",
+    "category": "Études",
+    "accent": "#7c6ff7",
+    "dataDirName": "cours-studio",
+    "legacy": {
+      "productName": "Cours Studio",
+      "debPackageName": "cours-studio"
+    }
   }
 }

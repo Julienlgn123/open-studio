@@ -1,35 +1,49 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CornerDownLeft, Search } from 'lucide-react'
-import { useStore } from '../store'
-import { AppIcon } from './AppCard'
+import { CornerDownLeft, Home, Plus, Search, Settings } from 'lucide-react'
+import { isInstalled, useStore, type View } from '../store'
+import ModuleIcon from './ModuleIcon'
+import Brandmark from './Brandmark'
 
-const SHORTCUT = /Mac/i.test(navigator.platform) ? '⌘⌥Espace' : 'Ctrl+Alt+Espace'
+interface Item {
+  key: string
+  label: string
+  hint: string
+  icon: JSX.Element
+  view: View
+}
 
-/** Palette de lancement : tape quelques lettres, Entrée ouvre l'app (raccourci global ou Ctrl+K). */
+/** Palette « Aller à… » : quelques lettres, Entrée. Ctrl+K, ou Ctrl+Alt+Espace de n'importe où. */
 export default function Launcher({ onClose }: { onClose: () => void }): JSX.Element {
-  const { apps, launch } = useStore()
+  const { modules, go } = useStore()
   const [q, setQ] = useState('')
   const [sel, setSel] = useState(0)
   const input = useRef<HTMLInputElement>(null)
 
-  const list = useMemo(() => {
+  const items = useMemo(() => {
+    const all: Item[] = [
+      ...modules.filter(isInstalled).map((m) => ({
+        key: m.id,
+        label: m.name,
+        hint: m.tagline,
+        icon: <ModuleIcon module={m} size={26} />,
+        view: { kind: 'module', id: m.id } as View
+      })),
+      { key: 'home', label: 'Accueil', hint: 'Tes modules', icon: <span className="launcher-glyph"><Home size={15} /></span>, view: { kind: 'home' } },
+      { key: 'store', label: 'Ajouter des modules', hint: 'Catalogue', icon: <span className="launcher-glyph"><Plus size={15} /></span>, view: { kind: 'store' } },
+      { key: 'settings', label: 'Réglages', hint: 'Thème, démarrage', icon: <span className="launcher-glyph"><Settings size={15} /></span>, view: { kind: 'settings' } }
+    ]
     const query = q.trim().toLowerCase()
-    return apps
-      .filter((a) => a.status !== 'not_installed')
-      .filter((a) => !query || a.name.toLowerCase().includes(query) || a.category.toLowerCase().includes(query))
-      .sort((a, b) => a.name.localeCompare(b.name))
-  }, [apps, q])
+    return all.filter((i) => !query || i.label.toLowerCase().includes(query) || i.hint.toLowerCase().includes(query))
+  }, [modules, q])
 
   useEffect(() => input.current?.focus(), [])
   useEffect(() => setSel(0), [q])
 
-  async function open(i: number): Promise<void> {
-    const a = list[i]
-    if (!a) return
+  const open = (i: number): void => {
+    const item = items[i]
+    if (!item) return
     onClose()
-    await launch(a.id)
-    // L'app lancée prend le relais : Open Studio se range.
-    window.api.window.minimize()
+    go(item.view)
   }
 
   return (
@@ -40,26 +54,26 @@ export default function Launcher({ onClose }: { onClose: () => void }): JSX.Elem
           <input
             ref={input}
             value={q}
-            placeholder="Ouvrir une app…"
+            placeholder="Aller à…"
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Escape') onClose()
-              else if (e.key === 'ArrowDown') (e.preventDefault(), setSel((s) => Math.min(list.length - 1, s + 1)))
+              else if (e.key === 'ArrowDown') (e.preventDefault(), setSel((s) => Math.min(items.length - 1, s + 1)))
               else if (e.key === 'ArrowUp') (e.preventDefault(), setSel((s) => Math.max(0, s - 1)))
-              else if (e.key === 'Enter') void open(sel)
+              else if (e.key === 'Enter') open(sel)
             }}
           />
-          <kbd>{SHORTCUT}</kbd>
+          <Brandmark size={18} />
         </div>
         <div className="launcher-list">
-          {list.length === 0 ? (
-            <div className="launcher-empty">{apps.some((a) => a.status !== 'not_installed') ? 'Aucune app ne correspond.' : 'Aucune app installée.'}</div>
+          {items.length === 0 ? (
+            <div className="launcher-empty">Rien ne correspond.</div>
           ) : (
-            list.map((a, i) => (
-              <button key={a.id} className={`launcher-item${i === sel ? ' on' : ''}`} onMouseEnter={() => setSel(i)} onClick={() => void open(i)}>
-                <AppIcon app={a} />
-                <span className="launcher-name">{a.name}</span>
-                <span className="launcher-cat">{a.category}</span>
+            items.map((it, i) => (
+              <button key={it.key} className={`launcher-item${i === sel ? ' on' : ''}`} onMouseEnter={() => setSel(i)} onClick={() => open(i)}>
+                {it.icon}
+                <span className="launcher-name">{it.label}</span>
+                <span className="launcher-cat">{it.hint}</span>
                 {i === sel && <CornerDownLeft size={14} className="launcher-enter" />}
               </button>
             ))

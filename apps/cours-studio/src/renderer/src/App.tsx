@@ -82,10 +82,6 @@ export default function App() {
     return () => offs.forEach((off: () => void) => off())
   }, [])
 
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', settings.theme === 'light' ? 'light' : 'dark')
-  }, [settings.theme])
-
   // Focus mode only makes sense in the editor
   useEffect(() => {
     if (view !== 'editor' && focusMode) setFocusMode(false)

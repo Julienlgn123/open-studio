@@ -3,6 +3,7 @@ import { createReadStream, existsSync, statSync } from 'fs'
 import { createServer, type Server } from 'http'
 import { extname, join, normalize, sep } from 'path'
 import { BrowserWindow, shell } from 'electron'
+import { host } from '@open-studio/module'
 import type { RunningProcess } from '@shared/types'
 import { inside, resolveSafe, roots, type ToolDef } from './tools'
 
@@ -52,7 +53,7 @@ const str = (v: unknown): string => (typeof v === 'string' ? v : '')
 
 function notify(): void {
   const list = listServers()
-  for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('servers:changed', list)
+  host.send('servers:changed', list)
 }
 
 export function listServers(): RunningProcess[] {

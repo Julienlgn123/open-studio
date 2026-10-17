@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useStore } from './store'
-import TitleBar from './components/TitleBar'
 import Sidebar from './components/Sidebar'
 import ToastStack from './components/Toast'
 import TransfersPanel from './components/TransfersPanel'
@@ -189,7 +188,6 @@ export default function App(): JSX.Element {
 
   return (
     <div className="app">
-      <TitleBar />
       <ReconnectBanner />
       <div className="app-body">
         <Sidebar />

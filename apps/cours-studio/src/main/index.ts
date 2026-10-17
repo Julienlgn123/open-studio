@@ -1,8 +1,8 @@
-import { app, BrowserWindow, shell, ipcMain, desktopCapturer, protocol, net, dialog, Notification, Menu, MenuItem } from 'electron'
+import { app, BrowserWindow, shell, ipcMain, desktopCapturer, net, dialog, Notification } from 'electron'
+import { host } from '@open-studio/module'
 import { join, extname, dirname } from 'path'
 import { pathToFileURL } from 'url'
 import { tmpdir } from 'os'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { getReviewStats } from './db'
 import { initDb, getSubjects, createSubject, updateSubject, reorderSubjects,
   softDeleteSubject, restoreSubject, getTrashedSubjects, permanentlyDeleteSubject,
@@ -48,11 +48,8 @@ if (process.platform !== 'win32' && existsSync(ffmpegPath)) {
 
 ffmpeg.setFfmpegPath(ffmpegPath)
 
-let mainWindow: BrowserWindow
-
-protocol.registerSchemesAsPrivileged([
-  { scheme: 'media', privileges: { secure: true, supportFetchAPI: true, stream: true } }
-])
+/** Fenêtre d'Open Studio : parent des boîtes de dialogue. */
+const win = (): BrowserWindow => host.window() as BrowserWindow
 
 function sanitize(str: string): string {
   return str.replace(/[<>:"/\\|?*\x00-\x1f]/g, '-').replace(/\s+/g, ' ').trim().slice(0, 60) || 'sans-titre'
@@ -83,61 +80,18 @@ function convertToMp4(input: string, output: string): Promise<string> {
   })
 }
 
-function createWindow(): void {
-  mainWindow = new BrowserWindow({
-    width: 1400, height: 900, minWidth: 900, minHeight: 600,
-    show: false, frame: false, titleBarStyle: 'hidden', backgroundColor: '#0d0d0f',
-    webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false, contextIsolation: true, plugins: true, spellcheck: true }
-  })
-  mainWindow.on('ready-to-show', () => mainWindow.show())
+let reminderTimer: NodeJS.Timeout | null = null
 
-  // French (+ English) spell checking with a right-click correction menu
-  try {
-    const ses = mainWindow.webContents.session
-    // macOS uses the OS spellchecker and ignores this; Windows/Linux need it set
-    if (process.platform !== 'darwin') {
-      const avail = ses.availableSpellCheckerLanguages
-      const langs = ['fr', 'en-US'].filter((l) => avail.includes(l))
-      if (langs.length) ses.setSpellCheckerLanguages(langs)
-    }
-  } catch { /* spellcheck is best-effort */ }
-
-  mainWindow.webContents.on('context-menu', (_e, params) => {
-    if (!params.misspelledWord && !params.isEditable) return
-    const menu = new Menu()
-    for (const s of params.dictionarySuggestions) {
-      menu.append(new MenuItem({ label: s, click: () => mainWindow.webContents.replaceMisspelling(s) }))
-    }
-    if (params.misspelledWord) {
-      if (params.dictionarySuggestions.length) menu.append(new MenuItem({ type: 'separator' }))
-      menu.append(new MenuItem({
-        label: 'Ajouter au dictionnaire',
-        click: () => mainWindow.webContents.session.addWordToSpellCheckerDictionary(params.misspelledWord)
-      }))
-      menu.append(new MenuItem({ type: 'separator' }))
-    }
-    if (params.isEditable) {
-      menu.append(new MenuItem({ role: 'cut' }))
-      menu.append(new MenuItem({ role: 'copy' }))
-      menu.append(new MenuItem({ role: 'paste' }))
-    } else if (params.selectionText) {
-      menu.append(new MenuItem({ role: 'copy' }))
-    }
-    if (menu.items.length) menu.popup()
-  })
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' } })
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
-  }
+/** Ouvre Open Studio sur Cours Studio, directement sur les révisions. */
+function openReview(): void {
+  host.reveal()
+  host.send('open-review-all')
 }
 
-app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.cours-studio')
-  app.on('browser-window-created', (_, w) => optimizer.watchWindowShortcuts(w))
-
-  protocol.handle('media', (request) => {
+/** Démarrage du module dans Open Studio. */
+export function activate(): void {
+  // Lecture des enregistrements audio/vidéo (schéma déclaré par Open Studio, branché sur notre session).
+  host.session().protocol.handle('media', (request) => {
     const path = request.url.slice('media://'.length)
     return net.fetch(`file://${path}`)
   })
@@ -153,15 +107,13 @@ app.whenReady().then(() => {
     if (settings.autoBackupFolder) runAutoBackupToFolder(settings.autoBackupFolder)
   } catch { /* no settings file yet, or it's unreadable — nothing to back up to */ }
   registerIpc()
-  createWindow()
   // Retrouve les PC associés sur le réseau local (rien ne tourne s'il n'y en a aucun).
   startPresence()
   app.on('before-quit', stopPresence)
-  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 
   // Rappel quotidien de révision à l'heure choisie (Paramètres → Révisions), si des cartes attendent.
   let lastReminder = ''
-  setInterval(() => {
+  reminderTimer = setInterval(() => {
     try {
       const s = JSON.parse(readFileSync(join(app.getPath('userData'), 'settings.json'), 'utf-8')) as { reviewReminderTime?: string }
       const m = /^(\d{1,2}):(\d{2})$/.exec(s.reviewReminderTime ?? '')
@@ -173,9 +125,7 @@ app.whenReady().then(() => {
       const due = countAllDueFlashcards()
       if (!due || !Notification.isSupported()) return
       const n = new Notification({ title: 'Cours Studio — c’est l’heure de réviser', body: `${due} flashcard${due > 1 ? 's' : ''} t’attendent.` })
-      n.on('click', () => {
-        if (mainWindow) { mainWindow.show(); mainWindow.webContents.send('open-review-all') }
-      })
+      n.on('click', openReview)
       n.show()
     } catch { /* pas de réglages : pas de rappel */ }
   }, 60_000)
@@ -188,15 +138,18 @@ app.whenReady().then(() => {
         title: 'Cours Studio — révisions',
         body: `${due} flashcard${due > 1 ? 's' : ''} à réviser aujourd'hui.`
       })
-      n.on('click', () => {
-        if (mainWindow) { mainWindow.show(); mainWindow.webContents.send('open-review-all') }
-      })
+      n.on('click', openReview)
       n.show()
     }
   } catch { /* notifications are best-effort */ }
-})
+}
 
-app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
+/** Arrêt du module (mise à jour, retrait). */
+export function deactivate(): void {
+  if (reminderTimer) clearInterval(reminderTimer)
+  stopPresence()
+  try { host.session().protocol.unhandle('media') } catch { /* déjà retiré */ }
+}
 
 function getRecordingsDir(): string {
   const dir = join(app.getPath('userData'), 'recordings')
@@ -219,10 +172,6 @@ function deleteCourseFiles(course: { id: string; audioPath?: string; videoPath?:
 }
 
 function registerIpc(): void {
-  ipcMain.handle('window:minimize', () => mainWindow.minimize())
-  ipcMain.handle('window:maximize', () => { mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize() })
-  ipcMain.handle('window:close', () => mainWindow.close())
-
   ipcMain.handle('subjects:get', () => getSubjects())
   ipcMain.handle('subjects:create', (_, d) => createSubject(d))
   ipcMain.handle('subjects:update', (_, id, d) => { updateSubject(id, d); return true })
@@ -306,7 +255,7 @@ function registerIpc(): void {
   ipcMain.handle('flashcards:exportAnki', async (_, courseId?: string) => {
     const cards = getFlashcardsForExport(courseId)
     if (!cards.length) throw new Error('Aucune flashcard à exporter.')
-    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+    const { canceled, filePath } = await dialog.showSaveDialog(win(), {
       title: 'Exporter vers Anki',
       defaultPath: `flashcards-cours-studio-${new Date().toISOString().slice(0, 10)}.txt`,
       filters: [{ name: 'Texte Anki', extensions: ['txt'] }]
@@ -533,7 +482,7 @@ function registerIpc(): void {
 
   // Export a course to PDF: render its HTML in a hidden window, then print to PDF
   ipcMain.handle('export:pdf', async (_, { title, html }: { title: string; html: string }) => {
-    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+    const { canceled, filePath } = await dialog.showSaveDialog(win(), {
       title: 'Exporter en PDF',
       defaultPath: `${title.replace(/[<>:"/\\|?*\x00-\x1f]/g, '-') || 'cours'}.pdf`,
       filters: [{ name: 'PDF', extensions: ['pdf'] }]
@@ -573,7 +522,7 @@ function registerIpc(): void {
 
   // Export a single course as a Markdown (.md) file
   ipcMain.handle('export:markdown', async (_, { title, html }: { title: string; html: string }) => {
-    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+    const { canceled, filePath } = await dialog.showSaveDialog(win(), {
       title: 'Exporter en Markdown',
       defaultPath: `${(title || 'cours').replace(/[<>:"/\\|?*\x00-\x1f]/g, '-')}.md`,
       filters: [{ name: 'Markdown', extensions: ['md'] }]
@@ -598,17 +547,17 @@ function registerIpc(): void {
   ipcMain.handle('peers:run', (_, id: string, items: unknown[]) => runPlan(id, items as never))
   ipcMain.handle('peers:send', (_, id: string, courseIds: string[]) => sendCourses(id, courseIds))
 
-  ipcMain.handle('backup:export', () => exportBackup(mainWindow))
-  ipcMain.handle('backup:import', () => importBackup(mainWindow))
+  ipcMain.handle('backup:export', () => exportBackup(win()))
+  ipcMain.handle('backup:import', () => importBackup(win()))
   ipcMain.handle('backup:openFolder', () => { openBackupsFolder(); return true })
   ipcMain.handle('backup:latest', () => latestBackupInfo())
-  ipcMain.handle('backup:resetAll', () => resetAllData(mainWindow))
-  ipcMain.handle('backup:chooseAutoFolder', () => chooseAutoBackupFolder(mainWindow))
+  ipcMain.handle('backup:resetAll', () => resetAllData(win()))
+  ipcMain.handle('backup:chooseAutoFolder', () => chooseAutoBackupFolder(win()))
 
   // Document import: pick a file (pdf/docx/odt/txt) and extract its plain text
   ipcMain.handle('documents:import', async () => {
     try {
-      return await pickAndExtractDocument(mainWindow)
+      return await pickAndExtractDocument(win())
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : String(err))
     }
@@ -630,7 +579,7 @@ function registerIpc(): void {
   // Pick one or more images (screenshots, photos of handwritten notes...) and
   // return them as base64 data URLs, ready to send to a vision-capable model
   ipcMain.handle('images:pick', async () => {
-    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win(), {
       title: 'Ajouter des images',
       properties: ['openFile', 'multiSelections'],
       filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }]

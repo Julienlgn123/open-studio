@@ -16,7 +16,7 @@ export interface GhRelease {
 /** Délai au-delà duquel une connexion sans aucune donnée est considérée bloquée. */
 const IDLE_TIMEOUT_MS = 20_000
 
-function getJson<T>(url: string, accept = 'application/vnd.github+json'): Promise<T> {
+export function getJson<T>(url: string, accept = 'application/vnd.github+json'): Promise<T> {
   return new Promise((resolve, reject) => {
     const req = https
       .get(

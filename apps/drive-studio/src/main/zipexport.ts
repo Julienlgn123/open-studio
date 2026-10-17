@@ -1,4 +1,5 @@
 import { app, dialog, BrowserWindow } from 'electron'
+import { host } from '@open-studio/module'
 import { join } from 'path'
 import { mkdirSync, rmSync, createReadStream, createWriteStream, statSync } from 'fs'
 import { v4 as uuid } from 'uuid'
@@ -22,7 +23,7 @@ export async function exportFiles(
   fileIds: string[],
   opts: { zip: boolean }
 ): Promise<{ path: string; count: number; verified: number; failed: number } | null> {
-  const win = BrowserWindow.getAllWindows()[0]
+  const win = (host.window() as BrowserWindow)
   const files = fileIds.map(getFile).filter((f): f is NonNullable<typeof f> => !!f)
   if (files.length === 0) return null
 

@@ -1,57 +1,68 @@
-import { app, BrowserWindow, shell, ipcMain, session } from 'electron'
-import { join } from 'path'
+import { app, BrowserWindow, shell, ipcMain, session, protocol } from 'electron'
+import { delimiter, join, resolve } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
-import { isInstalling } from './install'
-import { startManagedAppsAutoUpdate, UPDATE_INTERVAL_MS } from './autoUpdate'
 import { registerIpc } from './ipc'
-import { broadcast } from './events'
-import { hideOnClose, iconPath, setupTray, showWindow } from './tray'
+import { broadcast, setEventTarget } from './events'
+import { hideOnClose, iconPath, refreshTray, setupTray } from './tray'
+import { syncLoginItem } from './store'
+import { activateInstalled, autoUpdate, listModules } from './modules/manager'
+import { deactivateAll, guardWebviews, initRuntime } from './modules/runtime'
 
+// Profil séparé pour le développement et les versions de test : ni les réglages ni le verrou
+// d'instance unique de l'Open Studio installé ne sont touchés.
+const PROFILE = import.meta.env.MAIN_VITE_PROFILE || (app.isPackaged ? '' : 'dev')
+// Tests en développement : un faux AppData (copie des données), pour ne jamais toucher aux vraies.
+if ((!app.isPackaged || PROFILE) && process.env.OPEN_STUDIO_APPDATA) app.setPath('appData', process.env.OPEN_STUDIO_APPDATA)
+if (PROFILE) app.setPath('userData', join(app.getPath('appData'), `open-studio-${PROFILE}`))
+
+// Les modules chargent leurs dépendances lourdes (better-sqlite3, node-llama-cpp…) depuis les
+// node_modules d'Open Studio : leur propre dossier n'en a pas.
+process.env.NODE_PATH = [
+  join(app.getAppPath(), 'node_modules'),
+  ...(is.dev ? [resolve(app.getAppPath(), '../../node_modules')] : []),
+  process.env.NODE_PATH ?? ''
+]
+  .filter(Boolean)
+  .join(delimiter)
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+require('module').Module._initPaths()
+
+// Schémas utilisés par des modules (lecture des enregistrements de Cours Studio) : à déclarer
+// avant le démarrage d'Electron, chaque module les branche ensuite sur sa propre session.
+protocol.registerSchemesAsPrivileged([{ scheme: 'media', privileges: { secure: true, supportFetchAPI: true, stream: true } }])
+
+const UPDATE_INTERVAL_MS = 30 * 60_000
 let mainWindow: BrowserWindow | null = null
+const startHidden = process.argv.includes('--hidden')
 
-function createWindow(): void {
+function createWindow(show: boolean): void {
   mainWindow = new BrowserWindow({
-    width: 1100,
-    height: 720,
-    minWidth: 760,
-    minHeight: 520,
+    width: 1320,
+    height: 840,
+    minWidth: 900,
+    minHeight: 600,
     show: false,
     frame: false,
     titleBarStyle: 'hidden',
     backgroundColor: '#0d0d0f',
-    // Icône explicite : sinon Windows peut afficher l'icône par défaut d'Electron dans la barre
-    // des tâches (notamment après un redémarrage par la mise à jour automatique).
     icon: iconPath(),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
-      contextIsolation: true
+      contextIsolation: true,
+      webviewTag: true
     }
   })
 
-  mainWindow.on('ready-to-show', () => mainWindow?.show())
+  if (show) mainWindow.on('ready-to-show', () => mainWindow?.show())
   hideOnClose(mainWindow)
-
-  if (is.dev) {
-    mainWindow.webContents.on(
-      'console-message',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (e: any, level?: unknown, message?: unknown, line?: unknown, source?: unknown) => {
-        const msg = e && typeof e === 'object' && 'message' in e ? e.message : message
-        const src = e && typeof e === 'object' && 'sourceId' in e ? e.sourceId : source
-        const ln = e && typeof e === 'object' && 'lineNumber' in e ? e.lineNumber : line
-        // eslint-disable-next-line no-console
-        console.log(`[renderer] ${msg} (${src}:${ln})`)
-        void level
-      }
-    )
-  }
+  guardWebviews(mainWindow)
   mainWindow.on('closed', () => {
     mainWindow = null
   })
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
+    if (/^https?:/.test(url)) void shell.openExternal(url)
     return { action: 'deny' }
   })
 
@@ -62,83 +73,85 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.open-studio.app')
-  app.on('browser-window-created', (_, w) => optimizer.watchWindowShortcuts(w))
+function showWindow(): BrowserWindow | null {
+  if (!mainWindow) createWindow(true)
+  const win = mainWindow
+  if (!win) return null
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+  return win
+}
 
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    const csp = is.dev
-      ? "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: ws://localhost:* http://localhost:*; " +
-        'style-src \'self\' \'unsafe-inline\' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; ' +
-        "img-src 'self' data: https://raw.githubusercontent.com http://localhost:*"
-      : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-        "font-src https://fonts.gstatic.com; img-src 'self' data: https://raw.githubusercontent.com; " +
-        "connect-src 'self'"
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Content-Security-Policy': [csp]
-      }
+/** Affiche Open Studio sur un module (ou l'accueil). */
+function openModule(id: string | null): void {
+  showWindow()?.webContents.send('studio:navigate', id)
+}
+
+const trayActions = {
+  show: () => void showWindow(),
+  open: openModule,
+  launcher: () => showWindow()?.webContents.send('launcher:open')
+}
+
+async function modulesChanged(): Promise<void> {
+  refreshTray(await listModules().catch(() => []), trayActions)
+}
+
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+} else {
+  app.on('second-instance', () => void showWindow())
+
+  app.whenReady().then(async () => {
+    electronApp.setAppUserModelId('com.open-studio.app')
+    app.on('browser-window-created', (_, w) => optimizer.watchWindowShortcuts(w))
+
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+      // Seulement pour l'interface d'Open Studio : les modules ont leur propre session.
+      const csp = is.dev
+        ? "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: ws://localhost:* http://localhost:*; " +
+          "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data:"
+        : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+          "font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'"
+      callback({ responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': [csp] } })
     })
+
+    setEventTarget(() => mainWindow)
+    initRuntime({ window: () => mainWindow, reveal: openModule })
+    registerIpc(() => mainWindow, () => void modulesChanged(), openModule)
+    syncLoginItem()
+
+    // Les modules démarrent avant la fenêtre : leurs handlers doivent exister quand leur interface se charge.
+    await activateInstalled()
+    createWindow(!startHidden)
+    setupTray(trayActions)
+    void modulesChanged()
+    app.on('activate', () => void showWindow())
+
+    // Mises à jour des modules, en arrière-plan.
+    setTimeout(() => void autoUpdate(), 60_000)
+    setInterval(() => void autoUpdate(), UPDATE_INTERVAL_MS)
+
+    if (app.isPackaged && !PROFILE) {
+      autoUpdater.autoDownload = true
+      autoUpdater.autoInstallOnAppQuit = true
+      autoUpdater.on('update-downloaded', (info) => {
+        broadcast('app:updateReady', { version: info.version })
+        setTimeout(() => autoUpdater.quitAndInstall(false, true), 5000)
+      })
+      autoUpdater.on('error', (err) => console.error('[autoUpdater]', err))
+      let checked = false
+      ipcMain.on('renderer:ready', () => {
+        if (checked) return
+        checked = true
+        autoUpdater.checkForUpdates().catch(() => null)
+      })
+      setInterval(() => autoUpdater.checkForUpdates().catch(() => null), UPDATE_INTERVAL_MS)
+    }
   })
 
-  // Une seule instance : relancer Open Studio remet simplement sa fenêtre au premier plan.
-  if (!app.requestSingleInstanceLock()) {
-    app.quit()
-    return
-  }
-  app.on('second-instance', () => showWindow(() => mainWindow, createWindow))
-
-  registerIpc()
-  createWindow()
-  setupTray(() => mainWindow, createWindow)
-
-  app.on('activate', () => showWindow(() => mainWindow, createWindow))
-
-  if (app.isPackaged) {
-    // `checkForUpdates()` seul ne fait rien de visible : sans écouter ses
-    // événements ni déclencher le téléchargement, une mise à jour trouvée
-    // n'était jamais ni téléchargée ni proposée à la personne — c'est ce
-    // qui faisait qu'Open Studio semblait ne jamais se mettre à jour tout seul.
-    autoUpdater.autoDownload = true
-    autoUpdater.autoInstallOnAppQuit = true
-
-    autoUpdater.on('update-downloaded', (info) => {
-      // Entièrement automatique : on prévient juste la personne, puis on
-      // redémarre tout seul quelques secondes après (le temps que le message
-      // s'affiche) — pas de bouton à cliquer pour rester à jour. Si une app
-      // gérée est en train de s'installer, on attend qu'elle ait fini.
-      broadcast('app:updateReady', { version: info.version })
-      const restartWhenIdle = (): void => {
-        if (isInstalling()) setTimeout(restartWhenIdle, 5000)
-        else autoUpdater.quitAndInstall(false, true)
-      }
-      setTimeout(restartWhenIdle, 5000)
-    })
-    autoUpdater.on('error', (err) => {
-      // Une vérif qui échoue (pas de réseau, GitHub indisponible...) ne doit
-      // jamais gêner l'utilisation normale de l'app.
-      console.error('[autoUpdater]', err)
-    })
-
-    let checked = false
-    const runCheck = (): void => {
-      if (checked) return
-      checked = true
-      autoUpdater.checkForUpdates().catch(() => null)
-    }
-    ipcMain.on('renderer:ready', runCheck)
-    setTimeout(runCheck, 8000)
-    // Open Studio reste souvent ouvert longtemps : on revérifie régulièrement,
-    // pas seulement au démarrage.
-    setInterval(() => autoUpdater.checkForUpdates().catch(() => null), UPDATE_INTERVAL_MS)
-
-    // Les apps gérées (Cours Studio, Drive Studio, Local IA Studio…) se mettent
-    // aussi à jour toutes seules, dès qu'elles ne sont pas ouvertes.
-    startManagedAppsAutoUpdate()
-  }
-})
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
-})
+  // Fenêtre fermée ≠ quitter : Open Studio reste dans la zone de notification (voir tray.ts).
+  app.on('window-all-closed', () => {})
+  app.on('before-quit', () => void deactivateAll())
+}

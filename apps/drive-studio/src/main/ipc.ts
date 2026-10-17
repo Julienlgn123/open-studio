@@ -1,4 +1,5 @@
 import { ipcMain, BrowserWindow, dialog, shell, clipboard } from 'electron'
+import { host } from '@open-studio/module'
 import * as db from './db'
 import {
   getPublicSettings,
@@ -43,8 +44,9 @@ import type {
   RecentActivity
 } from '@shared/types'
 
+/** Fenêtre d'Open Studio : parent des boîtes de dialogue. */
 function getWin(): BrowserWindow {
-  return BrowserWindow.getAllWindows()[0]
+  return host.window() as BrowserWindow
 }
 
 export function registerIpc(): void {

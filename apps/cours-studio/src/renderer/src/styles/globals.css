@@ -162,7 +162,6 @@ button {
   padding: 0 12px;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
-  -webkit-app-region: drag;
   flex-shrink: 0;
   gap: 8px;
   position: relative;
@@ -207,6 +206,33 @@ button {
   align-items: center;
   gap: 6px;
   -webkit-app-region: no-drag;
+}
+
+/* Recherche (barre du haut, dans Open Studio) */
+.titlebar-search {
+  height: 28px;
+  width: 260px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 6px 0 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-tertiary);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: border-color var(--transition), color var(--transition);
+}
+.titlebar-search:hover { border-color: var(--border-medium); color: var(--text-secondary); }
+.titlebar-search kbd {
+  margin-left: auto;
+  font: inherit;
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
 }
 
 /* Sidebar */

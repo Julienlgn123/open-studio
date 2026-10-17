@@ -9,6 +9,7 @@ import LogoMark from './LogoMark'
 import WelcomeView from './WelcomeView'
 import ToolTrail from './ToolTrail'
 import ApprovalCard from './ApprovalCard'
+import { SidebarToggle } from './TitleBar'
 import type { ChatMessage, ExportFormat } from '@shared/types'
 import { ENGINE_LABELS } from '@shared/types'
 
@@ -133,8 +134,9 @@ export default function ChatView(): JSX.Element {
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-base-800 px-5 py-3">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-base-800 px-3 py-2.5">
         <div className="flex min-w-0 items-center gap-2.5">
+          <SidebarToggle />
           <h2 className="truncate text-[15px] font-semibold text-base-100">{conv.title}</h2>
           <span className="flex shrink-0 items-center gap-1 rounded-full bg-base-800 px-2 py-0.5 text-[11.5px] font-medium text-base-300">
             {conv.engine === 'ollama' ? <Server size={10} /> : conv.engine === 'mistral' ? <Cloud size={10} /> : conv.engine === 'lmstudio' ? <Apple size={10} /> : <Cpu size={10} />}

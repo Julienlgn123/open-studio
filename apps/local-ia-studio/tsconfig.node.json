@@ -8,8 +8,21 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@shared/*": ["src/shared/*"]
+      "@shared/*": [
+        "src/shared/*"
+      ],
+      "@open-studio/module": [
+        "../../packages/module-api/src/host.ts"
+      ]
     }
   },
-  "include": ["electron.vite.config.*", "src/main/**/*", "src/preload/**/*", "src/shared/**/*"]
+  "include": [
+    "electron.vite.config.*",
+    "src/main/**/*",
+    "src/preload/**/*",
+    "src/shared/**/*",
+    "../../packages/module-api/vite.ts",
+    "../../packages/module-api/src/host.ts",
+    "../../packages/module-api/src/types.ts"
+  ]
 }

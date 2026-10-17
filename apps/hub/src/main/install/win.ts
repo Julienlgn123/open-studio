@@ -1,7 +1,7 @@
 import { spawn } from 'child_process'
 import { existsSync, mkdirSync, rmSync } from 'fs'
 import { join, basename, dirname } from 'path'
-import type { CatalogEntry } from '@shared/types'
+import type { CatalogEntry } from '@shared/legacy'
 import type { PlatformInstaller } from './types'
 import { dirSize } from './dirSize'
 

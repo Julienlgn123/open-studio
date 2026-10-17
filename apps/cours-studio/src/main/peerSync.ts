@@ -1,4 +1,5 @@
-import { app, BrowserWindow } from 'electron'
+import { app } from 'electron'
+import { host } from '@open-studio/module'
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'crypto'
 import { createSocket, type Socket } from 'dgram'
 import { createServer, type IncomingMessage, type Server } from 'http'
@@ -522,8 +523,9 @@ let beaconTimer: NodeJS.Timeout | null = null
 let sweepTimer: NodeJS.Timeout | null = null
 const seenNonces = new Map<string, number>()
 
+/** Vers l'interface du module (si elle est ouverte dans Open Studio). */
 function emit(channel: string, payload: unknown): void {
-  for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(channel, payload)
+  host.send(channel, payload)
 }
 
 export interface PairedDevice {

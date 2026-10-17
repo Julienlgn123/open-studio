@@ -1,5 +1,5 @@
 import { spawn } from 'child_process'
-import type { CatalogEntry } from '@shared/types'
+import type { CatalogEntry } from '@shared/legacy'
 import type { PlatformInstaller } from './types'
 
 function run(cmd: string, args: string[]): Promise<string> {

@@ -1,0 +1,7 @@
+{
+  "name": "@open-studio/module-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Contrat entre Open Studio et ses modules : types, remplaçants d'electron et config de build.",
+  "main": "src/types.ts"
+}

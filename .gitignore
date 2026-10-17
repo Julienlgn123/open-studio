@@ -6,3 +6,5 @@ dist-installer
 .DS_Store
 .env
 .env.local
+dist-modules
+.env.test

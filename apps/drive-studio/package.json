@@ -1,6 +1,6 @@
 {
   "name": "gdrive-backup-manager",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Gestionnaire multi-comptes Google Drive : centralisation, distribution intelligente et backup",
   "author": {
     "name": "Julienlgn123",
@@ -37,7 +37,12 @@
     ],
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "resources/icon.ico"
     },
@@ -51,7 +56,13 @@
     },
     "mac": {
       "target": [
-        { "target": "dmg", "arch": ["x64", "arm64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ],
       "artifactName": "Drive-Studio-${version}-${arch}.${ext}",
       "icon": "resources/icon.png",
@@ -62,16 +73,38 @@
     "dmg": {
       "title": "Drive Studio ${version}",
       "artifactName": "Drive-Studio-${version}-${arch}.dmg",
-      "window": { "width": 540, "height": 400 },
+      "window": {
+        "width": 540,
+        "height": 400
+      },
       "contents": [
-        { "x": 130, "y": 150, "type": "file" },
-        { "x": 410, "y": 150, "type": "link", "path": "/Applications" },
-        { "x": 270, "y": 300, "type": "file", "path": "resources/Fix-macOS-Signature.command" }
+        {
+          "x": 130,
+          "y": 150,
+          "type": "file"
+        },
+        {
+          "x": 410,
+          "y": 150,
+          "type": "link",
+          "path": "/Applications"
+        },
+        {
+          "x": 270,
+          "y": 300,
+          "type": "file",
+          "path": "resources/Fix-macOS-Signature.command"
+        }
       ]
     },
     "linux": {
       "target": [
-        { "target": "deb", "arch": ["x64"] }
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "resources/icon.png",
       "category": "Utility"
@@ -107,5 +140,18 @@
     "electron-vite": "^3.1.0",
     "typescript": "^5.8.3",
     "vite": "^6.3.5"
+  },
+  "openStudioModule": {
+    "id": "drive-studio",
+    "name": "Drive Studio",
+    "tagline": "Tous tes Google Drive, au même endroit.",
+    "description": "Plusieurs comptes Google Drive réunis : envois répartis automatiquement, dossiers virtuels, backups planifiés, partages et chiffrement de tes fichiers.",
+    "category": "Stockage",
+    "accent": "#38bdf8",
+    "dataDirName": "gdrive-backup-manager",
+    "legacy": {
+      "productName": "Drive Studio",
+      "debPackageName": "gdrive-backup-manager"
+    }
   }
 }

@@ -1,4 +1,4 @@
-import type { CatalogEntry } from '@shared/types'
+import type { CatalogEntry } from '@shared/legacy'
 
 export interface PlatformInstaller {
   /** Cherche une install déjà présente à l'emplacement conventionnel (hors suivi Open Studio). */
