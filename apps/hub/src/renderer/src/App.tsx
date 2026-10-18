@@ -10,6 +10,7 @@ import ModuleFrames from './components/ModuleFrames'
 import Launcher from './components/Launcher'
 import ToastStack from './components/Toast'
 import ConfirmDialog from './components/ConfirmDialog'
+import Tour from './components/Tour'
 
 export default function App(): JSX.Element {
   const { view, loadSettings, loadModules, setProgress, applyTheme, openModule, go } = useStore()
@@ -21,9 +22,10 @@ export default function App(): JSX.Element {
       await loadSettings()
       await loadModules()
       window.api.app.notifyReady()
-      // Reprend là où on s'était arrêté.
-      const last = useStore.getState().settings.lastModule
-      if (last) openModule(last)
+      // Premier lancement : visite guidée. Sinon, reprend là où on s'était arrêté.
+      const { settings, openTour } = useStore.getState()
+      if (!settings.tourSeen) openTour()
+      else if (settings.lastModule) openModule(settings.lastModule)
     })()
 
     /** Ctrl+0 accueil, Ctrl+1…9 modules de la barre de gauche. */
@@ -82,6 +84,7 @@ export default function App(): JSX.Element {
       )}
       <ToastStack />
       <ConfirmDialog />
+      <Tour />
       {palette && <Launcher onClose={() => setPalette(false)} />}
     </div>
   )

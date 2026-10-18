@@ -1094,6 +1094,164 @@ kbd {
   margin-top: 20px;
 }
 
+/* ─── Visite guidée ──────────────────────────────────── */
+.tour {
+  width: 520px;
+  max-width: calc(100% - 32px);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+  overflow: hidden;
+  animation: pop 180ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+.tour-art {
+  height: 190px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 130%, var(--accent-soft), transparent 70%), var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+.tour-body {
+  padding: 22px 26px 6px;
+}
+.tour-step {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+.tour-body h2 {
+  margin-top: 6px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+.tour-body p {
+  margin-top: 8px;
+  color: var(--text-2);
+  line-height: 1.6;
+  font-size: 13.5px;
+}
+.tour-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px 20px;
+}
+.tour-dots {
+  display: flex;
+  gap: 6px;
+}
+.tour-dots button {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  transition: width var(--ease), background var(--ease);
+}
+.tour-dots button.on {
+  width: 20px;
+  background: var(--accent);
+}
+.tour-rail {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 10px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+  animation: rise 260ms ease-out both;
+}
+.tour-rail-btn {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+}
+.tour-rail-btn.on {
+  background: var(--active);
+}
+.tour-rail-btn.add {
+  width: 34px;
+  height: 34px;
+  border: 1.5px dashed var(--accent);
+  color: var(--accent-text);
+  border-radius: 10px;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+.tour-rail-sep {
+  width: 1px;
+  height: 24px;
+  background: var(--border-strong);
+}
+.tour-cards {
+  display: flex;
+  gap: 10px;
+}
+.tour-card {
+  width: 128px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 8px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--accent-m) 30%, var(--border));
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: center;
+  animation: rise 260ms ease-out both;
+}
+.tour-card .chip {
+  align-self: center;
+}
+.tour-keys {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: rise 260ms ease-out both;
+}
+.tour-keys > div {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  align-items: center;
+  gap: 14px;
+  color: var(--text-2);
+}
+.tour-keys > div > span:last-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tour-combo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  color: var(--text-3);
+}
+.tour-combo kbd {
+  font-size: 12px;
+  padding: 3px 8px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 0 var(--border-strong);
+}
+.setting-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
 /* ─── Palette « Aller à… » ────────────────────────────── */
 .launcher-overlay {
   align-items: flex-start;

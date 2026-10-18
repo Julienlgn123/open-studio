@@ -39,6 +39,8 @@ export interface AppSettings {
   launchAtStartup: boolean
   /** Dernier module ouvert, rouvert au lancement. */
   lastModule: string | null
+  /** Visite guidée d'Open Studio 2 déjà vue. */
+  tourSeen: boolean
 }
 
 /** État de la récupération du catalogue (hors ligne, source locale de test…). */

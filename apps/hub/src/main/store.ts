@@ -11,6 +11,7 @@ interface StoredData {
   launchAtStartup?: boolean
   lastModule?: string | null
   trayHintSeen?: boolean
+  tourSeen?: boolean
 }
 
 function storePath(): string {
@@ -34,7 +35,8 @@ export function getSettings(): AppSettings {
   return {
     theme: raw.theme ?? 'dark',
     launchAtStartup: raw.launchAtStartup ?? false,
-    lastModule: raw.lastModule ?? null
+    lastModule: raw.lastModule ?? null,
+    tourSeen: raw.tourSeen ?? false
   }
 }
 
@@ -47,6 +49,10 @@ export function effectiveTheme(): Theme {
   const t = getSettings().theme
   if (t === 'system') return nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
   return t
+}
+
+export function setTourSeen(): void {
+  patch({ tourSeen: true })
 }
 
 export function setLastModule(id: string | null): void {

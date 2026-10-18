@@ -19,6 +19,7 @@ const api = {
     get: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
     setTheme: (theme: ThemeSetting): Promise<Settings> => ipcRenderer.invoke('settings:setTheme', theme),
     setLaunchAtStartup: (enabled: boolean): Promise<Settings> => ipcRenderer.invoke('settings:setLaunchAtStartup', enabled),
+    setTourSeen: (): Promise<Settings> => ipcRenderer.invoke('settings:setTourSeen'),
     onTheme: (cb: (t: Theme) => void) => on<Theme>('studio:theme', cb)
   },
   modules: {

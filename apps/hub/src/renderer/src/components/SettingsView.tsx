@@ -14,7 +14,7 @@ const THEMES: { id: ThemeSetting; label: string; icon: JSX.Element }[] = [
 ]
 
 export default function SettingsView(): JSX.Element {
-  const { settings, setTheme, setLaunchAtStartup, catalog } = useStore()
+  const { settings, setTheme, setLaunchAtStartup, catalog, openTour } = useStore()
   const [version, setVersion] = useState('')
   useEffect(() => {
     window.api.app.getVersion().then(setVersion).catch(() => {})
@@ -63,7 +63,12 @@ export default function SettingsView(): JSX.Element {
         </section>
 
         <section className="panel">
-          <div className="setting-name" style={{ marginBottom: 10 }}>Raccourcis</div>
+          <div className="setting-head">
+            <div className="setting-name">Raccourcis</div>
+            <button className="btn btn-ghost btn-sm" onClick={openTour}>
+              Revoir la visite guidée
+            </button>
+          </div>
           <div className="shortcuts">
             <span>Aller à un module, aux réglages…</span>
             <kbd>{MOD}K</kbd>
