@@ -1,0 +1,25 @@
+{
+  "name": "plan-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ton agenda, tes tâches et tes objectifs.",
+  "main": "out/main/index.js",
+  "scripts": {
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
+  },
+  "dependencies": {},
+  "openStudioModule": {
+    "id": "plan-studio",
+    "name": "Plan Studio",
+    "tagline": "Ton agenda, tes tâches et tes objectifs.",
+    "description": "Agenda de la semaine et du mois, tâches avec échéances et priorités, objectifs avec progression. Rappels avant chaque échéance.",
+    "category": "Productivité",
+    "accent": "#ec4899",
+    "dataDirName": "plan-studio",
+    "legacy": {
+      "productName": "Plan Studio",
+      "debPackageName": "plan-studio"
+    }
+  }
+}

@@ -246,13 +246,23 @@ kbd {
   z-index: 5;
 }
 .rail-modules {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  padding: 0 10px;
+  margin: 0 -10px;
+}
+.rail-modules::-webkit-scrollbar {
+  display: none;
 }
 .rail-bottom {
-  margin-top: auto;
+  margin-top: 6px;
 }
 .rail-sep {
   width: 24px;
@@ -342,10 +352,8 @@ kbd {
   animation: spin 0.9s linear infinite;
 }
 .rail-tip {
-  position: absolute;
-  left: calc(100% + 12px);
-  top: 50%;
-  transform: translate(-4px, -50%);
+  position: fixed;
+  transform: translate(0, -50%);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -358,13 +366,14 @@ kbd {
   font-weight: 600;
   white-space: nowrap;
   pointer-events: none;
-  opacity: 0;
-  transition: opacity 120ms ease, transform 120ms ease;
-  z-index: 30;
+  z-index: 80;
+  animation: ui-tip 120ms ease-out both;
 }
-.rail-btn:hover .rail-tip {
-  opacity: 1;
-  transform: translate(0, -50%);
+@keyframes ui-tip {
+  from {
+    opacity: 0;
+    transform: translate(-4px, -50%);
+  }
 }
 
 /* ─── Logos de modules ────────────────────────────────── */
@@ -673,6 +682,30 @@ kbd {
 .chip.success {
   background: var(--success-soft);
   color: var(--success);
+}
+.cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+.cat {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-weight: 500;
+  transition: background var(--ease), color var(--ease), border-color var(--ease);
+}
+.cat:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.cat.on {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  color: var(--accent-text);
 }
 .chip.danger {
   background: var(--danger-soft);

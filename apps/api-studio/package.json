@@ -1,0 +1,21 @@
+{
+  "name": "api-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Teste tes requêtes HTTP.",
+  "main": "out/main/index.js",
+  "scripts": {
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
+  },
+  "dependencies": {},
+  "openStudioModule": {
+    "id": "api-studio",
+    "name": "Client API",
+    "tagline": "Teste tes requêtes HTTP.",
+    "description": "Un mini Postman : méthodes, en-têtes, corps JSON, historique et collections, réponse formatée avec statut, durée et taille.",
+    "category": "Développement",
+    "accent": "#f59e0b",
+    "dataDirName": "open-studio-api-studio"
+  }
+}

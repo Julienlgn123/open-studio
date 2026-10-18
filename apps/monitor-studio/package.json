@@ -1,0 +1,21 @@
+{
+  "name": "monitor-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ce qui ralentit ton PC, en un coup d'œil.",
+  "main": "out/main/index.js",
+  "scripts": {
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
+  },
+  "dependencies": {},
+  "openStudioModule": {
+    "id": "monitor-studio",
+    "name": "Moniteur système",
+    "tagline": "Ce qui ralentit ton PC, en un coup d'œil.",
+    "description": "CPU par cœur, mémoire, disques, réseau, GPU et températures en direct, avec les processus responsables. Lecture seule : rien n'est modifié.",
+    "category": "Système",
+    "accent": "#06b6d4",
+    "dataDirName": "open-studio-monitor-studio"
+  }
+}

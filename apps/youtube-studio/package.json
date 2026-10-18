@@ -1,0 +1,21 @@
+{
+  "name": "youtube-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Une vidéo, son texte et son résumé.",
+  "main": "out/main/index.js",
+  "scripts": {
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
+  },
+  "dependencies": {},
+  "openStudioModule": {
+    "id": "youtube-studio",
+    "name": "Résumé YouTube",
+    "tagline": "Une vidéo, son texte et son résumé.",
+    "description": "Colle un lien YouTube : transcription horodatée, résumé, points clés et flashcards, avec ton IA locale (Ollama) ou Mistral.",
+    "category": "IA",
+    "accent": "#ff2d55",
+    "dataDirName": "open-studio-youtube-studio"
+  }
+}

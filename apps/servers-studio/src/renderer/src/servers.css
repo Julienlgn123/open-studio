@@ -1,0 +1,143 @@
+.proj {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  text-align: left;
+}
+.proj:hover {
+  background: var(--hover);
+}
+.proj.on {
+  background: var(--active);
+}
+.proj-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--text-3);
+  flex-shrink: 0;
+}
+.dot.running {
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+}
+.dot.starting {
+  background: var(--info);
+}
+.dot.crashed {
+  background: var(--danger);
+}
+.mini {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+  opacity: 0;
+}
+.proj:hover .mini {
+  opacity: 1;
+}
+.mini:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+.proj-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.proj-title {
+  font-size: 15px;
+}
+.proj-info {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.proj-info code {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.log-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+}
+.log-tools .search {
+  height: 30px;
+  min-width: 240px;
+}
+.log-tools .spacer {
+  flex: 1;
+}
+.logs {
+  flex: 1;
+  overflow: auto;
+  margin: 0 14px 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #0b0d10;
+  color: #d4d4d8;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  user-select: text;
+}
+.log {
+  display: flex;
+  gap: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.log.err {
+  color: #fca5a5;
+}
+.log.sys {
+  color: #7dd3fc;
+  font-weight: 600;
+}
+.log-t {
+  color: #52525b;
+  flex-shrink: 0;
+}
+.log-empty {
+  padding: 20px;
+  text-align: center;
+}
+.sugg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sugg .chip {
+  font-family: var(--mono);
+  cursor: pointer;
+}

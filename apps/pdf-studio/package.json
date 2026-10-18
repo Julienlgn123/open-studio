@@ -1,0 +1,28 @@
+{
+  "name": "pdf-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lire, annoter, fusionner, signer tes PDF.",
+  "main": "out/main/index.js",
+  "scripts": {
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
+  },
+  "dependencies": {
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^4.10.38"
+  },
+  "openStudioModule": {
+    "id": "pdf-studio",
+    "name": "PDF Studio",
+    "tagline": "Lire, annoter, fusionner, signer tes PDF.",
+    "description": "Lecteur PDF avec annotations et signets, fusion, découpage, rotation, réorganisation des pages, signature manuscrite et compression.",
+    "category": "Documents",
+    "accent": "#ef4444",
+    "dataDirName": "pdf-studio",
+    "legacy": {
+      "productName": "PDF Studio",
+      "debPackageName": "pdf-studio"
+    }
+  }
+}

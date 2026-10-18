@@ -1,0 +1,21 @@
+{
+  "name": "convert-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Images, vidéos et sons dans le format voulu.",
+  "main": "out/main/index.js",
+  "scripts": {
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
+  },
+  "dependencies": {},
+  "openStudioModule": {
+    "id": "convert-studio",
+    "name": "Convertisseur",
+    "tagline": "Images, vidéos et sons dans le format voulu.",
+    "description": "Glisse tes fichiers et choisis le format : mp4 → mp3, mov → mp4, webp → png, compression de vidéos et d'images, en lot.",
+    "category": "Outils",
+    "accent": "#14b8a6",
+    "dataDirName": "open-studio-convert-studio"
+  }
+}

@@ -1,0 +1,108 @@
+.two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.textarea.big {
+  min-height: 420px;
+  height: calc(100vh - 210px);
+}
+.out {
+  position: relative;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  min-height: 44px;
+}
+.out pre {
+  margin: 0;
+  padding: 10px 40px 10px 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 12.5px;
+  line-height: 1.55;
+  max-height: calc(100vh - 260px);
+  overflow: auto;
+  user-select: text;
+}
+.out .copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+.out-error {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 12.5px;
+}
+.regex-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.regex-bar .flags {
+  width: 80px;
+}
+.highlight {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
+}
+.highlight mark {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+.big-color {
+  width: 56px !important;
+  height: 56px !important;
+}
+.swatch-big {
+  height: 120px;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 15px;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.color-val {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  text-align: left;
+  transition: border-color var(--ease);
+}
+.color-val:hover {
+  border-color: var(--accent);
+}
+.clip {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.shades {
+  display: flex;
+  border-radius: 12px;
+  overflow: hidden;
+  height: 44px;
+}
+.shades button {
+  flex: 1;
+}
+.big-num {
+  font-size: 28px;
+}
+.stats {
+  flex-wrap: wrap;
+}

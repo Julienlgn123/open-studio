@@ -1,0 +1,23 @@
+{
+  "name": "calc-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Calculs scientifiques, courbes et conversions.",
+  "main": "out/main/index.js",
+  "scripts": {
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
+  },
+  "dependencies": {
+    "mathjs": "^13.2.0"
+  },
+  "openStudioModule": {
+    "id": "calc-studio",
+    "name": "Calculatrice",
+    "tagline": "Calculs scientifiques, courbes et conversions.",
+    "description": "Calculatrice scientifique avec historique, traceur de courbes de fonctions et conversion d'unités (longueurs, masses, données, températures…).",
+    "category": "Études",
+    "accent": "#6366f1",
+    "dataDirName": "open-studio-calc-studio"
+  }
+}

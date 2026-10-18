@@ -1,0 +1,21 @@
+{
+  "name": "servers-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lance et surveille tes projets.",
+  "main": "out/main/index.js",
+  "scripts": {
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
+  },
+  "dependencies": {},
+  "openStudioModule": {
+    "id": "servers-studio",
+    "name": "Serveurs locaux",
+    "tagline": "Lance et surveille tes projets.",
+    "description": "Démarre et arrête tes bots Discord, sites et scripts en un clic, avec leurs logs en direct, le redémarrage auto et le lancement avec Open Studio.",
+    "category": "Développement",
+    "accent": "#22c55e",
+    "dataDirName": "open-studio-servers-studio"
+  }
+}

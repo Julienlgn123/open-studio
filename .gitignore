@@ -8,3 +8,5 @@ dist-installer
 .env.local
 dist-modules
 .env.test
+dist-test
+dist-verify

@@ -1,0 +1,221 @@
+/* Moniteur système : esprit « instrument de mesure » (inspiré de TMOG, tmog.org). */
+:root {
+  --accent: #06b6d4;
+  --accent-hover: #22d3ee;
+  --accent-soft: rgba(6, 182, 212, 0.14);
+  --accent-text: #22d3ee;
+}
+:root[data-theme='light'] {
+  --accent: #0891b2;
+  --accent-text: #0e7490;
+  --accent-soft: rgba(8, 145, 178, 0.1);
+}
+.brand-ico {
+  color: var(--accent-text);
+}
+.credit {
+  font-size: 11.5px;
+  color: var(--text-3);
+  padding: 10px 6px 0;
+  line-height: 1.5;
+}
+.credit p {
+  margin-top: 6px;
+}
+.link {
+  color: var(--accent-text);
+  font-weight: 600;
+  font-size: inherit;
+}
+.link:hover {
+  text-decoration: underline;
+}
+.live {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-3);
+  margin-right: 4px;
+}
+.live.on {
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+  animation: ui-fade 1.4s ease-in-out infinite alternate;
+}
+.verdict {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  font-size: 14px;
+}
+.verdict.ok {
+  background: var(--success-soft);
+  border-color: color-mix(in srgb, var(--success) 35%, var(--border));
+}
+.verdict.ok svg {
+  color: var(--success);
+}
+.verdict.warm {
+  background: var(--warning-soft);
+  border-color: color-mix(in srgb, var(--warning) 35%, var(--border));
+}
+.verdict.warm svg {
+  color: var(--warning);
+}
+.verdict.hot {
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+}
+.verdict.hot svg {
+  color: var(--danger);
+}
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tile-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.tile-value {
+  font-family: var(--mono);
+  font-size: 26px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.tile-sub {
+  font-size: 12px;
+  min-height: 18px;
+}
+.chart {
+  width: 100%;
+  display: block;
+  margin-top: 6px;
+}
+.temps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.temps div {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+}
+.temps b {
+  font-size: 17px;
+  font-weight: 500;
+}
+.meter {
+  width: 70px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.meter div {
+  height: 100%;
+  border-radius: 3px;
+}
+.cell-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.table td.num {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.perf {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.perf-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.perf-head b {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.perf-value {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.perf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 12px;
+}
+.perf-grid .perf {
+  margin: 0;
+}
+.cores {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 6px;
+}
+.core {
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 11px;
+  font-family: var(--mono);
+}
+.proc-card {
+  padding: 0;
+  overflow: hidden;
+}
+.vol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.vol-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.vol-head .spacer {
+  flex: 1;
+}
+.vol-bar {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.vol-bar div {
+  height: 100%;
+  border-radius: 5px;
+}

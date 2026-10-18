@@ -9,11 +9,14 @@ import { formatBytes } from '../lib/format'
 export default function StoreView(): JSX.Element {
   const { modules, catalog, loadModules } = useStore()
   const [q, setQ] = useState('')
+  const [cat, setCat] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const query = q.trim().toLowerCase()
-  const list = modules.filter(
-    (m) => !query || [m.name, m.tagline, m.description, m.category].some((s) => s.toLowerCase().includes(query))
-  )
+  const categories = [...new Set(modules.map((m) => m.category))].sort((a, b) => a.localeCompare(b, 'fr'))
+  const list = modules
+    .filter((m) => !cat || m.category === cat)
+    .filter((m) => !query || [m.name, m.tagline, m.description, m.category].some((s) => s.toLowerCase().includes(query)))
+    .sort((a, b) => Number(b.status !== 'available') - Number(a.status !== 'available') || a.name.localeCompare(b.name, 'fr'))
 
   return (
     <div className="page">
@@ -48,6 +51,19 @@ export default function StoreView(): JSX.Element {
             <div>
               <strong>Catalogue indisponible.</strong> <span>{catalog.error}</span>
             </div>
+          </div>
+        )}
+
+        {categories.length > 1 && (
+          <div className="cats">
+            <button className={`cat${cat === null ? ' on' : ''}`} onClick={() => setCat(null)}>
+              Tous <span className="faint">{modules.length}</span>
+            </button>
+            {categories.map((c) => (
+              <button key={c} className={`cat${cat === c ? ' on' : ''}`} onClick={() => setCat(c)}>
+                {c} <span className="faint">{modules.filter((m) => m.category === c).length}</span>
+              </button>
+            ))}
           </div>
         )}
 

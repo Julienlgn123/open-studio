@@ -1,0 +1,26 @@
+{
+  "name": "paint-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dessine, retouche et crée en 3D.",
+  "main": "out/main/index.js",
+  "scripts": {
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
+  },
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "openStudioModule": {
+    "id": "paint-studio",
+    "name": "Paint",
+    "tagline": "Dessine, retouche et crée en 3D.",
+    "description": "Pinceaux, formes, texte, remplissage, gomme, calques et annulation, plus un atelier 3D pour composer des formes en volume et les exporter.",
+    "category": "Création",
+    "accent": "#f43f5e",
+    "dataDirName": "open-studio-paint-studio"
+  },
+  "devDependencies": {
+    "@types/three": "^0.170.0"
+  }
+}

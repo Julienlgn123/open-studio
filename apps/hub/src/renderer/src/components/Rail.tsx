@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Plus, Settings } from 'lucide-react'
 import { isInstalled, useStore } from '../store'
 import Brandmark from './Brandmark'
@@ -68,16 +69,28 @@ function RailButton({
   onClick: () => void
   children: React.ReactNode
 }): JSX.Element {
+  const [tip, setTip] = useState<{ x: number; y: number } | null>(null)
   return (
-    <button className={`rail-btn${active ? ' active' : ''}`} onClick={onClick} aria-label={label}>
+    <button
+      className={`rail-btn${active ? ' active' : ''}`}
+      onClick={onClick}
+      aria-label={label}
+      onMouseEnter={(e) => {
+        const r = e.currentTarget.getBoundingClientRect()
+        setTip({ x: r.right + 12, y: r.top + r.height / 2 })
+      }}
+      onMouseLeave={() => setTip(null)}
+    >
       <span className="rail-pill" />
       {children}
       {dot && <span className={`rail-dot ${dot}`} />}
       {busy && <span className="rail-busy" />}
-      <span className="rail-tip">
-        {label}
-        {hint && <kbd>{hint}</kbd>}
-      </span>
+      {tip && (
+        <span className="rail-tip" style={{ left: tip.x, top: tip.y }}>
+          {label}
+          {hint && <kbd>{hint}</kbd>}
+        </span>
+      )}
     </button>
   )
 }

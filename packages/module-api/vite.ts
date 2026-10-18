@@ -1,5 +1,6 @@
 import { resolve } from 'path'
 import type { Plugin } from 'vite'
+import react from '@vitejs/plugin-react'
 
 // Config de build commune aux modules (electron.vite.config.ts de chaque module).
 //
@@ -10,6 +11,7 @@ import type { Plugin } from 'vite'
 const SRC = resolve(__dirname, 'src')
 const SHIMS = { main: resolve(SRC, 'main.ts'), preload: resolve(SRC, 'preload.ts') }
 const HOST = resolve(SRC, 'host.ts')
+const UI = resolve(__dirname, '..', 'module-ui')
 
 /**
  * Dépendances fournies par Open Studio (modules natifs, ou trop lourdes à embarquer dans
@@ -24,7 +26,8 @@ export const HOST_PROVIDED = [
   'pdf-parse',
   'mammoth',
   'katex',
-  'jszip'
+  'jszip',
+  'systeminformation'
 ]
 
 function redirectElectron(kind: 'main' | 'preload'): Plugin {
@@ -49,7 +52,7 @@ const external = [...HOST_PROVIDED, new RegExp(`^(${HOST_PROVIDED.join('|')})/.+
 export function moduleMainConfig(alias: Record<string, string> = {}) {
   return {
     plugins: [redirectElectron('main')],
-    resolve: { alias: { '@open-studio/module': HOST, ...alias } },
+    resolve: { alias: { '@open-studio/module': HOST, '@open-studio/kit': resolve(SRC, 'kit-main.ts'), ...alias } },
     build: { rollupOptions: { external } }
   }
 }
@@ -57,6 +60,15 @@ export function moduleMainConfig(alias: Record<string, string> = {}) {
 export function modulePreloadConfig(alias: Record<string, string> = {}) {
   return {
     plugins: [redirectElectron('preload')],
-    resolve: { alias }
+    resolve: { alias: { '@open-studio/kit': resolve(SRC, 'kit-preload.ts'), ...alias } }
+  }
+}
+
+/** Interface d'un module : React, et le kit d'interface commun (`@ui`) pour un rendu identique partout. */
+export function moduleRendererConfig(alias: Record<string, string> = {}, extra: Record<string, unknown> = {}) {
+  return {
+    plugins: [react()],
+    resolve: { alias: { '@ui': UI, ...alias } },
+    ...extra
   }
 }

@@ -1,0 +1,26 @@
+{
+  "name": "transfer-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Envoie des fichiers entre PC et téléphone.",
+  "main": "out/main/index.js",
+  "scripts": {
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  },
+  "openStudioModule": {
+    "id": "transfer-studio",
+    "name": "Transfert local",
+    "tagline": "Envoie des fichiers entre PC et téléphone.",
+    "description": "Partage des fichiers sur ton Wi-Fi, sans câble ni compte : scanne le QR code avec ton téléphone, envoie et reçois dans les deux sens.",
+    "category": "Outils",
+    "accent": "#0ea5e9",
+    "dataDirName": "open-studio-transfer-studio"
+  },
+  "devDependencies": {
+    "@types/qrcode": "^1.5.5"
+  }
+}

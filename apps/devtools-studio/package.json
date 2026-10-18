@@ -1,0 +1,21 @@
+{
+  "name": "devtools-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "JSON, Base64, hash, regex, couleurs, UUID.",
+  "main": "out/main/index.js",
+  "scripts": {
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
+  },
+  "dependencies": {},
+  "openStudioModule": {
+    "id": "devtools-studio",
+    "name": "Boîte à outils dev",
+    "tagline": "JSON, Base64, hash, regex, couleurs, UUID.",
+    "description": "Tous les petits outils du quotidien : formateur JSON, Base64, URL, hash, testeur de regex, couleurs, UUID, horodatages, JWT.",
+    "category": "Développement",
+    "accent": "#64748b",
+    "dataDirName": "open-studio-devtools-studio"
+  }
+}

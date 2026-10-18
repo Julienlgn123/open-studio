@@ -1,0 +1,148 @@
+.ui-side {
+  width: 250px;
+}
+.small {
+  font-size: 12px;
+  padding: 4px 6px;
+}
+.req-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12.5px;
+}
+.req-item:hover {
+  background: var(--hover);
+}
+.req-item.on {
+  background: var(--active);
+}
+.req-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.del {
+  opacity: 0;
+}
+.req-item:hover .del {
+  opacity: 1;
+}
+.m {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  width: 44px;
+  flex-shrink: 0;
+}
+.m-GET { color: #22c55e; }
+.m-POST { color: #f59e0b; }
+.m-PUT { color: #3b82f6; }
+.m-PATCH { color: #a855f7; }
+.m-DELETE { color: #ef4444; }
+.m-HEAD,
+.m-OPTIONS { color: var(--text-2); }
+.st {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+.st.ok { color: var(--success); }
+.st.err { color: var(--danger); }
+.api {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 16px 20px;
+  gap: 12px;
+}
+.request-bar {
+  display: flex;
+  gap: 8px;
+}
+.request-bar .input {
+  height: 40px;
+  font-size: 13px;
+}
+.method {
+  width: 116px;
+  height: 40px;
+  font-family: var(--mono);
+  font-weight: 700;
+}
+.request-bar .btn {
+  height: 40px;
+}
+.req-panel {
+  max-height: 260px;
+  overflow-y: auto;
+}
+.pairs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pair {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pair input[type='checkbox'] {
+  accent-color: var(--accent);
+}
+.response {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 12px;
+  overflow: hidden;
+}
+.res-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.res-head .spacer {
+  flex: 1;
+}
+.res-body {
+  flex: 1;
+  overflow: auto;
+  margin: 0;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--bg);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+}
+.response .table {
+  display: block;
+  overflow: auto;
+}
+.res-empty {
+  margin: auto;
+}
+.j-key { color: #7dd3fc; }
+.j-str { color: #86efac; }
+.j-num { color: #fca5a5; }
+.j-kw { color: #c4b5fd; }
+:root[data-theme='light'] .j-key { color: #0369a1; }
+:root[data-theme='light'] .j-str { color: #15803d; }
+:root[data-theme='light'] .j-num { color: #b91c1c; }
+:root[data-theme='light'] .j-kw { color: #6d28d9; }

@@ -1,0 +1,21 @@
+{
+  "name": "ent-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ton emploi du temps de la fac, toujours à jour.",
+  "main": "out/main/index.js",
+  "scripts": {
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
+  },
+  "dependencies": {},
+  "openStudioModule": {
+    "id": "ent-studio",
+    "name": "ENT Studio",
+    "tagline": "Ton emploi du temps de la fac, toujours à jour.",
+    "description": "Ton emploi du temps ADE en direct : semaine claire avec cours, prof, salle et horaires, mise à jour au lancement et alerte dès qu'un cours change.",
+    "category": "Études",
+    "accent": "#f97316",
+    "dataDirName": "open-studio-ent-studio"
+  }
+}
