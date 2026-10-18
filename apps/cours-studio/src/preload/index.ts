@@ -51,6 +51,9 @@ const api = {
     stopDiscovery: (): Promise<boolean> => ipcRenderer.invoke('sync:stopDiscovery'),
     send: (host: string, port: number, code: string, pairOnly?: boolean): Promise<void> =>
       ipcRenderer.invoke('sync:send', host, port, code, pairOnly),
+    shareables: () => ipcRenderer.invoke('sync:shareables'),
+    share: (host: string, port: number, code: string, courseIds: string[], subjectIds: string[]): Promise<number> =>
+      ipcRenderer.invoke('sync:share', host, port, code, courseIds, subjectIds),
     onStatus: (cb: (s: unknown) => void): (() => void) => {
       const h = (_: unknown, s: unknown): void => cb(s)
       ipcRenderer.on('sync:status', h)

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, ArrowLeft, Clock, Mic, Monitor, Edit2, Trash2, FileDown, X, Send } from 'lucide-react'
+import { Plus, Search, ArrowLeft, Clock, Mic, Monitor, Edit2, Trash2, FileDown, X, Send, Wifi } from 'lucide-react'
 import { useStore } from '../store'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import NewCourseModal from './NewCourseModal'
 import CourseEditModal from './CourseEditModal'
 import ContextMenu from './ContextMenu'
+import SyncModal from './SyncModal'
 import type { Course } from '../../../shared/types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -21,6 +22,8 @@ export default function SubjectView() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; course: Course } | null>(null)
   const [tagFilter, setTagFilter] = useState<string | null>(null)
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
+  /** Cours à partager par le Wi-Fi (fenêtre de partage ouverte). */
+  const [shareIds, setShareIds] = useState<string[] | null>(null)
 
   useEffect(() => { clearCourseSelection() }, [activeSubjectId])
 
@@ -180,6 +183,9 @@ export default function SubjectView() {
             </select>
           )}
 
+          <button className="btn btn-sm" onClick={() => setShareIds([...selectedCourseIds])} title="Partager ces cours avec un autre PC par le Wi-Fi">
+            <Wifi size={13} /> Partager
+          </button>
           <button className="btn btn-sm" style={{ color: 'var(--danger, #ef4444)' }} onClick={() => setConfirmBulkDelete(true)}>
             <Trash2 size={13} /> Supprimer
           </button>
@@ -229,10 +235,12 @@ export default function SubjectView() {
                   .catch((err: Error) => useStore.getState().showToast(err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), 'error'))
               }
             })),
+            { label: 'Partager par Wi-Fi…', icon: <Wifi size={14} />, onClick: () => { setShareIds([contextMenu.course.id]); setContextMenu(null) } },
             { label: 'Supprimer', icon: <Trash2 size={14} />, danger: true, onClick: () => handleDelete(contextMenu.course.id) }
           ]}
         />
       )}
+      {shareIds && <SyncModal initialCourseIds={shareIds} onClose={() => setShareIds(null)} />}
     </div>
   )
 }

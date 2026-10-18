@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Plus, Home, BookOpen, MoreHorizontal, Trash2 } from 'lucide-react'
+import { Plus, Home, BookOpen, MoreHorizontal, Trash2, Wifi } from 'lucide-react'
 import { useStore } from '../store'
 import SubjectModal from './SubjectModal'
 import ContextMenu from './ContextMenu'
+import SyncModal from './SyncModal'
 import { useEscapeToClose } from '../hooks/useEscapeToClose'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -14,6 +15,7 @@ export default function Sidebar() {
   const [editSubject, setEditSubject] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; subjectId: string } | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [shareSubjectId, setShareSubjectId] = useState<string | null>(null)
   const [deleteConfirmCount, setDeleteConfirmCount] = useState(0)
   const [dragId, setDragId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
@@ -164,6 +166,11 @@ export default function Sidebar() {
               onClick: () => { setEditSubject(contextMenu.subjectId); setContextMenu(null) }
             },
             {
+              label: 'Partager par Wi-Fi…',
+              icon: <Wifi size={14} />,
+              onClick: () => { setShareSubjectId(contextMenu.subjectId); setContextMenu(null) }
+            },
+            {
               label: 'Supprimer',
               icon: <MoreHorizontal size={14} />,
               danger: true,
@@ -172,6 +179,8 @@ export default function Sidebar() {
           ]}
         />
       )}
+
+      {shareSubjectId && <SyncModal initialSubjectIds={[shareSubjectId]} onClose={() => setShareSubjectId(null)} />}
 
       {deleteConfirm && subjectToDelete && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }} onClick={() => setDeleteConfirm(null)}>
