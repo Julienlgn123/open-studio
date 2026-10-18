@@ -10,7 +10,7 @@ jobs:
   build-windows:
     strategy:
       matrix:
-        app: [hub, cours-studio, drive-studio, local-ia-studio, power-studio]
+        app: [hub]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,10 +39,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Le hub garde tout (portable + blockmap : son propre auto-updater en a
-      # besoin) ; les apps gérées n'exposent que leur unique installateur —
-      # Open Studio ne regarde jamais que ça, le reste n'est que du bruit sur
-      # la page de release.
+      # Le hub garde tout (portable + blockmap : son propre auto-updater en a besoin).
       - name: Upload artifacts (hub)
         if: matrix.app == 'hub'
         uses: actions/upload-artifact@v4
@@ -54,18 +51,12 @@ jobs:
             !apps/${{ matrix.app }}/dist-installer/builder-debug.yml
             apps/${{ matrix.app }}/dist-installer/*.blockmap
 
-      - name: Upload artifacts (managed app)
-        if: matrix.app != 'hub'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.app }}-windows
-          path: apps/${{ matrix.app }}/dist-installer/*.exe
 
   # ─── macOS ─────────────────────────────────────────────────
   build-mac:
     strategy:
       matrix:
-        app: [hub, cours-studio, drive-studio, local-ia-studio, power-studio]
+        app: [hub]
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -100,18 +91,12 @@ jobs:
             !apps/${{ matrix.app }}/dist-installer/builder-debug.yml
             apps/${{ matrix.app }}/dist-installer/*.blockmap
 
-      - name: Upload artifacts (managed app)
-        if: matrix.app != 'hub'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.app }}-mac
-          path: apps/${{ matrix.app }}/dist-installer/*.dmg
 
   # ─── Linux ─────────────────────────────────────────────────
   build-linux:
     strategy:
       matrix:
-        app: [hub, cours-studio, drive-studio, local-ia-studio, power-studio]
+        app: [hub]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -144,18 +129,37 @@ jobs:
             !apps/${{ matrix.app }}/dist-installer/builder-debug.yml
             apps/${{ matrix.app }}/dist-installer/*.blockmap
 
-      - name: Upload artifacts (managed app)
-        if: matrix.app != 'hub'
+
+  # ─── Modules ────────────────────────────────────────────────
+  # Les modules (Cours Studio, Drive Studio, Local IA Studio, ENT Studio…) sont du JavaScript sans
+  # binaire natif propre : un seul build sert tous les systèmes. Les bibliothèques natives
+  # (better-sqlite3, node-llama-cpp, ffmpeg…) viennent d'Open Studio lui-même.
+  build-modules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies (sans compiler de binaires)
+        run: npm install --ignore-scripts
+
+      - name: Build modules
+        run: node scripts/build-modules.mjs
+
+      - name: Upload modules
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.app }}-linux
-          path: apps/${{ matrix.app }}/dist-installer/*.deb
+          name: modules
+          path: dist-modules/*
 
   # ─── Create Release ─────────────────────────────────────────
-  # Une seule release pour toute la suite : le hub (auto-update via electron-updater)
-  # et chaque app qu'il installe (assets préfixés, cf. apps/hub/src/main/catalog.ts).
+  # Une seule release : Open Studio (auto-update via electron-updater) et le catalogue de modules
+  # (modules-index.json + un zip par module, lus par apps/hub/src/main/modules/source.ts).
   release:
-    needs: [build-windows, build-mac, build-linux]
+    needs: [build-windows, build-mac, build-linux, build-modules]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -175,60 +179,33 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      # Un zip par OS avec les installateurs de toute la suite dedans — la
-      # personne ne télécharge que celui de son système, pas les deux autres.
+      # Un zip par OS avec l'installateur d'Open Studio : la personne ne télécharge que le sien.
       - name: Bundle one zip per OS
         run: |
           mkdir -p bundle/windows bundle/mac bundle/linux
 
           cp dist-artifacts/Open-Studio-Setup-*.exe bundle/windows/
-          cp dist-artifacts/Cours-Studio-Setup-*.exe bundle/windows/
-          cp dist-artifacts/Drive-Studio-Setup-*.exe bundle/windows/
-          cp dist-artifacts/Local-IA-Studio-Setup-*.exe bundle/windows/
-          cp dist-artifacts/Power-Studio-Setup-*.exe bundle/windows/
           cat > bundle/windows/Lire-moi.txt <<'EOF'
-          Lance l'installateur de l'app que tu veux :
-          - Open-Studio-Setup-*.exe (recommandé, installe/lance/met à jour les autres)
-          - Cours-Studio-Setup-*.exe
-          - Drive-Studio-Setup-*.exe
-          - Local-IA-Studio-Setup-*.exe
-          - Power-Studio-Setup-*.exe
+          Lance Open-Studio-Setup-*.exe. Si tu utilisais déjà Cours Studio, Drive Studio ou
+          Local IA Studio, ouvre Open Studio, va dans « Ajouter des modules » et installe-les :
+          tes cours, sauvegardes et conversations sont retrouvés automatiquement.
           EOF
           (cd bundle/windows && zip -r "../../dist-artifacts/Open-Studio-Windows.zip" .)
 
           cp dist-artifacts/Open-Studio-*.dmg bundle/mac/
-          cp dist-artifacts/Cours-Studio-*.dmg bundle/mac/
-          cp dist-artifacts/Drive-Studio-*.dmg bundle/mac/
-          cp dist-artifacts/Local-IA-Studio-*.dmg bundle/mac/
-          cp dist-artifacts/Power-Studio-*.dmg bundle/mac/
           cat > bundle/mac/Lire-moi.txt <<'EOF'
-          Choisis le .dmg "arm64" (Apple Silicon M1/M2/M3/M4) ou "x64" (Intel)
-          de l'app que tu veux installer. Open-Studio-*.dmg est recommandé :
-          il installe/lance/met à jour les autres apps depuis son catalogue.
+          Choisis le .dmg "arm64" (Apple Silicon M1/M2/M3/M4) ou "x64" (Intel).
 
           Première ouverture : macOS affiche "app endommagée" (pas de certificat
-          Apple Developer payant) -> Terminal -> xattr -cr "/Applications/NomDeLApp.app"
+          Apple Developer payant) -> Terminal -> xattr -cr "/Applications/Open Studio.app"
           EOF
           (cd bundle/mac && zip -r "../../dist-artifacts/Open-Studio-macOS.zip" .)
 
           cp dist-artifacts/Open-Studio-*.AppImage dist-artifacts/Open-Studio-*.deb bundle/linux/
-          cp dist-artifacts/Cours-Studio-*.deb bundle/linux/
-          cp dist-artifacts/Drive-Studio-*.deb bundle/linux/
-          cp dist-artifacts/Local-IA-Studio-*.deb bundle/linux/
-          cp dist-artifacts/Power-Studio-*.deb bundle/linux/
           cat > bundle/linux/Lire-moi.txt <<'EOF'
-          Lance le .deb (Debian/Ubuntu/Mint) ou l'AppImage de l'app que tu veux.
-          Open-Studio.* est recommandé : il installe/lance/met à jour les autres
-          apps depuis son catalogue.
+          Lance le .deb (Debian/Ubuntu/Mint) ou l'AppImage.
           EOF
           (cd bundle/linux && zip -r "../../dist-artifacts/Open-Studio-Linux.zip" .)
-
-          # Les apps gérées n'ont plus besoin d'exister comme assets
-          # de release à part : ils sont déjà dans les 3 zips ci-dessus, et
-          # Open Studio les récupère lui-même en les extrayant de là (voir
-          # apps/hub/src/main/install/zipSource.ts) plutôt que d'aller
-          # chercher un fichier séparé par nom.
-          rm -f dist-artifacts/Cours-Studio-* dist-artifacts/Drive-Studio-* dist-artifacts/Local-IA-Studio-* dist-artifacts/Power-Studio-*
 
       # Vraie version de chaque app (le numéro de la release concerne toute la suite) :
       # Open Studio ne propose une mise à jour que si l'app a réellement changé.
@@ -240,11 +217,17 @@ jobs:
         with:
           name: "Open Studio Suite v${{ steps.version.outputs.VERSION }}"
           body: |
-            ## 🗂️ Open Studio Suite v${{ steps.version.outputs.VERSION }}
+            ## 🗂️ Open Studio v${{ steps.version.outputs.VERSION }} — une seule app, des modules
 
-            Installe **Open Studio** une seule fois : il télécharge, installe et lance
-            chaque app de la suite depuis son catalogue, et gère leurs mises à jour —
-            aucune des apps gérées ne se télécharge séparément.
+            Open Studio est maintenant **une seule application** : tu y ajoutes les modules dont tu as
+            besoin (Cours Studio, Drive Studio, Local IA Studio, ENT Studio, PDF Studio, Paint,
+            Moniteur système, Transfert local…). Aucun n'est installé au départ.
+
+            **Tu utilisais déjà Cours Studio, Drive Studio ou Local IA Studio ?** Installe Open Studio,
+            puis ajoute le module : **tes cours, sauvegardes, conversations et réglages sont retrouvés
+            automatiquement**, rien à importer. Tu peux ensuite désinstaller l'ancienne app.
+
+            Les anciennes versions d'Open Studio se mettent à jour toutes seules.
 
             ### 📦 Télécharge le zip de ton système
 
@@ -254,26 +237,17 @@ jobs:
             | 🍎 macOS | `Open-Studio-macOS.zip` |
             | 🐧 Linux | `Open-Studio-Linux.zip` |
 
-            Dézippe-le et lance l'installateur `Open-Studio-*` dedans (les
-            installateurs de Cours Studio/Drive Studio/Local IA Studio/Power Studio sont là aussi si tu veux
-            les installer directement, mais Open Studio les propose déjà depuis
-            son catalogue).
-
             > ⚠️ Première ouverture sur macOS : pas de certificat Apple Developer payant,
             > donc l'app n'est signée qu'en *ad-hoc* → macOS affiche **« Open Studio est
-            > endommagée et ne peut pas être ouverte »** (le clic droit → Ouvrir ne suffit
-            > pas ici, contrairement à une vraie app non-notariée). Ouvre **Terminal** et lance :
+            > endommagée et ne peut pas être ouverte »**. Ouvre **Terminal** et lance :
             > ```
             > xattr -cr "/Applications/Open Studio.app"
             > ```
             > puis ouvre l'app normalement.
 
             ---
-            Tous les autres fichiers ci-dessous sont ceux qu'Open Studio et son
-            mécanisme de mise à jour utilisent automatiquement en arrière-plan —
-            pas besoin d'en télécharger un directement, sers-toi des 3 zips au-dessus.
-
-            🔄 Open Studio se met à jour tout seul, et met à jour les apps installées dès qu'elles ont une nouvelle version.
+            Les autres fichiers (modules, `.yml`, `.blockmap`) sont utilisés automatiquement par
+            Open Studio — pas besoin de les télécharger.
           files: dist-artifacts/**/*
           draft: false
           prerelease: false
