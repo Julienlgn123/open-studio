@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fda4af"/><stop offset="1" stop-color="#dc2626"/></linearGradient><linearGradient id="c" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#818cf8"/></linearGradient></defs><rect width="1024" height="1024" rx="224" fill="#14142e"/><path d="M300 150h300l184 184v456a84 84 0 0 1-84 84H300a84 84 0 0 1-84-84V234a84 84 0 0 1 84-84z" fill="url(#g)"/>
+<path d="M600 150v116a68 68 0 0 0 68 68h116z" fill="#14142e" opacity=".3"/>
+<text x="500" y="560" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-weight="900" font-size="176" fill="#14142e" letter-spacing="-6">PDF</text>
+<path d="M300 720c40-56 70-56 90-10s40 50 74-6 64-46 84 4 54 30 100-20" fill="none" stroke="url(#c)" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/></svg>

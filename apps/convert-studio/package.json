@@ -1,6 +1,6 @@
 {
   "name": "convert-studio",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Images, vidéos et sons dans le format voulu.",
   "main": "out/main/index.js",

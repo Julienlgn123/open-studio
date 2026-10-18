@@ -1,6 +1,6 @@
 {
   "name": "calc-studio",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Calculs scientifiques, courbes et conversions.",
   "main": "out/main/index.js",

@@ -1,6 +1,6 @@
 {
   "name": "transfer-studio",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Envoie des fichiers entre PC et téléphone.",
   "main": "out/main/index.js",

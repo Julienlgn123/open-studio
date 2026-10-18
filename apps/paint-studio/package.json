@@ -1,6 +1,6 @@
 {
   "name": "paint-studio",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Dessine, retouche et crée en 3D.",
   "main": "out/main/index.js",

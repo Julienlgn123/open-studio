@@ -1,6 +1,6 @@
 {
   "name": "snippets-studio",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Tes bouts de code, rangés et retrouvés.",
   "main": "out/main/index.js",

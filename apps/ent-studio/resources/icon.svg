@@ -1,9 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fb923c"/><stop offset="1" stop-color="#ea580c"/></linearGradient>
-    <linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></linearGradient>
-  </defs>
-  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#g)"/>
-  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#s)"/>
-  <g transform="translate(116 116) scale(11.667)" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></g>
-</svg>
+<svg width="1024" height="1024" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fcd34d"/><stop offset="1" stop-color="#f97316"/></linearGradient><linearGradient id="c" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#3b82f6"/></linearGradient></defs><rect width="1024" height="1024" rx="224" fill="#14142e"/><rect x="176" y="232" width="640" height="592" rx="88" fill="url(#g)"/>
+<rect x="300" y="168" width="64" height="150" rx="32" fill="#fde68a"/><rect x="628" y="168" width="64" height="150" rx="32" fill="#fde68a"/>
+<g fill="#14142e"><rect x="254" y="450" width="128" height="104" rx="26"/><rect x="432" y="450" width="128" height="104" rx="26"/><rect x="254" y="610" width="128" height="104" rx="26"/><rect x="432" y="610" width="128" height="104" rx="26"/><rect x="610" y="610" width="128" height="104" rx="26"/></g>
+<rect x="610" y="450" width="128" height="104" rx="26" fill="#fff"/>
+<circle cx="800" cy="248" r="104" fill="url(#c)" stroke="#14142e" stroke-width="28"/>
+<rect x="788" y="186" width="24" height="76" rx="12" fill="#fff"/><circle cx="800" cy="296" r="15" fill="#fff"/></svg>

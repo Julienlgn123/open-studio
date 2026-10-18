@@ -1,6 +1,6 @@
 {
   "name": "youtube-studio",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Une vidéo, son texte et son résumé.",
   "main": "out/main/index.js",

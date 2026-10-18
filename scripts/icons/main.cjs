@@ -1,4 +1,4 @@
-// Génère resources/icon.png (512 px) des modules : un carré arrondi en dégradé et un pictogramme
+// Génère resources/icon.png (1024 px) des modules : un carré arrondi en dégradé et un pictogramme
 // Lucide blanc, dans le même style pour tous. À lancer avec Electron :
 //   npx electron scripts/icons/main.cjs [id…]
 const { app, BrowserWindow } = require('electron')
@@ -47,21 +47,24 @@ function svg([glyph, c1, c2]) {
 app.disableHardwareAcceleration()
 app.whenReady().then(async () => {
   const only = process.argv.slice(2).filter((a) => ICONS[a])
-  const win = new BrowserWindow({ width: 512, height: 512, show: false, frame: false, transparent: true, webPreferences: { offscreen: true } })
+  const win = new BrowserWindow({ width: 1024, height: 1024, show: false, frame: false, transparent: true, webPreferences: { offscreen: true } })
   for (const [id, spec] of Object.entries(ICONS)) {
     if (only.length && !only.includes(id)) continue
     const dir = join(root, 'apps', id, 'resources')
     if (!existsSync(dir)) continue
-    const html = `<html><body style="margin:0;background:transparent">${svg(spec)}</body></html>`
+    // Logo dessiné à la main (scripts/icons/logos, voir logos.py) s'il existe, sinon pictogramme Lucide.
+    const custom = join(__dirname, 'logos', `${id}.svg`)
+    const art = existsSync(custom) ? readFileSync(custom, 'utf-8').replace('<svg ', '<svg width="1024" height="1024" ') : svg(spec)
+    const html = `<html><body style="margin:0;background:transparent">${art}</body></html>`
     await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
     // La toute première capture peut sortir vide : on réessaie jusqu'à avoir l'image.
     let img
     for (let i = 0; i < 10 && (!img || img.isEmpty()); i++) {
       await new Promise((r) => setTimeout(r, 150))
-      img = await win.webContents.capturePage({ x: 0, y: 0, width: 512, height: 512 })
+      img = await win.webContents.capturePage({ x: 0, y: 0, width: 1024, height: 1024 })
     }
-    writeFileSync(join(dir, 'icon.png'), img.resize({ width: 512, height: 512 }).toPNG())
-    writeFileSync(join(dir, 'icon.svg'), svg(spec))
+    writeFileSync(join(dir, 'icon.png'), img.resize({ width: 1024, height: 1024 }).toPNG())
+    writeFileSync(join(dir, 'icon.svg'), art)
   }
   app.exit(0)
 })
