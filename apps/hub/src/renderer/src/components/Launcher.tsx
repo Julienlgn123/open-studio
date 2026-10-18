@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CornerDownLeft, Home, Plus, Search, Settings } from 'lucide-react'
-import { isInstalled, useStore, type View } from '../store'
+import { isInstalled, sortModules, useStore, type View } from '../store'
 import ModuleIcon from './ModuleIcon'
 import Brandmark from './Brandmark'
 
@@ -14,14 +14,14 @@ interface Item {
 
 /** Palette « Aller à… » : quelques lettres, Entrée. Ctrl+K, ou Ctrl+Alt+Espace de n'importe où. */
 export default function Launcher({ onClose }: { onClose: () => void }): JSX.Element {
-  const { modules, go } = useStore()
+  const { modules, go, settings } = useStore()
   const [q, setQ] = useState('')
   const [sel, setSel] = useState(0)
   const input = useRef<HTMLInputElement>(null)
 
   const items = useMemo(() => {
     const all: Item[] = [
-      ...modules.filter(isInstalled).map((m) => ({
+      ...sortModules(modules.filter(isInstalled), settings.layout.order).map((m) => ({
         key: m.id,
         label: m.name,
         hint: m.tagline,
@@ -34,7 +34,7 @@ export default function Launcher({ onClose }: { onClose: () => void }): JSX.Elem
     ]
     const query = q.trim().toLowerCase()
     return all.filter((i) => !query || i.label.toLowerCase().includes(query) || i.hint.toLowerCase().includes(query))
-  }, [modules, q])
+  }, [modules, q, settings.layout.order])
 
   useEffect(() => input.current?.focus(), [])
   useEffect(() => setSel(0), [q])

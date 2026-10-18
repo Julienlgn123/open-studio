@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Download, MoreHorizontal, Play, RefreshCw, Trash2 } from 'lucide-react'
 import type { ModuleInfo } from '@shared/types'
 import { useStore } from '../store'
@@ -11,7 +12,26 @@ const PHASE: Record<string, string> = { downloading: 'Téléchargement', install
 export default function ModuleActions({ module: m, compact }: { module: ModuleInfo; compact?: boolean }): JSX.Element {
   const { install, uninstall, go, progress, ask } = useStore()
   const [busy, setBusy] = useState(false)
-  const [menu, setMenu] = useState(false)
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  const btn = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (!menu) return
+    const close = (e: Event): void => {
+      if (e.target instanceof Element && e.target.closest('.menu-pop, .menu-trigger')) return
+      setMenu(null)
+    }
+    const esc = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setMenu(null)
+    }
+    window.addEventListener('mousedown', close)
+    window.addEventListener('keydown', esc)
+    window.addEventListener('resize', close)
+    return () => {
+      window.removeEventListener('mousedown', close)
+      window.removeEventListener('keydown', esc)
+      window.removeEventListener('resize', close)
+    }
+  }, [menu])
   const p = progress[m.id]
 
   const run = async (fn: () => Promise<void>): Promise<void> => {
@@ -57,17 +77,27 @@ export default function ModuleActions({ module: m, compact }: { module: ModuleIn
         <Play size={13} fill="currentColor" />
         Ouvrir
       </button>
-      <div className="menu-wrap" onMouseLeave={() => setMenu(false)}>
-        <button className="btn btn-ghost btn-icon" onClick={() => setMenu((v) => !v)} title="Plus d’options">
+      <div className="menu-wrap">
+        <button
+          ref={btn}
+          className="btn btn-ghost btn-icon menu-trigger"
+          onClick={() => {
+            if (menu) return setMenu(null)
+            const r = btn.current!.getBoundingClientRect()
+            setMenu({ x: Math.max(8, r.right - 190), y: r.bottom + 4 })
+          }}
+          title="Plus d’options"
+        >
           <MoreHorizontal size={16} />
         </button>
-        {menu && (
-          <div className="menu">
+        {menu &&
+          createPortal(
+          <div className="menu menu-pop" style={{ left: menu.x, top: menu.y }}>
             <div className="menu-note">Version {m.installedVersion}</div>
             <button
               className="menu-item danger"
               onClick={() => {
-                setMenu(false)
+                setMenu(null)
                 ask({
                   title: `Retirer ${m.name} ?`,
                   body: 'Tes données restent sur l’ordinateur : tu les retrouveras en réinstallant le module.',
@@ -80,7 +110,8 @@ export default function ModuleActions({ module: m, compact }: { module: ModuleIn
               <Trash2 size={14} />
               Retirer le module
             </button>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     </div>

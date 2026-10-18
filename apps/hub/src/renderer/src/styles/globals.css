@@ -234,7 +234,7 @@ kbd {
 
 /* ─── Barre d'icônes (rail) ───────────────────────────── */
 .rail {
-  width: 64px;
+  width: var(--rail-w, 64px);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -272,8 +272,8 @@ kbd {
 }
 .rail-btn {
   position: relative;
-  width: 44px;
-  height: 44px;
+  width: var(--rail-btn, 44px);
+  height: var(--rail-btn, 44px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1416,4 +1416,109 @@ kbd {
   to {
     transform: translateX(300%);
   }
+}
+
+/* ─── Personnalisation ────────────────────────────────── */
+:root[data-rail='right'] .app-body {
+  flex-direction: row-reverse;
+}
+:root[data-rail='right'] .rail {
+  border-right: none;
+  border-left: 1px solid var(--border);
+}
+:root[data-rail='right'] .rail-pill {
+  left: auto;
+  right: -10px;
+  border-radius: 4px 0 0 4px;
+}
+.rail-btn[draggable='true'] {
+  cursor: grab;
+}
+.rail-btn.dragging {
+  opacity: 0.35;
+}
+.rail-btn.drop-before::before,
+.rail-btn.drop-after::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--accent);
+}
+.rail-btn.drop-before::before {
+  top: -5px;
+}
+.rail-btn.drop-after::after {
+  bottom: -5px;
+}
+.tile.dragging {
+  opacity: 0.35;
+}
+.tile.drop-target {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.tiles.list {
+  grid-template-columns: 1fr;
+}
+.tiles.list .tile {
+  flex-direction: row;
+  align-items: center;
+  min-height: 0;
+}
+.cust-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.cust-row + .cust-row {
+  margin-top: 6px;
+}
+.cust-row .grow {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+}
+.cust-row.off .grow {
+  opacity: 0.5;
+}
+.swatches {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  box-shadow: 0 0 0 1px var(--border-strong);
+}
+.swatch.on {
+  border-color: var(--bg);
+  box-shadow: 0 0 0 2px var(--text);
+}
+.swatches input[type='color'] {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.menu-pop {
+  position: fixed;
+  z-index: 200;
+}
+.tiles.list .tile-foot {
+  margin-left: auto;
+}
+.rail-tip.left {
+  transform: translate(-100%, -50%);
 }

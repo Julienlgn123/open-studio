@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
-import { isInstalled, useStore } from './store'
+import { isInstalled, sortModules, useStore } from './store'
 import TitleBar from './components/TitleBar'
 import Rail from './components/Rail'
 import HomeView from './components/HomeView'
@@ -32,7 +32,8 @@ export default function App(): JSX.Element {
     const digit = (key: string): void => {
       const n = Number(key)
       if (n === 0) return go({ kind: 'home' })
-      const m = useStore.getState().modules.filter(isInstalled)[n - 1]
+      const { modules, settings } = useStore.getState()
+      const m = sortModules(modules.filter(isInstalled), settings.layout.order).filter((x) => !settings.layout.hidden.includes(x.id))[n - 1]
       if (m) go({ kind: 'module', id: m.id })
     }
     const onKey = (e: KeyboardEvent): void => {

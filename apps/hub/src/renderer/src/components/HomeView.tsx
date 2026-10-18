@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { ArrowRight, History, Sparkles } from 'lucide-react'
-import { isInstalled, useStore } from '../store'
+import { isInstalled, sortModules, useStore } from '../store'
 import ModuleIcon from './ModuleIcon'
 import ModuleActions from './ModuleActions'
 import LegacyNotice from './LegacyNotice'
@@ -13,18 +14,33 @@ function greeting(): string {
 
 /** Accueil : tes modules en grand, ceux à découvrir en dessous. */
 export default function HomeView(): JSX.Element {
-  const { modules, loaded, go, catalog } = useStore()
-  const installed = modules.filter(isInstalled)
+  const { modules, loaded, go, catalog, settings, setLayout } = useStore()
+  const { layout } = settings
+  const installed = sortModules(modules.filter(isInstalled), layout.order)
+  const [drag, setDrag] = useState<string | null>(null)
+  const [over, setOver] = useState<string | null>(null)
+  const drop = (): void => {
+    if (drag && over && drag !== over) {
+      const ids = installed.map((m) => m.id)
+      ids.splice(ids.indexOf(drag), 1)
+      ids.splice(ids.indexOf(over), 0, drag)
+      void setLayout({ order: ids })
+    }
+    setDrag(null)
+    setOver(null)
+  }
   const others = modules.filter((m) => !isInstalled(m))
   const withOldData = others.filter((m) => m.legacy?.hasData)
 
   return (
     <div className="page">
       <div className="page-inner">
+        {layout.showHero && (
         <header className="hero">
           <h1>{greeting()} 👋</h1>
           <p>{installed.length ? 'Tout ton espace de travail, au même endroit.' : 'Open Studio rassemble tes outils en un seul endroit. Choisis tes modules pour commencer.'}</p>
         </header>
+        )}
 
         <LegacyNotice />
 
@@ -41,9 +57,29 @@ export default function HomeView(): JSX.Element {
         {installed.length > 0 && (
           <section>
             <h2 className="section-title">Tes modules</h2>
-            <div className="tiles">
-              {installed.map((m, i) => (
-                <button key={m.id} className="tile" style={{ ['--accent-m' as string]: m.accent }} onClick={() => go({ kind: 'module', id: m.id })}>
+            <div className={`tiles${layout.homeView === 'list' ? ' list' : ''}`}>
+              {installed.map((m) => (
+                <button
+                  key={m.id}
+                  className={`tile${drag === m.id ? ' dragging' : ''}${over === m.id && drag !== m.id ? ' drop-target' : ''}`}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = 'move'
+                    setDrag(m.id)
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    setOver(m.id)
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    drop()
+                  }}
+                  onDragEnd={() => {
+                    setDrag(null)
+                    setOver(null)
+                  }}
+                  style={{ ['--accent-m' as string]: m.accent }} onClick={() => go({ kind: 'module', id: m.id })}>
                   <div className="tile-glow" />
                   <ModuleIcon module={m} size={52} />
                   <div className="tile-text">
@@ -51,7 +87,7 @@ export default function HomeView(): JSX.Element {
                     <div className="tile-tagline">{m.tagline}</div>
                   </div>
                   <div className="tile-foot">
-                    {i < 9 && <kbd>{`${MOD}${i + 1}`}</kbd>}
+                    {(() => { const k = installed.filter((x) => !layout.hidden.includes(x.id)).indexOf(m); return k >= 0 && k < 9 ? <kbd>{`${MOD}${k + 1}`}</kbd> : null })()}
                     {m.status === 'update' && <span className="chip accent">Mise à jour dispo</span>}
                     {m.error && <span className="chip danger">Erreur</span>}
                     <ArrowRight size={15} className="tile-arrow" />
@@ -62,7 +98,7 @@ export default function HomeView(): JSX.Element {
           </section>
         )}
 
-        {others.length > 0 && (
+        {layout.showDiscover && others.length > 0 && (
           <section>
             <h2 className="section-title">{installed.length ? 'À découvrir' : 'Modules disponibles'}</h2>
             <div className="cards">

@@ -36,6 +36,39 @@ export interface ModuleProgress {
   pct: number
 }
 
+/** Personnalisation de l'interface (tout est modifiable depuis Réglages ▸ Personnaliser). */
+export interface Layout {
+  /** Couleur d'accent (#rrggbb), null = celle du thème. */
+  accent: string | null
+  railSide: 'left' | 'right'
+  railSize: 'small' | 'normal' | 'large'
+  /** Ordre des modules (barre, accueil, Ctrl+1…9). Les modules absents viennent après. */
+  order: string[]
+  /** Modules masqués de la barre latérale (toujours visibles sur l'accueil). */
+  hidden: string[]
+  radius: 'sharp' | 'normal' | 'round'
+  /** Accueil : tuiles ou liste. */
+  homeView: 'tiles' | 'list'
+  /** Accueil : texte d'accueil et sections affichés. */
+  showHero: boolean
+  showDiscover: boolean
+  /** Taille du texte de l'interface d'Open Studio (1 = normal). */
+  scale: number
+}
+
+export const DEFAULT_LAYOUT: Layout = {
+  accent: null,
+  railSide: 'left',
+  railSize: 'normal',
+  order: [],
+  hidden: [],
+  radius: 'normal',
+  homeView: 'tiles',
+  showHero: true,
+  showDiscover: true,
+  scale: 1
+}
+
 export interface AppSettings {
   theme: ThemeSetting
   launchAtStartup: boolean
@@ -43,6 +76,7 @@ export interface AppSettings {
   lastModule: string | null
   /** Visite guidée d'Open Studio 2 déjà vue. */
   tourSeen: boolean
+  layout: Layout
 }
 
 /** État de la récupération du catalogue (hors ligne, source locale de test…). */

@@ -1,5 +1,5 @@
-import { contextBridge, ipcRenderer } from 'electron'
-import type { AppSettings, CatalogState, ModuleInfo, ModuleProgress, Theme, ThemeSetting } from '../shared/types'
+import { contextBridge, ipcRenderer, webFrame } from 'electron'
+import type { AppSettings, Layout, CatalogState, ModuleInfo, ModuleProgress, Theme, ThemeSetting } from '../shared/types'
 
 function on<T>(channel: string, cb: (payload: T) => void): () => void {
   const handler = (_: unknown, payload: T): void => cb(payload)
@@ -19,6 +19,7 @@ const api = {
     get: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
     setTheme: (theme: ThemeSetting): Promise<Settings> => ipcRenderer.invoke('settings:setTheme', theme),
     setLaunchAtStartup: (enabled: boolean): Promise<Settings> => ipcRenderer.invoke('settings:setLaunchAtStartup', enabled),
+    setLayout: (p: Partial<Layout> | null): Promise<Settings> => ipcRenderer.invoke('settings:setLayout', p),
     setTourSeen: (): Promise<Settings> => ipcRenderer.invoke('settings:setTourSeen'),
     onTheme: (cb: (t: Theme) => void) => on<Theme>('studio:theme', cb)
   },
@@ -39,6 +40,7 @@ const api = {
   },
   app: {
     notifyReady: () => ipcRenderer.send('renderer:ready'),
+    setZoom: (f: number): void => webFrame.setZoomFactor(Math.max(0.7, Math.min(1.5, f))),
     getVersion: (): Promise<string> => ipcRenderer.invoke('app:version'),
     onLauncher: (cb: () => void) => on<void>('launcher:open', cb),
     /** Demande d'ouverture d'un module (menu de l'icône, notification, autre module). */

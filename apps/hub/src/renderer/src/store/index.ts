@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { AppSettings, CatalogState, ModuleInfo, ModuleProgress, Theme, ThemeSetting } from '@shared/types'
+import { DEFAULT_LAYOUT, type Layout, type AppSettings, CatalogState, ModuleInfo, ModuleProgress, Theme, ThemeSetting } from '@shared/types'
 
 const api = window.api
 
@@ -38,6 +38,8 @@ interface Store {
   setTheme: (t: ThemeSetting) => Promise<void>
   applyTheme: (t: Theme) => void
   setLaunchAtStartup: (enabled: boolean) => Promise<void>
+  /** Modifie la personnalisation (null = tout réinitialiser). */
+  setLayout: (p: Partial<Layout> | null) => Promise<void>
   /** Visite guidée affichée. */
   tour: boolean
   openTour: () => void
@@ -61,7 +63,7 @@ const clean = (err: unknown): string =>
   (err instanceof Error ? err.message : String(err)).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
 
 export const useStore = create<Store>((set, get) => ({
-  settings: { theme: 'dark', launchAtStartup: false, lastModule: null, tourSeen: true, effectiveTheme: 'dark' },
+  settings: { theme: 'dark', launchAtStartup: false, lastModule: null, tourSeen: true, layout: DEFAULT_LAYOUT, effectiveTheme: 'dark' },
   modules: [],
   catalog: null,
   loaded: false,
@@ -76,7 +78,16 @@ export const useStore = create<Store>((set, get) => ({
   loadSettings: async () => {
     const settings = await api.settings.get()
     set({ settings })
+    applyLayout(settings.layout)
     get().applyTheme(settings.effectiveTheme)
+  },
+  setLayout: async (p) => {
+    // Appliqué tout de suite, puis enregistré.
+    if (p) applyLayout({ ...get().settings.layout, ...p })
+    else applyLayout(DEFAULT_LAYOUT)
+    const settings = await api.settings.setLayout(p)
+    set((s) => ({ settings: { ...settings, effectiveTheme: s.settings.effectiveTheme } }))
+    applyLayout(settings.layout)
   },
   setTheme: async (t) => {
     const settings = await api.settings.setTheme(t)
@@ -159,5 +170,43 @@ export const useStore = create<Store>((set, get) => ({
   },
   dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }))
 }))
+
+/** Modules installés dans l'ordre choisi par l'utilisateur. */
+export function sortModules(list: ModuleInfo[], order: string[]): ModuleInfo[] {
+  const rank = (id: string): number => {
+    const i = order.indexOf(id)
+    return i < 0 ? order.length : i
+  }
+  return [...list].sort((a, b) => rank(a.id) - rank(b.id))
+}
+
+function shade(hex: string, k: number): string {
+  const n = parseInt(hex.slice(1), 16)
+  const c = (v: number): number => Math.max(0, Math.min(255, Math.round(v + (k > 0 ? (255 - v) * k : v * k))))
+  return `rgb(${c(n >> 16)}, ${c((n >> 8) & 255)}, ${c(n & 255)})`
+}
+
+/** Pose la personnalisation sur la page (couleurs, tailles, côté de la barre…). */
+export function applyLayout(l: Layout): void {
+  const root = document.documentElement
+  const st = root.style
+  if (l.accent && /^#[0-9a-f]{6}$/i.test(l.accent)) {
+    const n = parseInt(l.accent.slice(1), 16)
+    st.setProperty('--accent', l.accent)
+    st.setProperty('--accent-hover', shade(l.accent, 0.15))
+    st.setProperty('--accent-soft', `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, 0.15)`)
+    st.setProperty('--accent-text', shade(l.accent, 0.35))
+  } else {
+    for (const v of ['--accent', '--accent-hover', '--accent-soft', '--accent-text']) st.removeProperty(v)
+  }
+  const size = { small: 52, normal: 64, large: 80 }[l.railSize]
+  st.setProperty('--rail-w', `${size}px`)
+  st.setProperty('--rail-btn', `${size - 20}px`)
+  const r = { sharp: [4, 2], normal: [12, 8], round: [20, 14] }[l.radius]
+  st.setProperty('--radius', `${r[0]}px`)
+  st.setProperty('--radius-sm', `${r[1]}px`)
+  api.app.setZoom(l.scale || 1)
+  root.setAttribute('data-rail', l.railSide)
+}
 
 export const isInstalled = (m: ModuleInfo): boolean => m.status !== 'available'

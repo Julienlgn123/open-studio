@@ -1,7 +1,7 @@
 import { app, nativeTheme } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync } from 'fs'
-import type { AppSettings, Theme, ThemeSetting } from '@shared/types'
+import { DEFAULT_LAYOUT, type AppSettings, type Layout, type Theme, type ThemeSetting } from '@shared/types'
 
 // Réglages d'Open Studio. Les données des modules n'y sont jamais : chacun garde son propre
 // dossier (celui de l'ancienne app quand il y en avait une).
@@ -12,6 +12,7 @@ interface StoredData {
   lastModule?: string | null
   trayHintSeen?: boolean
   tourSeen?: boolean
+  layout?: Partial<Layout>
 }
 
 function storePath(): string {
@@ -36,8 +37,13 @@ export function getSettings(): AppSettings {
     theme: raw.theme ?? 'dark',
     launchAtStartup: raw.launchAtStartup ?? false,
     lastModule: raw.lastModule ?? null,
-    tourSeen: raw.tourSeen ?? false
+    tourSeen: raw.tourSeen ?? false,
+    layout: { ...DEFAULT_LAYOUT, ...(raw.layout ?? {}) }
   }
+}
+
+export function setLayout(p: Partial<Layout> | null): void {
+  patch({ layout: p === null ? {} : { ...readRaw().layout, ...p } })
 }
 
 export function setTheme(theme: ThemeSetting): void {
