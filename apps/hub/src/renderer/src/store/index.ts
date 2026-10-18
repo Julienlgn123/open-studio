@@ -25,6 +25,11 @@ interface Store {
   catalog: CatalogState | null
   loaded: boolean
   progress: Record<string, ModuleProgress>
+  /** Modules qui travaillent (leur interface reste chargée même hors de l'écran). */
+  busy: Record<string, boolean>
+  /** Dernier moment où chaque module était à l'écran. */
+  lastSeen: Record<string, number>
+  setBusy: (id: string, busy: boolean) => void
   view: View
   /** Modules déjà ouverts une fois : leur interface reste chargée (état conservé). */
   opened: string[]
@@ -68,6 +73,9 @@ export const useStore = create<Store>((set, get) => ({
   catalog: null,
   loaded: false,
   progress: {},
+  busy: {},
+  lastSeen: {},
+  setBusy: (id, busy) => set((s) => ({ busy: { ...s.busy, [id]: busy } })),
   view: { kind: 'home' },
   opened: [],
   toasts: [],
@@ -155,7 +163,9 @@ export const useStore = create<Store>((set, get) => ({
     }),
 
   go: (v) => {
-    set((s) => ({ view: v, opened: v.kind === 'module' && !s.opened.includes(v.id) ? [...s.opened, v.id] : s.opened }))
+    set((s) => ({
+      lastSeen: s.view.kind === 'module' && !(v.kind === 'module' && v.id === s.view.id) ? { ...s.lastSeen, [s.view.id]: Date.now() } : s.lastSeen,
+      view: v, opened: v.kind === 'module' && !s.opened.includes(v.id) ? [...s.opened, v.id] : s.opened }))
     api.modules.setCurrent(v.kind === 'module' ? v.id : null)
   },
   openModule: (id) => {

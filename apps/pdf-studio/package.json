@@ -1,6 +1,6 @@
 {
   "name": "pdf-studio",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "Lire, annoter, fusionner, signer tes PDF.",
   "main": "out/main/index.js",

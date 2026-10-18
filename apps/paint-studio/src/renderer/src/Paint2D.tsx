@@ -181,6 +181,7 @@ export default function Paint2D({ active: shown }: { active: boolean }): JSX.Ele
     history.current.undo.push({ layer: layer.id, data: ctx.getImageData(0, 0, size.w, size.h) })
     if (history.current.undo.length > 40) history.current.undo.shift()
     history.current.redo = []
+    window.studio?.setBusy(true) // dessin non enregistré : on garde l'interface chargée
   }
   const step = (from: 'undo' | 'redo'): void => {
     const to = from === 'undo' ? 'redo' : 'undo'
@@ -343,12 +344,15 @@ export default function Paint2D({ active: shown }: { active: boolean }): JSX.Ele
     return c
   }
 
+  useEffect(() => () => window.studio?.setBusy(false), [])
+
   const save = async (): Promise<void> => {
     const path = await window.kit.files.save({ title: 'Enregistrer l’image', defaultPath: 'dessin.png', filters: [{ name: 'PNG', extensions: ['png'] }, { name: 'JPG', extensions: ['jpg'] }] })
     if (!path) return
     const jpg = /\.jpe?g$/i.test(path)
     const data = flat(jpg ? '#ffffff' : undefined).toDataURL(jpg ? 'image/jpeg' : 'image/png', 0.92)
     await window.kit.files.writeBase64(path, data.split(',')[1])
+    window.studio?.setBusy(false)
     toast('Image enregistrée', 'success')
   }
 
@@ -362,6 +366,7 @@ export default function Paint2D({ active: shown }: { active: boolean }): JSX.Ele
     const c = makeCanvas(img.naturalWidth, img.naturalHeight)
     c.getContext('2d')!.drawImage(img, 0, 0)
     history.current = { undo: [], redo: [] }
+    window.studio?.setBusy(false)
     setSize({ w: img.naturalWidth, h: img.naturalHeight })
     setLayers([
       { id: uid(), name: path.split(/[\\/]/).pop()!, canvas: c, visible: true, opacity: 1 },
@@ -373,6 +378,7 @@ export default function Paint2D({ active: shown }: { active: boolean }): JSX.Ele
 
   const create = (w: number, h: number, bg: string | null): void => {
     history.current = { undo: [], redo: [] }
+    window.studio?.setBusy(false)
     setSize({ w, h })
     setLayers([{ id: uid(), name: 'Fond', canvas: makeCanvas(w, h, bg ?? undefined), visible: true, opacity: 1 }])
     setActive(0)

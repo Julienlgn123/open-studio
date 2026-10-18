@@ -1,6 +1,6 @@
 {
   "name": "devtools-studio",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "JSON, Base64, hash, regex, couleurs, UUID.",
   "main": "out/main/index.js",

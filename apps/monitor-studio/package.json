@@ -1,6 +1,6 @@
 {
   "name": "monitor-studio",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "Ce qui ralentit ton PC, en un coup d'œil.",
   "main": "out/main/index.js",

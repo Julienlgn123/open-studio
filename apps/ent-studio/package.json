@@ -1,6 +1,6 @@
 {
   "name": "ent-studio",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "Ton emploi du temps de la fac, toujours à jour.",
   "main": "out/main/index.js",

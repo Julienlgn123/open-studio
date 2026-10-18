@@ -208,6 +208,12 @@ export async function deactivateAll(): Promise<void> {
 }
 
 /** Thème d'Open Studio, poussé à toutes les interfaces de modules ouvertes. */
+/** Module dont l'interface (webview) est `wc`. */
+export function moduleOfGuest(wc: WebContents): string | null {
+  for (const m of active.values()) if (m.guest === wc) return m.manifest.id
+  return null
+}
+
 export function broadcastTheme(): void {
   const theme = effectiveTheme()
   for (const mod of active.values()) if (mod.guest && !mod.guest.isDestroyed()) mod.guest.send('studio:theme', theme)

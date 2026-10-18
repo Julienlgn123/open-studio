@@ -1,6 +1,6 @@
 {
   "name": "gdrive-backup-manager",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "Gestionnaire multi-comptes Google Drive : centralisation, distribution intelligente et backup",
   "author": {
     "name": "Julienlgn123",

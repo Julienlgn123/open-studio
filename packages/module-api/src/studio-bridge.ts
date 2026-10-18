@@ -1,7 +1,7 @@
 // `window.studio` dans l'interface d'un module : thème d'Open Studio (appliqué à toute la page),
 // navigation entre modules. Importé par le preload du module (une seule fois, quel que soit le chemin).
 import { contextBridge, ipcRenderer as raw } from 'electron'
-import { moduleId } from './scoped-ipc'
+import { moduleId, setManualBusy } from './scoped-ipc'
 import type { StudioBridge, StudioTheme } from './types'
 
 let theme: StudioTheme = raw.sendSync('studio:theme') === 'light' ? 'light' : 'dark'
@@ -25,6 +25,7 @@ const bridge: StudioBridge = {
     return () => listeners.delete(cb)
   },
   openModule: (id) => raw.send('studio:open', id),
-  openHome: () => raw.send('studio:open', null)
+  openHome: () => raw.send('studio:open', null),
+  setBusy: (busy) => setManualBusy(!!busy)
 }
 contextBridge.exposeInMainWorld('studio', bridge)

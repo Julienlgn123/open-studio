@@ -67,12 +67,13 @@ const icons = new Map<string, string>()
 
 /** Logo réduit à 128 px (data URL) : celui du module installé, sinon celui du catalogue. */
 function iconOf(id: string, installed?: Installed, fromCatalog?: string): string | null {
-  const key = `${id}@${installed?.version ?? 'catalog'}`
+  // Le catalogue fait foi : un logo mis à jour apparaît sans réinstaller le module.
+  const key = `${id}@${installed?.version ?? 'catalog'}@${fromCatalog ? fromCatalog.length : 0}`
   if (icons.has(key)) return icons.get(key) ?? null
   let img: Electron.NativeImage | null = null
   const file = installed ? join(moduleDir(id, installed.version), 'icon.png') : null
-  if (file && existsSync(file)) img = nativeImage.createFromPath(file)
-  else if (fromCatalog) img = nativeImage.createFromDataURL(fromCatalog)
+  if (fromCatalog) img = nativeImage.createFromDataURL(fromCatalog)
+  if ((!img || img.isEmpty()) && file && existsSync(file)) img = nativeImage.createFromPath(file)
   if (!img || img.isEmpty()) return null
   const url = img.resize({ width: 128, height: 128, quality: 'best' }).toDataURL()
   icons.set(key, url)

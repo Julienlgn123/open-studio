@@ -1,6 +1,6 @@
 {
   "name": "quick-notes",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "Une idée ? Note-la en une seconde.",
   "main": "out/main/index.js",

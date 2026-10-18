@@ -96,4 +96,10 @@ export interface StudioBridge {
   onTheme(cb: (theme: StudioTheme) => void): () => void
   openModule(id: string): void
   openHome(): void
+  /**
+   * Signale que le module travaille (minuteur, brouillon non enregistré…) : Open Studio garde alors
+   * son interface chargée même quand on la quitte. Les appels au main process longs sont déjà
+   * détectés tout seuls.
+   */
+  setBusy(busy: boolean): void
 }

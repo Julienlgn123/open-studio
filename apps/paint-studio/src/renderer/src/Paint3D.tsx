@@ -50,6 +50,11 @@ export default function Paint3D({ active }: { active: boolean }): JSX.Element {
   /** Couleur suivante : un compteur à part, à jour même si on ajoute deux formes d'affilée. */
   const nextColor = useRef(0)
   const [, tick] = useState(0)
+  // Scène non vide : Open Studio garde l'interface chargée (elle n'est pas enregistrée).
+  useEffect(() => {
+    window.studio?.setBusy(count > 0)
+    return () => window.studio?.setBusy(false)
+  }, [count > 0])
   const theme = useTheme()
 
   useEffect(() => {

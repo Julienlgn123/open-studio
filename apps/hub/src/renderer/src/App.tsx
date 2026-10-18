@@ -51,6 +51,7 @@ export default function App(): JSX.Element {
     const offs = [
       window.api.modules.onProgress(setProgress),
       window.api.modules.onChanged(() => void loadModules()),
+      window.api.modules.onBusy((p) => useStore.getState().setBusy(p.id, p.busy)),
       window.api.modules.onAutoUpdated((p) => useStore.getState().toast(`${p.name} mis à jour${p.version ? ` (v${p.version})` : ''}`, 'success')),
       window.api.settings.onTheme(applyTheme),
       window.api.app.onNavigate(openModule),

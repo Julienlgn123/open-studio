@@ -14,6 +14,9 @@ function fmt(s: number): string {
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
 
+/** Pont avec Open Studio (absent hors d'Open Studio). */
+const studio = (): { setBusy(b: boolean): void } | undefined => (window as unknown as { studio?: { setBusy(b: boolean): void } }).studio
+
 export default function PomodoroWidget() {
   const { pomodoroOpen, togglePomodoro, activeSubjectId, activeCourseId, courses, subjects, showToast } = useStore()
   const [mode, setMode] = useState<'focus' | 'break'>('focus')
@@ -35,6 +38,12 @@ export default function PomodoroWidget() {
     }
     accumulated.current = 0
   }
+
+  // Minuteur en marche : Open Studio garde l'interface chargée même quand on change de module.
+  useEffect(() => {
+    studio()?.setBusy(running)
+    return () => studio()?.setBusy(false)
+  }, [running])
 
   useEffect(() => {
     if (!running) {

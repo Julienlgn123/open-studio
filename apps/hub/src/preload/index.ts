@@ -31,6 +31,7 @@ const api = {
     removeLegacy: (id: string): Promise<void> => ipcRenderer.invoke('modules:removeLegacy', id),
     setCurrent: (id: string | null) => ipcRenderer.send('modules:current', id),
     onProgress: (cb: (p: ModuleProgress) => void) => on<ModuleProgress>('modules:progress', cb),
+    onBusy: (cb: (p: { id: string; busy: boolean }) => void) => on<{ id: string; busy: boolean }>('modules:busy', cb),
     onChanged: (cb: () => void) => on<null>('modules:changed', cb),
     onAutoUpdated: (cb: (p: { id: string; name: string; version: string | null }) => void) =>
       on<{ id: string; name: string; version: string | null }>('modules:autoUpdated', cb)

@@ -2,7 +2,7 @@ import { app, ipcMain, BrowserWindow, shell, nativeTheme } from 'electron'
 import type { Layout, ThemeSetting } from '@shared/types'
 import { effectiveTheme, getSettings, setLastModule, setLaunchAtStartup, setLayout, setTheme, setTourSeen } from './store'
 import { getCatalogState, installModule, listModules, removeLegacyApp, uninstallModule } from './modules/manager'
-import { broadcastTheme, setCurrentModule } from './modules/runtime'
+import { broadcastTheme, moduleOfGuest, setCurrentModule } from './modules/runtime'
 import { broadcast } from './events'
 
 export function registerIpc(getWin: () => BrowserWindow | null, onModulesChanged: () => void, open: (id: string | null) => void): void {
@@ -56,6 +56,11 @@ export function registerIpc(getWin: () => BrowserWindow | null, onModulesChanged
 
   // Une interface de module demande à ouvrir un autre module (ou l'accueil).
   ipcMain.on('studio:open', (_, id: string | null) => open(id))
+  // Un module signale qu'il travaille (ou qu'il a fini) : l'hôte garde ou décharge son interface.
+  ipcMain.on('studio:busy', (e, busy: boolean) => {
+    const id = moduleOfGuest(e.sender)
+    if (id) broadcast('modules:busy', { id, busy: !!busy })
+  })
   // Thème courant, lu de façon synchrone par le preload des modules (pas de flash au chargement).
   ipcMain.on('studio:theme', (e) => {
     e.returnValue = effectiveTheme()
