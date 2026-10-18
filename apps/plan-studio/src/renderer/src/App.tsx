@@ -69,7 +69,7 @@ export default function App(): JSX.Element {
           <NavItem icon={<ListTodo size={15} />} label="Tâches" count={openTasks.length || undefined} active={view === 'tasks'} onClick={() => setView('tasks')} />
           <NavItem icon={<Target size={15} />} label="Objectifs" count={data.goals.filter((g) => !g.done).length || undefined} active={view === 'goals'} onClick={() => setView('goals')} />
           <div className="ui-side-foot">
-            <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => setEditEvent({ date: today(), emoji: '📅' })}>
+            <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => setEditEvent({ date: today(), emoji: '📅', start_time: '09:00', end_time: '10:00' })}>
               <Plus size={14} /> Événement
             </button>
             <button className="btn btn-secondary" style={{ width: '100%', marginTop: 6 }} onClick={() => setEditTask({ priority: 'medium', due_date: today() })}>
@@ -256,7 +256,7 @@ function AgendaView({ events, tasks, onEvent }: { events: PlanEvent[]; tasks: Pl
                 key={c}
                 className={`month-cell${inMonth ? '' : ' out'}${c === today() ? ' today' : ''}${c === selected ? ' sel' : ''}`}
                 onClick={() => setSelected(c)}
-                onDoubleClick={() => onEvent({ date: c, emoji: '📅' })}
+                onDoubleClick={() => onEvent({ date: c, emoji: '📅', start_time: '09:00', end_time: '10:00' })}
               >
                 <span className="month-num">{parse(c).getDate()}</span>
                 {evs.slice(0, 3).map((e) => (
@@ -274,7 +274,7 @@ function AgendaView({ events, tasks, onEvent }: { events: PlanEvent[]; tasks: Pl
       <aside className="agenda-day">
         <div className="ui-row" style={{ justifyContent: 'space-between' }}>
           <h3>{long(selected)}</h3>
-          <button className="btn btn-primary btn-sm btn-icon" onClick={() => onEvent({ date: selected, emoji: '📅' })} title="Ajouter un événement">
+          <button className="btn btn-primary btn-sm btn-icon" onClick={() => onEvent({ date: selected, emoji: '📅', start_time: '09:00', end_time: '10:00' })} title="Ajouter un événement">
             <Plus size={14} />
           </button>
         </div>

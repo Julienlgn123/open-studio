@@ -25,16 +25,18 @@ const HOUR_PX = 76
 // Couleurs des matières : stables (même matière, même couleur) et lisibles dans les deux thèmes.
 // Une couleur par matière, attribuée dans l'ordre des codes (R101, R102…) : deux matières
 // différentes ont des couleurs différentes tant qu'il y en a assez dans la palette.
-const PALETTE = ['#6366f1', '#0ea5e9', '#f97316', '#22c55e', '#ec4899', '#eab308', '#14b8a6', '#a855f7', '#ef4444', '#84cc16', '#06b6d4', '#f43f5e', '#8b5cf6', '#10b981', '#f59e0b', '#3b82f6']
+const PALETTE = ['#6366f1', '#0ea5e9', '#f97316', '#22c55e', '#ec4899', '#eab308', '#14b8a6', '#a855f7', '#ef4444', '#84cc16', '#06b6d4', '#f43f5e', '#8b5cf6', '#10b981', '#f59e0b', '#3b82f6', '#d946ef', '#65a30d', '#0891b2', '#e11d48', '#7c3aed', '#ca8a04', '#059669', '#2563eb']
 const colors = new Map<string, string>()
 const keyOf = (c: Course): string => c.code ?? c.name
+/** Activités sans code de matière (réunions, vie étudiante…) : gris neutre, pour ne pas voler une couleur aux cours. */
+const OTHER = '#94a3b8'
 function assignColors(courses: Course[]): void {
-  const keys = [...new Set(courses.map(keyOf))].sort((a, b) => a.localeCompare(b, 'fr', { numeric: true }))
+  const keys = [...new Set(courses.filter((c) => c.code).map(keyOf))].sort((a, b) => a.localeCompare(b, 'fr', { numeric: true }))
   colors.clear()
   keys.forEach((k, i) => colors.set(k, PALETTE[i % PALETTE.length]))
 }
 function colorOf(c: Course): string {
-  return colors.get(keyOf(c)) ?? PALETTE[0]
+  return c.code ? (colors.get(keyOf(c)) ?? PALETTE[0]) : OTHER
 }
 
 const KIND_CLASS: Record<string, string> = { CM: 'info', TD: 'success', TP: 'warning', Examen: 'danger', Projet: 'accent', RN: 'accent' }
@@ -230,13 +232,12 @@ function Timetable({ state, onChanges, onSettings }: { state: EntState; onChange
     return () => clearInterval(t)
   }, [])
 
-  // Le week-end, on montre directement la semaine suivante.
-  useEffect(() => {
-    const d = new Date().getDay()
-    if ((d === 6 || d === 0) && !state.courses.some((c) => c.start >= now && c.start < startOfWeek(now) + 7 * DAY_MS)) {
-      setWeekStart(startOfWeek(now) + 7 * DAY_MS)
-    }
-  }, [])
+  /** Semaine « actuelle » : celle-ci, ou la suivante s'il ne reste plus aucun cours cette semaine (week-end). */
+  const currentWeek = (): number => {
+    const w = startOfWeek(Date.now())
+    return state.courses.some((c) => c.end >= Date.now() && c.start < w + 7 * DAY_MS) ? w : w + 7 * DAY_MS
+  }
+  useEffect(() => setWeekStart(currentWeek()), [])
 
   const unseen = state.history.filter((h) => !h.seen).reduce((n, h) => n + h.changes.length, 0)
   const changedUids = useMemo(() => {
@@ -248,7 +249,7 @@ function Timetable({ state, onChanges, onSettings }: { state: EntState; onChange
   const next = state.courses.find((c) => c.end > now)
   const current = next && next.start <= now ? next : null
   const weekEnd = weekStart + 7 * DAY_MS
-  const isThisWeek = weekStart === startOfWeek(now)
+  const isThisWeek = weekStart === currentWeek()
 
   const sync = (): void => {
     void window.kit.invoke<EntState>('ent:sync').then((s) => {
@@ -264,7 +265,7 @@ function Timetable({ state, onChanges, onSettings }: { state: EntState; onChange
           <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setWeekStart(weekStart - 7 * DAY_MS)} title="Semaine précédente">
             <ChevronLeft size={16} />
           </button>
-          <button className={`btn btn-sm ${isThisWeek ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => setWeekStart(startOfWeek(now))}>
+          <button className={`btn btn-sm ${isThisWeek ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => setWeekStart(currentWeek())}>
             Aujourd’hui
           </button>
           <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setWeekStart(weekStart + 7 * DAY_MS)} title="Semaine suivante">

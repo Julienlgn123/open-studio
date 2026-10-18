@@ -47,15 +47,33 @@ export interface KitFetchResult {
   size: number
 }
 
+/** Erreur réseau en français clair (au lieu de « fetch failed »). */
+function networkError(err: unknown): string {
+  const e = err as { name?: string; message?: string; cause?: { code?: string; message?: string } }
+  const code = e.cause?.code ?? ''
+  if (e.name === 'TimeoutError' || e.name === 'AbortError' || code === 'ETIMEDOUT' || code === 'UND_ERR_CONNECT_TIMEOUT') return 'Pas de réponse : délai dépassé.'
+  if (code === 'ECONNREFUSED') return 'Serveur injoignable : rien ne répond à cette adresse (est-il lancé ?).'
+  if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') return 'Adresse introuvable : nom de domaine inconnu, ou pas de connexion Internet.'
+  if (code === 'ECONNRESET' || code === 'UND_ERR_SOCKET') return 'La connexion a été coupée par le serveur.'
+  if (/CERT|SSL|TLS/i.test(code + (e.cause?.message ?? ''))) return 'Certificat HTTPS invalide pour cette adresse.'
+  if (/Invalid URL|Failed to parse URL/i.test(e.message ?? '')) return 'Adresse invalide.'
+  return `Échec de la requête${code ? ` (${code})` : ''} : ${e.cause?.message ?? e.message ?? 'erreur réseau'}`
+}
+
 /** Requête HTTP depuis le main (pas de CORS), pour les modules qui interrogent le web. */
 export async function kitFetch(url: string, init: KitFetchInit = {}): Promise<KitFetchResult> {
   const t0 = Date.now()
-  const res = await fetch(url, {
-    method: init.method ?? 'GET',
-    headers: init.headers,
-    body: init.body && !['GET', 'HEAD'].includes((init.method ?? 'GET').toUpperCase()) ? init.body : undefined,
-    signal: AbortSignal.timeout(init.timeoutMs ?? 30_000)
-  })
+  let res: Response
+  try {
+    res = await fetch(url, {
+      method: init.method ?? 'GET',
+      headers: init.headers,
+      body: init.body && !['GET', 'HEAD'].includes((init.method ?? 'GET').toUpperCase()) ? init.body : undefined,
+      signal: AbortSignal.timeout(init.timeoutMs ?? 30_000)
+    })
+  } catch (err) {
+    throw new Error(networkError(err))
+  }
   const buf = Buffer.from(await res.arrayBuffer())
   const headers: Record<string, string> = {}
   res.headers.forEach((v, k) => (headers[k] = v))

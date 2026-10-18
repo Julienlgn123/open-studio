@@ -1,4 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fda4af"/><stop offset="1" stop-color="#dc2626"/></linearGradient><linearGradient id="c" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#818cf8"/></linearGradient></defs><rect width="1024" height="1024" rx="224" fill="#14142e"/><path d="M300 150h300l184 184v456a84 84 0 0 1-84 84H300a84 84 0 0 1-84-84V234a84 84 0 0 1 84-84z" fill="url(#g)"/>
-<path d="M600 150v116a68 68 0 0 0 68 68h116z" fill="#14142e" opacity=".3"/>
-<text x="500" y="560" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-weight="900" font-size="176" fill="#14142e" letter-spacing="-6">PDF</text>
-<path d="M300 720c40-56 70-56 90-10s40 50 74-6 64-46 84 4 54 30 100-20" fill="none" stroke="url(#c)" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<defs>
+<linearGradient id="bg" x1="0.1" y1="0" x2="0.9" y2="1"><stop offset="0" stop-color="#F87171"/><stop offset="1" stop-color="#B91C1C"/></linearGradient>
+<linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></linearGradient>
+<filter id="sh" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="16" stdDeviation="16" flood-color="#000" flood-opacity=".28"/></filter>
+<filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="10" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<rect width="1024" height="1024" rx="232" fill="url(#bg)"/>
+<rect width="1024" height="1024" rx="232" fill="url(#gloss)"/>
+<g filter="url(#sh)">
+<path d="M272 190 H620 L752 322 V780 Q752 834 698 834 H326 Q272 834 272 780 V244 Q272 190 326 190Z" fill="#fff"/>
+<path d="M620 190 V268 Q620 322 674 322 H752Z" fill="#FECACA"/>
+<g transform="translate(362 400)" fill="none" stroke="#DC2626" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+<path d="M0 110 V0 H38 A32 32 0 0 1 38 66 H0"/>
+<path d="M118 0 H146 A55 55 0 0 1 146 110 H118Z"/>
+<path d="M258 110 V0 H318 M258 52 H306"/></g>
+<path d="M330 700 C350 620 395 610 400 668 C405 715 440 712 470 655 C486 628 500 652 490 690 C484 712 540 708 600 662" fill="none" stroke="#B91C1C" stroke-width="14" stroke-linecap="round"/>
+<path d="M322 750 H702" stroke="#E5E7EB" stroke-width="10" stroke-linecap="round"/>
+</g>
+</svg>

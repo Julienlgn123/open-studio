@@ -34,6 +34,9 @@
 .dot.starting {
   background: var(--info);
 }
+.dot.restarting {
+  background: var(--warning);
+}
 .dot.crashed {
   background: var(--danger);
 }

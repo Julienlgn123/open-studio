@@ -15,7 +15,7 @@ export default function ModuleFrames(): JSX.Element {
     <div className={`frames${activeId ? ' visible' : ''}`}>
       {opened.map((id) => {
         const m = modules.find((x) => x.id === id && x.entryUrl)
-        return m ? <Frame key={`${m.id}@${m.installedVersion}`} module={m} active={m.id === activeId} /> : null
+        return m ? <Frame key={`${m.id}@${m.installedVersion}@${m.installedAt}`} module={m} active={m.id === activeId} /> : null
       })}
     </div>
   )

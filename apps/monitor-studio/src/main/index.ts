@@ -1,4 +1,5 @@
 import si from 'systeminformation'
+import { spawn, type ChildProcess } from 'child_process'
 import { hostname } from 'os'
 import { host } from '@open-studio/module'
 import { registerKit } from '@open-studio/kit'
@@ -32,7 +33,35 @@ async function refreshIo(): Promise<void> {
   Object.assign(io, { net, disk, at: Date.now(), busy: false })
 }
 
+/**
+ * Débit disque sous Windows : systeminformation ne le mesure pas, on lit les compteurs de
+ * performance de Windows (noms WMI, identiques quelle que soit la langue) dans un seul PowerShell
+ * qui tourne en boucle, plutôt qu'un nouveau processus à chaque mesure.
+ */
+const winDisk = { read: null as number | null, write: null as number | null, at: 0, proc: null as ChildProcess | null }
+function startWinDisk(): void {
+  if (process.platform !== 'win32' || winDisk.proc) return
+  const script =
+    "$ErrorActionPreference='SilentlyContinue'; while ($true) { $d = Get-CimInstance Win32_PerfFormattedData_PerfDisk_PhysicalDisk -Filter \"Name='_Total'\"; " +
+    "if ($d) { [Console]::Out.WriteLine(('{0} {1}' -f $d.DiskReadBytesPersec, $d.DiskWriteBytesPersec)); [Console]::Out.Flush() }; Start-Sleep -Milliseconds 900 }"
+  const proc = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { windowsHide: true })
+  winDisk.proc = proc
+  let buf = ''
+  proc.stdout.on('data', (d: Buffer) => {
+    buf += d.toString()
+    const lines = buf.split(/\r?\n/)
+    buf = lines.pop() ?? ''
+    const last = lines.filter(Boolean).pop()
+    const m = last && /^(\d+) (\d+)$/.exec(last.trim())
+    if (m) Object.assign(winDisk, { read: Number(m[1]), write: Number(m[2]), at: Date.now() })
+  })
+  proc.on('exit', () => {
+    winDisk.proc = null
+  })
+}
+
 async function sample(): Promise<Sample> {
+  startWinDisk()
   void refreshSlow()
   void refreshIo()
   const [load, mem] = await Promise.all([settle(si.currentLoad()), settle(si.mem())])
@@ -53,8 +82,9 @@ async function sample(): Promise<Sample> {
     swapTotal: num(mem?.swaptotal),
     netRx: sumNet('rx_sec'),
     netTx: sumNet('tx_sec'),
-    diskRead: num(disk?.rIO_sec),
-    diskWrite: num(disk?.wIO_sec),
+    // Mesure Windows si elle est récente, sinon celle de systeminformation (macOS, Linux).
+    diskRead: Date.now() - winDisk.at < 5_000 ? winDisk.read : num(disk?.rIO_sec),
+    diskWrite: Date.now() - winDisk.at < 5_000 ? winDisk.write : num(disk?.wIO_sec),
     cpuTemp: temp && temp.main != null && temp.main > 0 ? temp.main : null,
     gpuLoad: num(gpu?.utilizationGpu),
     gpuTemp: num(gpu?.temperatureGpu),
@@ -127,6 +157,10 @@ async function info(): Promise<SystemInfo> {
       .filter((n) => !n.internal && n.ip4)
       .map((n) => ({ iface: n.ifaceName || n.iface, ip4: n.ip4, mac: n.mac, speed: num(n.speed), type: n.type }))
   }
+}
+
+export function deactivate(): void {
+  winDisk.proc?.kill()
 }
 
 export function activate(): void {

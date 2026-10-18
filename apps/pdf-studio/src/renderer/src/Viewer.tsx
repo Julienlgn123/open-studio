@@ -1,4 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
+
+/** Suivre le pointeur hors de la zone (refusé parfois : le tracé continue quand même). */
+const capture = (e: React.PointerEvent): void => {
+  try {
+    ;(e.target as Element).setPointerCapture(e.pointerId)
+  } catch {
+    /* pas de capture possible */
+  }
+}
 import { ArrowLeft, Bookmark, Eraser, Hand, Highlighter, Minus, PenLine, Plus, Save, Signature, Square, Type, Undo2 } from 'lucide-react'
 import { Modal, errorText, toast, uid, usePersisted, usePrompt } from '@ui'
 import { baseName, flatten, writePdf, type Annotation, type PdfJsDoc } from './pdf'
@@ -258,7 +267,13 @@ function PageView({
   onErase: (id: string) => void
 }): JSX.Element {
   const box = useRef<HTMLDivElement>(null)
-  const [draft, setDraft] = useState<Annotation | null>(null)
+  const [draft, setDraftState] = useState<Annotation | null>(null)
+  // Le tracé en cours vit aussi dans une ref : des événements très rapprochés le complètent sans attendre un rendu.
+  const draftRef = useRef<(Annotation & { sx?: number; sy?: number }) | null>(null)
+  const setDraft = (d: Annotation | null): void => {
+    draftRef.current = d
+    setDraftState(d)
+  }
   const page = n - 1
 
   const pos = (e: React.PointerEvent): [number, number] => {
@@ -282,11 +297,12 @@ function PageView({
       onAdd({ id: uid(), page, kind: 'image', x: Math.min(x, 1 - w), y, w, h: (w * ratio) / 2.6, dataUrl: signature })
       return
     }
-    ;(e.target as Element).setPointerCapture(e.pointerId)
+    ;capture(e)
     if (tool === 'pen') setDraft({ id: uid(), page, kind: 'pen', points: [[x, y]], color, width: 2 })
     else setDraft({ id: uid(), page, kind: tool, x, y, w: 0, h: 0, color })
   }
   const move = (e: React.PointerEvent): void => {
+    const draft = draftRef.current
     if (!draft) return
     const [x, y] = pos(e)
     if (draft.kind === 'pen') setDraft({ ...draft, points: [...draft.points, [x, y]] })
@@ -298,6 +314,7 @@ function PageView({
     }
   }
   const up = (): void => {
+    const draft = draftRef.current
     if (!draft) return
     const clean = { ...draft } as Annotation & { sx?: number; sy?: number }
     delete clean.sx
@@ -389,7 +406,7 @@ function SignaturePad({ onClose, onSave }: { onClose: () => void; onSave: (dataU
         height={400}
         onPointerDown={(e) => {
           drawing.current = true
-          ;(e.target as Element).setPointerCapture(e.pointerId)
+          ;capture(e)
           const ctx = ref.current!.getContext('2d')!
           ctx.beginPath()
           ctx.moveTo(...at(e))

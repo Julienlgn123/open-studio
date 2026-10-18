@@ -11,7 +11,8 @@ export interface Project {
   env: string
 }
 
-export type Status = 'stopped' | 'starting' | 'running' | 'crashed'
+/** `restarting` : planté, relance automatique programmée (on peut encore l'annuler). */
+export type Status = 'stopped' | 'starting' | 'running' | 'crashed' | 'restarting'
 
 export interface LogLine {
   t: number

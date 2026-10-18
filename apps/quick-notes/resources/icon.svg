@@ -1,4 +1,16 @@
-<svg width="1024" height="1024" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fef08a"/><stop offset="1" stop-color="#f59e0b"/></linearGradient><linearGradient id="c" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#6366f1"/></linearGradient></defs><rect width="1024" height="1024" rx="224" fill="#14142e"/><path d="M260 190h420l150 150v410a84 84 0 0 1-84 84H260a84 84 0 0 1-84-84V274a84 84 0 0 1 84-84z" fill="url(#g)"/>
-<path d="M680 190v96a54 54 0 0 0 54 54h96z" fill="#14142e" opacity=".3"/>
-<g fill="#14142e"><rect x="270" y="410" width="380" height="48" rx="24"/><rect x="270" y="520" width="440" height="48" rx="24"/><rect x="270" y="630" width="260" height="48" rx="24"/></g>
-<path d="M752 560 622 770h104l-28 150 156-226H748z" fill="url(#c)" stroke="#14142e" stroke-width="26" stroke-linejoin="round"/></svg>
+<svg width="1024" height="1024" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<defs>
+<linearGradient id="bg" x1="0.1" y1="0" x2="0.9" y2="1"><stop offset="0" stop-color="#FDE047"/><stop offset="1" stop-color="#EAB308"/></linearGradient>
+<linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></linearGradient>
+<filter id="sh" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="16" stdDeviation="16" flood-color="#000" flood-opacity=".28"/></filter>
+<filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="10" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<rect width="1024" height="1024" rx="232" fill="url(#bg)"/>
+<rect width="1024" height="1024" rx="232" fill="url(#gloss)"/>
+<g filter="url(#sh)">
+<path d="M300 200 H650 L790 340 V780 Q790 824 746 824 H300 Q256 824 256 780 V244 Q256 200 300 200Z" fill="#FFFBEA"/>
+<path d="M650 200 V296 Q650 340 694 340 H790Z" fill="#F0D77A"/>
+<g stroke="#EADB9E" stroke-width="24" stroke-linecap="round"><path d="M320 430 H540"/><path d="M320 510 H500"/><path d="M320 590 H430"/></g>
+<polygon points="620,460 420,690 536,690 490,860 710,598 584,598" fill="#FF8A00" stroke="#FFFBEA" stroke-width="18" stroke-linejoin="round"/>
+</g>
+</svg>

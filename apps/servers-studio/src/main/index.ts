@@ -117,6 +117,7 @@ function start(id: string): RunState {
         // Relance avec une attente croissante, pour ne pas boucler sur une erreur immédiate.
         const delay = Math.min(60, 2 ** Math.min(r.state.restarts, 5)) * 1000
         r.state.restarts++
+        r.state.status = 'restarting'
         addLog(id, `↻ Relance automatique dans ${delay / 1000} s…`, false)
         r.restartTimer = setTimeout(() => {
           try {

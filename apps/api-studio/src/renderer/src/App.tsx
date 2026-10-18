@@ -113,7 +113,7 @@ export default function App(): JSX.Element {
       setHistory((h) => [{ req, status: r.status, at: Date.now() }, ...h].slice(0, 60))
     } catch (err) {
       const msg = errorText(err)
-      setError(err instanceof SyntaxError ? `Corps JSON invalide : ${msg}` : msg.replace(/^fetch failed$/, 'Serveur injoignable (adresse, port ou connexion).'))
+      setError(err instanceof SyntaxError ? `Corps JSON invalide : ${msg}` : msg)
       setRes(null)
       setHistory((h) => [{ req, status: null, at: Date.now() }, ...h].slice(0, 60))
     } finally {

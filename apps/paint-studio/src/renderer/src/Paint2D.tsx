@@ -1,4 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
+
+/** Suivre le pointeur hors de la zone (refusé parfois : le tracé continue quand même). */
+const capture = (e: React.PointerEvent): void => {
+  try {
+    ;(e.target as Element).setPointerCapture(e.pointerId)
+  } catch {
+    /* pas de capture possible */
+  }
+}
 import {
   ArrowUpRight,
   Brush,
@@ -22,6 +31,13 @@ import {
   Undo2
 } from 'lucide-react'
 import { Modal, toast, uid, usePrompt } from '@ui'
+
+/** Une frappe dans un champ de texte n'est pas un raccourci (un curseur ou une case à cocher, si). */
+export function typing(e: KeyboardEvent): boolean {
+  const t = e.target as HTMLElement
+  if (t.isContentEditable || t.tagName === 'TEXTAREA') return true
+  return t.tagName === 'INPUT' && !['range', 'checkbox', 'color', 'button', 'radio'].includes((t as HTMLInputElement).type)
+}
 
 type Tool = 'brush' | 'pencil' | 'eraser' | 'line' | 'arrow' | 'rect' | 'ellipse' | 'fill' | 'picker' | 'text'
 
@@ -180,7 +196,7 @@ export default function Paint2D({ active: shown }: { active: boolean }): JSX.Ele
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (!shown || ['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return
+      if (!shown || typing(e)) return
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault()
         step(e.shiftKey ? 'redo' : 'undo')
@@ -270,7 +286,7 @@ export default function Paint2D({ active: shown }: { active: boolean }): JSX.Ele
       redraw((n) => n + 1)
       return
     }
-    ;(e.target as Element).setPointerCapture(e.pointerId)
+    ;capture(e)
     remember()
     drag.current = { x, y, last: [x, y], snapshot: ctx.getImageData(0, 0, size.w, size.h) }
     if (tool === 'brush' || tool === 'pencil' || tool === 'eraser') {

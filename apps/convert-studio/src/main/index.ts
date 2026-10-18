@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'child_process'
-import { existsSync, statSync } from 'fs'
+import { existsSync, statSync, unlinkSync } from 'fs'
 import { join, dirname, basename, extname } from 'path'
 import { app } from 'electron'
 import { host } from '@open-studio/module'
@@ -61,7 +61,16 @@ function run(): void {
   })
   proc.on('close', (code) => {
     current = null
-    if (code === 0 && existsSync(output)) {
+    const ok = code === 0 && existsSync(output) && job.status !== 'error'
+    // Annulée ou ratée : pas de fichier à moitié écrit laissé dans le dossier.
+    if (!ok && existsSync(output)) {
+      try {
+        unlinkSync(output)
+      } catch {
+        /* encore verrouillé : tant pis */
+      }
+    }
+    if (ok) {
       job.status = 'done'
       job.progress = 1
       job.outSize = statSync(output).size

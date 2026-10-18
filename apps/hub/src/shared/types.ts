@@ -17,6 +17,8 @@ export interface ModuleInfo {
   icon: string | null
   status: ModuleStatus
   installedVersion: string | null
+  /** Date d'installation (change à chaque réinstallation : l'interface est alors rechargée). */
+  installedAt: number | null
   latestVersion: string | null
   /** Taille du téléchargement, en octets. */
   size: number | null

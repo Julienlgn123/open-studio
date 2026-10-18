@@ -386,7 +386,13 @@ function CompressTool(): JSX.Element {
     try {
       const out = await compress(pdf.bytes, mode, quality, setProgress)
       const gain = 1 - out.length / pdf.bytes.length
-      if (gain <= 0.01) toast('Ce PDF est déjà bien optimisé : essaie la compression forte.', 'info')
+      if (gain <= 0.01)
+        toast(
+          mode === 'light'
+            ? 'Ce PDF est déjà bien optimisé : essaie la compression forte (utile pour les scans et les photos).'
+            : 'Ce PDF est déjà léger : la compression forte le rendrait plus lourd. Rien n’a été enregistré.',
+          'info'
+        )
       else await saveAs(pdf.path.replace(/\.pdf$/i, ' (compressé).pdf'), out)
     } catch (err) {
       toast(errorText(err), 'error')

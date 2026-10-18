@@ -1,5 +1,6 @@
 // Génère resources/icon.png (1024 px) des modules : un carré arrondi en dégradé et un pictogramme
 // Lucide blanc, dans le même style pour tous. À lancer avec Electron :
+// Les logos fournis (scripts/icons/logos/<id>.svg) priment sur le pictogramme.
 //   npx electron scripts/icons/main.cjs [id…]
 const { app, BrowserWindow } = require('electron')
 const { readFileSync, writeFileSync, existsSync } = require('fs')
@@ -20,7 +21,9 @@ const ICONS = {
   'snippets-studio': ['code-xml', '#a3e635', '#4d7c0f'],
   'api-studio': ['send-horizontal', '#fbbf24', '#d97706'],
   'devtools-studio': ['wrench', '#94a3b8', '#334155'],
-  'servers-studio': ['server', '#4ade80', '#15803d']
+  'servers-studio': ['server', '#4ade80', '#15803d'],
+  'cours-studio': ['graduation-cap', '#22d3ee', '#4338ca'],
+  'drive-studio': ['folder-up', '#60a5fa', '#7c3aed']
 }
 
 /** Éléments SVG d'une icône Lucide, lus dans le paquet lucide-react. */

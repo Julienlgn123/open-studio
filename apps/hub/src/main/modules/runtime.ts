@@ -129,11 +129,13 @@ function moduleApp(manifest: ModuleManifest, dataDir: string, cleanups: (() => v
 
 /** Charge et démarre un module installé dans `dir`. Une erreur ne bloque pas Open Studio. */
 export async function activate(manifest: ModuleManifest, dir: string): Promise<void> {
+  // Interface déjà ouverte (réinstallation) : elle reste branchée sur le module redémarré.
+  const previousGuest = active.get(manifest.id)?.guest ?? null
   if (active.has(manifest.id)) await deactivate(manifest.id)
   const dataDir = dataDirFor(manifest)
   mkdirSync(dataDir, { recursive: true })
   const cleanups: (() => void)[] = []
-  const mod: ActiveModule = { manifest, dir, entry: null, error: null, cleanups, guest: null }
+  const mod: ActiveModule = { manifest, dir, entry: null, error: null, cleanups, guest: previousGuest && !previousGuest.isDestroyed() ? previousGuest : null }
   active.set(manifest.id, mod)
 
   const host: ModuleHost = {

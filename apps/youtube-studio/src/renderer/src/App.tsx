@@ -11,9 +11,15 @@ const clock = (s: number): string => {
   return `${h ? `${h}:` : ''}${String(m).padStart(h ? 2 : 1, '0')}:${String(sec).padStart(2, '0')}`
 }
 
-/** Meilleure piste : française écrite à la main, sinon française automatique, sinon la première. */
+/**
+ * Meilleure piste : le français s'il existe ; sinon la langue parlée dans la vidéo (celle des
+ * sous-titres automatiques de YouTube), écrite à la main de préférence ; l'anglais en dernier recours.
+ */
 function bestTrack(tracks: Track[]): Track | null {
-  return tracks.find((t) => t.lang.startsWith('fr') && !t.auto) ?? tracks.find((t) => t.lang.startsWith('fr')) ?? tracks.find((t) => !t.auto) ?? tracks[0] ?? null
+  const lang = (t: Track): string => t.lang.slice(0, 2)
+  const spoken = tracks.find((t) => t.auto)
+  const pick = (l: string): Track | undefined => tracks.find((t) => lang(t) === l && !t.auto) ?? tracks.find((t) => lang(t) === l)
+  return pick('fr') ?? (spoken ? pick(lang(spoken)) : undefined) ?? pick('en') ?? tracks[0] ?? null
 }
 
 type Tab = 'summary' | 'cards' | 'transcript'

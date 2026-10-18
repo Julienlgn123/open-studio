@@ -45,7 +45,12 @@ function state(): TransferState {
 const push = (): void => host.send('transfer:state', state())
 
 function freePath(dir: string, name: string): string {
-  const safe = name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').slice(0, 180) || 'fichier'
+  // Seulement le nom (jamais de chemin), sans caractères interdits ni point au début (fichier caché).
+  const safe =
+    (name.split(/[\\/]/).pop() ?? '')
+      .replace(/[<>:"|?*\x00-\x1f]/g, '_')
+      .replace(/^[.\s]+/, '')
+      .slice(0, 180) || 'fichier'
   const ext = extname(safe)
   const base = safe.slice(0, safe.length - ext.length)
   let p = join(dir, safe)

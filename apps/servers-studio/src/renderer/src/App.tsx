@@ -8,7 +8,8 @@ const STATUS: Record<Status, { label: string; cls: string }> = {
   running: { label: 'En marche', cls: 'success' },
   starting: { label: 'Démarrage…', cls: 'info' },
   stopped: { label: 'Arrêté', cls: '' },
-  crashed: { label: 'Planté', cls: 'danger' }
+  crashed: { label: 'Planté', cls: 'danger' },
+  restarting: { label: 'Relance…', cls: 'warning' }
 }
 
 const since = (t: number | null): string => {
@@ -54,7 +55,7 @@ export default function App(): JSX.Element {
   }
 
   const active = projects.find((p) => p.id === activeId) ?? null
-  const running = Object.values(states).filter((s) => s.status === 'running' || s.status === 'starting').length
+  const running = Object.values(states).filter((s) => s.status === 'running' || s.status === 'starting' || s.status === 'restarting').length
 
   return (
     <Layout
@@ -71,7 +72,7 @@ export default function App(): JSX.Element {
               <button key={p.id} className={`proj${p.id === activeId ? ' on' : ''}`} onClick={() => setActiveId(p.id)}>
                 <span className={`dot ${st}`} />
                 <span className="proj-name">{p.name}</span>
-                {st === 'running' || st === 'starting' ? (
+                {st === 'running' || st === 'starting' || st === 'restarting' ? (
                   <span
                     className="mini"
                     title="Arrêter"
@@ -146,7 +147,7 @@ export default function App(): JSX.Element {
 
 function ProjectView({ project: p, state, logs, onAct, onEdit, onClear }: { project: Project; state?: RunState; logs: LogLine[]; onAct: (channel: string) => void; onEdit: () => void; onClear: () => void }): JSX.Element {
   const st = state?.status ?? 'stopped'
-  const on = st === 'running' || st === 'starting'
+  const on = st === 'running' || st === 'starting' || st === 'restarting'
   const [q, setQ] = useState('')
   const [onlyErr, setOnlyErr] = useState(false)
   const box = useRef<HTMLDivElement>(null)

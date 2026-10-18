@@ -41,7 +41,9 @@ export function decryptString(stored: string | null | undefined): string {
       // Secret écrit par l'ancienne app Drive Studio (autre clé que celle d'Open Studio).
       const legacy = host.decryptLegacy(buf)
       if (legacy !== null) return legacy
-      throw err
+      // Clé inconnue : on traite le secret comme absent (à ressaisir / compte à reconnecter) plutôt que de planter.
+      console.warn('[crypto] secret illisible, ignoré :', (err as Error).message)
+      return ''
     }
   }
   if (stored.startsWith(RAW_PREFIX)) {

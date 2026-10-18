@@ -206,31 +206,40 @@ export function usePersisted<T>(key: string, initial: T): [T, (v: T | ((prev: T)
   const [ready, setReady] = useState(false)
   const latest = useRef(value)
   const loaded = useRef(false)
+  /** Modifications faites avant la relecture : rejouées sur la valeur enregistrée, jamais perdues. */
+  const early = useRef<((prev: T) => T)[]>([])
+  const save = useRef<number>()
+  const persist = useCallback(() => {
+    window.clearTimeout(save.current)
+    save.current = window.setTimeout(() => void window.kit.store.set(key, latest.current), 250)
+  }, [key])
   useEffect(() => {
     let alive = true
+    loaded.current = false
     window.kit.store.get<T>(key, initial).then((v) => {
       if (!alive) return
-      latest.current = v ?? initial
+      let next = v ?? initial
+      for (const op of early.current) next = op(next)
+      latest.current = next
       loaded.current = true
-      setValue(latest.current)
+      setValue(next)
       setReady(true)
+      if (early.current.length) persist()
+      early.current = []
     })
     return () => {
       alive = false
     }
   }, [key])
-  const save = useRef<number>()
   const set = useCallback(
     (v: T | ((prev: T) => T)) => {
-      // Avant la lecture de la valeur enregistrée, une écriture l'écraserait : ignorée.
-      if (!loaded.current) return
-      const next = typeof v === 'function' ? (v as (p: T) => T)(latest.current) : v
-      latest.current = next
-      setValue(next)
-      window.clearTimeout(save.current)
-      save.current = window.setTimeout(() => void window.kit.store.set(key, latest.current), 250)
+      const op = typeof v === 'function' ? (v as (p: T) => T) : () => v
+      if (!loaded.current) early.current.push(op)
+      latest.current = op(latest.current)
+      setValue(latest.current)
+      if (loaded.current) persist()
     },
-    [key]
+    [key, persist]
   )
   return [value, set, ready]
 }

@@ -67,6 +67,23 @@ export default function App(): JSX.Element {
   )
 }
 
+/** Ligne de l'erreur : « position N », « line N », ou l'extrait cité par le moteur retrouvé dans le texte. */
+function errorLine(input: string, msg: string): number {
+  const lineOf = (pos: number): number => input.slice(0, pos).split('\n').length
+  const pos = /position (\d+)/.exec(msg)
+  if (pos) return lineOf(Number(pos[1]))
+  const ln = /line (\d+)/.exec(msg)
+  if (ln) return Number(ln[1])
+  if (/end of JSON input/i.test(msg)) return input.split('\n').length
+  // V8 : Unexpected token '}', ..."<extrait>"... is not valid JSON
+  const ctx = /Unexpected token '(.)', (?:\.\.\.)?"([\s\S]*?)"(?:\.\.\.)? is not valid JSON/.exec(msg)
+  if (ctx) {
+    const at = input.indexOf(ctx[2])
+    if (at >= 0) return lineOf(at + ctx[2].lastIndexOf(ctx[1]))
+  }
+  return 0
+}
+
 function JsonTool(): JSX.Element {
   const [input, setInput] = usePersisted('json', '{"nom":"Julien","outils":["json","base64"],"actif":true}')
   const [indent, setIndent] = useState<'2' | '4' | '0'>('2')
@@ -81,10 +98,9 @@ function JsonTool(): JSX.Element {
       const keys = (x: unknown): number => (Array.isArray(x) ? x.reduce((n: number, y) => n + keys(y), 0) : x && typeof x === 'object' ? Object.values(x).reduce((n: number, y) => n + 1 + keys(y), 0) : 0)
       return { out: JSON.stringify(v, null, Number(indent)), err: null, stats: `JSON valide · ${keys(v)} clés` }
     } catch (e) {
-      const m = /position (\d+)/.exec((e as Error).message)
-      const pos = m ? Number(m[1]) : -1
-      const line = pos >= 0 ? input.slice(0, pos).split('\n').length : 0
-      return { out: '', err: `JSON invalide${line ? ` (ligne ${line})` : ''} : ${(e as Error).message}`, stats: '' }
+      const msg = (e as Error).message
+      const line = errorLine(input, msg)
+      return { out: '', err: `JSON invalide${line ? ` (ligne ${line})` : ''} : ${msg}`, stats: '' }
     }
   }, [input, indent, sort])
   return (

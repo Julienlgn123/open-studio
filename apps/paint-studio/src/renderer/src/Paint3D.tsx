@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js'
 import { Box, Camera, Circle, Cone, Copy, Cylinder, Diamond, Donut, Move3d, Pyramid, Rotate3d, Scale3d, Trash2 } from 'lucide-react'
 import { toast, useTheme } from '@ui'
+import { typing } from './Paint2D'
 
 // Atelier 3D (façon Paint 3D) : on ajoute des formes, on les colore, on les place, on exporte.
 
@@ -182,7 +183,7 @@ export default function Paint3D({ active }: { active: boolean }): JSX.Element {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (!active || ['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return
+      if (!active || typing(e)) return
       if (e.key === 'Delete' || e.key === 'Backspace') remove()
       if (e.key.toLowerCase() === 'g') setMode('translate')
       if (e.key.toLowerCase() === 'r') setMode('rotate')

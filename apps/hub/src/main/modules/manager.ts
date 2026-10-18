@@ -102,6 +102,7 @@ export async function listModules(opts: { refresh?: boolean } = {}): Promise<Mod
         icon: iconOf(id, inst, cat?.icon),
         status: !inst ? 'available' : update ? 'update' : 'installed',
         installedVersion: inst?.version ?? null,
+        installedAt: inst?.installedAt ?? null,
         latestVersion: latest,
         size: cat?.size ?? null,
         entryUrl: inst ? entryUrlFor(moduleDir(id, inst.version)) : null,

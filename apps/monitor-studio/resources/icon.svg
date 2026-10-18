@@ -1,5 +1,18 @@
-<svg width="1024" height="1024" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#67e8f9"/><stop offset="1" stop-color="#0891b2"/></linearGradient><linearGradient id="p" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#34d399"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs><rect width="1024" height="1024" rx="224" fill="#14142e"/><rect x="150" y="190" width="724" height="504" rx="88" fill="url(#g)"/>
-<rect x="206" y="246" width="612" height="392" rx="48" fill="#14142e"/>
-<path d="M240 452h120l52-120 84 250 70-190 46 60h172" fill="none" stroke="url(#p)" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
-<circle cx="784" cy="452" r="24" fill="#34d399"/>
-<rect x="452" y="694" width="120" height="96" fill="#0ea5c6"/><rect x="332" y="776" width="360" height="62" rx="31" fill="url(#g)"/></svg>
+<svg width="1024" height="1024" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<defs>
+<linearGradient id="bg" x1="0.1" y1="0" x2="0.9" y2="1"><stop offset="0" stop-color="#4ADE80"/><stop offset="1" stop-color="#15803D"/></linearGradient>
+<linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></linearGradient>
+<filter id="sh" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="16" stdDeviation="16" flood-color="#000" flood-opacity=".28"/></filter>
+<filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="10" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<rect width="1024" height="1024" rx="232" fill="url(#bg)"/>
+<rect width="1024" height="1024" rx="232" fill="url(#gloss)"/>
+<g filter="url(#sh)">
+<rect x="472" y="650" width="80" height="90" fill="#D1FAE5"/>
+<rect x="352" y="730" width="320" height="44" rx="22" fill="#ECFDF5"/>
+<rect x="190" y="230" width="644" height="440" rx="56" fill="#ECFDF5"/>
+<rect x="226" y="266" width="572" height="368" rx="30" fill="#052E22"/>
+<g stroke="#0B4A38" stroke-width="4"><path d="M226 358 H798"/><path d="M226 450 H798"/><path d="M226 542 H798"/><path d="M370 266 V634"/><path d="M512 266 V634"/><path d="M654 266 V634"/></g>
+<polyline points="262,450 380,450 432,372 492,552 548,322 604,498 640,450 762,450" fill="none" stroke="#4ADE80" stroke-width="22" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+</g>
+</svg>
