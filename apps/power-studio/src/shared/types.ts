@@ -100,6 +100,53 @@ export interface AutoRules {
   onAc: ProfileId | null
   /** Quand un de ces programmes tourne (jeux, montage…) → ce profil. */
   apps: { process: string; profile: ProfileId }[]
+  /** Plages horaires (ex. 23:00 → 07:00 en « Silencieux »). Jours : 0 = dimanche … 6 = samedi. */
+  schedule: ScheduleRule[]
+  /** Batterie sous ce niveau (hors charge) → ce profil. */
+  lowBattery: { percent: number; profile: ProfileId } | null
+}
+
+export interface ScheduleRule {
+  from: string
+  to: string
+  days: number[]
+  profile: ProfileId
+}
+
+export interface BatteryHealth {
+  /** Capacité d'origine et capacité actuelle à pleine charge (mWh). */
+  designMwh: number | null
+  fullMwh: number | null
+  /** Santé : capacité actuelle / capacité d'origine (%). */
+  healthPct: number | null
+  cycles: number | null
+  manufacturer: string
+  model: string
+  chemistry: string
+  /** Évolution de la capacité (rapport Windows). */
+  history: { date: string; fullMwh: number; designMwh: number }[]
+  /** Autonomie estimée à pleine charge, selon l'usage récent (minutes). */
+  estimateMinutes: number | null
+  /** Chemin du rapport HTML complet (Windows). */
+  reportPath: string | null
+}
+
+export interface RepairTool {
+  id: string
+  title: string
+  description: string
+  /** Quand l'utiliser. */
+  when: string
+  admin: boolean
+  /** Durée indicative. */
+  duration: string
+  restart: boolean
+}
+
+export interface RepairResult {
+  ok: boolean
+  output: string
+  adminDenied: boolean
 }
 
 export type TweakCategory = 'privacy' | 'performance' | 'battery' | 'services' | 'interface'
@@ -189,7 +236,7 @@ export interface AppSettings {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   activeProfile: null,
-  auto: { enabled: false, onBattery: 'eco', onAc: null, apps: [] },
+  auto: { enabled: false, onBattery: 'eco', onAc: null, apps: [], schedule: [], lowBattery: null },
   runInTray: true,
   launchAtLogin: false,
   restorePointDone: false,

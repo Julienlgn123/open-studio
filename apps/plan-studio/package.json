@@ -12,8 +12,8 @@
   "openStudioModule": {
     "id": "plan-studio",
     "name": "Plan Studio",
-    "tagline": "Ton agenda, tes tâches et tes objectifs.",
-    "description": "Agenda de la semaine et du mois, tâches avec échéances et priorités, objectifs avec progression. Rappels avant chaque échéance.",
+    "tagline": "Agenda, tâches, objectifs, habitudes et concentration.",
+    "description": "Agenda (mois et semaine, événements répétés, lieu, rappel au choix), tâches avec listes, sous-tâches et répétition, objectifs reliés aux tâches, habitudes avec séries, minuteur Pomodoro, saisie rapide en français (« dentiste mardi 10h ») et import/export .ics.",
     "category": "Productivité",
     "accent": "#ec4899",
     "dataDirName": "plan-studio",

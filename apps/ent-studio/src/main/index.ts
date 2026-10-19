@@ -1,15 +1,16 @@
 import { host } from '@open-studio/module'
 import { kitFetch, notify, registerKit, storeGet, storeSet } from '@open-studio/kit'
 import { diffCourses, parseIcs, type Change, type ChangeSet, type Course } from '../shared/ics'
-import type { EntSettings, EntState } from '../shared/types'
+import { isHidden, type EntSettings, type EntState } from '../shared/types'
 
 // ENT Studio : emploi du temps ADE lu depuis l'URL iCalendar générée dans ADE. Mis à jour au
 // lancement d'Open Studio puis régulièrement ; chaque changement de cours est signalé.
 
-const DEFAULTS: EntSettings = { url: '', notify: true, refreshMin: 30 }
+const DEFAULTS: EntSettings = { url: '', notify: true, refreshMin: 30, remindBefore: 0, morning: false, hidden: [] }
 let syncing = false
 let lastError: string | null = null
 let timer: NodeJS.Timeout | null = null
+let tick: NodeJS.Timeout | null = null
 
 const settings = (): EntSettings => ({ ...DEFAULTS, ...storeGet<Partial<EntSettings>>('settings', {}) })
 
@@ -20,7 +21,8 @@ function state(): EntState {
     lastSync: storeGet<number | null>('lastSync', null),
     lastError,
     history: storeGet<ChangeSet[]>('history', []),
-    syncing
+    syncing,
+    notes: storeGet<Record<string, string>>('notes', {})
   }
 }
 
@@ -90,6 +92,46 @@ async function sync(): Promise<EntState> {
   return state()
 }
 
+const hm = (t: number): string => new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+
+/** Chaque minute : rappel avant les cours, et résumé du matin. */
+function remind(): void {
+  const st = settings()
+  if (!st.url) return
+  const now = Date.now()
+  const courses = storeGet<Course[]>('courses', []).filter((c) => !isHidden(c, st.hidden))
+  const sent = new Set(storeGet<string[]>('reminded', []))
+  let changed = false
+  if (st.remindBefore > 0) {
+    for (const c of courses) {
+      const mins = (c.start - now) / 60_000
+      const key = `c:${c.uid}:${c.start}`
+      if (mins > 0 && mins <= st.remindBefore && !sent.has(key)) {
+        sent.add(key)
+        changed = true
+        const note = storeGet<Record<string, string>>('notes', {})[c.uid]
+        notify(`Dans ${Math.round(mins)} min : ${c.name}${c.kind ? ` (${c.kind})` : ''}`, `${hm(c.start)}–${hm(c.end)}${c.location ? ` · ${c.location}` : ''}${note ? `\n📝 ${note.slice(0, 80)}` : ''}`)
+      }
+    }
+  }
+  const d = new Date()
+  const today = `m:${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+  if (st.morning && d.getHours() >= 7 && !sent.has(today)) {
+    const start = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+    const list = courses.filter((c) => c.start >= start && c.start < start + 86_400_000)
+    sent.add(today)
+    changed = true
+    if (list.length) {
+      const exams = list.filter((c) => c.kind === 'Examen').length
+      notify(
+        `Aujourd’hui : ${list.length} cours${exams ? ` dont ${exams} examen${exams > 1 ? 's' : ''}` : ''}`,
+        `Premier à ${hm(list[0].start)}${list[0].location ? ` (${list[0].location})` : ''}, fin à ${hm(list[list.length - 1].end)}.`
+      )
+    }
+  }
+  if (changed) storeSet('reminded', [...sent].slice(-400))
+}
+
 function schedule(): void {
   if (timer) clearInterval(timer)
   timer = setInterval(() => void sync(), Math.max(5, settings().refreshMin) * 60_000)
@@ -123,6 +165,14 @@ export function activate(): void {
     push()
     return state()
   })
+  ipc.handle('ent:note', (_e, key: string, text: string) => {
+    const notes = storeGet<Record<string, string>>('notes', {})
+    if (text.trim()) notes[key] = text
+    else delete notes[key]
+    storeSet('notes', notes)
+    push()
+    return state()
+  })
   ipc.handle('ent:disconnect', () => {
     for (const k of ['courses', 'history']) storeSet(k, [])
     storeSet('lastSync', null)
@@ -134,8 +184,11 @@ export function activate(): void {
   // Mise à jour au lancement, puis à intervalle régulier.
   setTimeout(() => void sync(), 2_000)
   schedule()
+  tick = setInterval(remind, 60_000)
+  setTimeout(remind, 5_000)
 }
 
 export function deactivate(): void {
   if (timer) clearInterval(timer)
+  if (tick) clearInterval(tick)
 }

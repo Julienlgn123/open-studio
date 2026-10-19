@@ -12,8 +12,8 @@
   "openStudioModule": {
     "id": "youtube-studio",
     "name": "Résumé YouTube",
-    "tagline": "Une vidéo, son texte et son résumé.",
-    "description": "Colle un lien YouTube : transcription horodatée, résumé, points clés et flashcards, avec ton IA locale (Ollama) ou Mistral.",
+    "tagline": "Une vidéo : son texte, son résumé, un quiz.",
+    "description": "Colle un lien YouTube (ou plusieurs) : transcription horodatée et chapitres, puis résumé, fiche de révision ou plan de cours par l'IA, questions sur la vidéo, quiz noté, flashcards avec mode révision, notes perso, export Markdown, SRT et Anki.",
     "category": "IA",
     "accent": "#ff2d55",
     "dataDirName": "open-studio-youtube-studio"

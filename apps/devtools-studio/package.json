@@ -8,14 +8,20 @@
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
   },
-  "dependencies": {},
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "qrcode": "^1.5.4"
+  },
   "openStudioModule": {
     "id": "devtools-studio",
     "name": "Boîte à outils dev",
-    "tagline": "JSON, Base64, hash, regex, couleurs, UUID.",
-    "description": "Tous les petits outils du quotidien : formateur JSON, Base64, URL, hash, testeur de regex, couleurs, UUID, horodatages, JWT.",
+    "tagline": "20 outils de dev : JSON, YAML, diff, QR, mots de passe…",
+    "description": "Tous les petits outils du quotidien : JSON, conversions JSON/YAML/CSV/TypeScript, comparaison de textes, regex, Base64 et images, URL, entités HTML, QR codes (Wi-Fi, contact), mots de passe, hash, JWT, UUID, cron, chmod, codes HTTP, couleurs, horodatages, faux texte.",
     "category": "Développement",
     "accent": "#64748b",
     "dataDirName": "open-studio-devtools-studio"
+  },
+  "devDependencies": {
+    "@types/qrcode": "^1.5.5"
   }
 }

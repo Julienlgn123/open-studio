@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { ArrowLeft, Save, History, Mic, Check, Trash2, FileUp, FileDown, FileText, List, BookOpen, Hash, Maximize2, Minimize2, ImagePlus, ChevronLeft, ChevronRight, Compass } from 'lucide-react'
+import { ArrowLeft, Save, History, Mic, Check, Trash2, FileUp, FileDown, FileText, List, BookOpen, Hash, Maximize2, Minimize2, ImagePlus, ChevronLeft, ChevronRight, Compass, Network } from 'lucide-react'
 import type { Attachment } from '../../../shared/types'
 import { getPdfPageCount, renderPdfPageToDataUrl } from '../lib/pdfPage'
 
@@ -12,6 +12,7 @@ import VersionPanel from './VersionPanel'
 import MediaPanel from './MediaPanel'
 import ImportDocumentModal from './ImportDocumentModal'
 import AttachmentsPanel from './AttachmentsPanel'
+import MindMapModal from './MindMapModal'
 
 export default function EditorView() {
   const { courses, subjects, activeCourseId, setView, setActiveCourse, updateCourse, deleteCourse, showToast,
@@ -27,6 +28,7 @@ export default function EditorView() {
   const [showImport, setShowImport] = useState(false)
   const [activeTab, setActiveTab] = useState<'editor' | 'versions' | 'media' | 'files'>('editor')
   const [showOutline, setShowOutline] = useState(false)
+  const [showMap, setShowMap] = useState(false)
   const [showPdf, setShowPdf] = useState(false)
   const [pdfAtts, setPdfAtts] = useState<Attachment[]>([])
   const [pdfPath, setPdfPath] = useState('')
@@ -327,6 +329,14 @@ export default function EditorView() {
             <List size={15} />
           </button>
           <button
+            className="icon-btn"
+            onClick={() => setShowMap(true)}
+            data-tooltip="Carte mentale du cours"
+            data-tooltip-dir="left-down"
+          >
+            <Network size={15} />
+          </button>
+          <button
             className={`icon-btn ${showPdf ? 'active' : ''}`}
             onClick={() => setShowPdf((v) => !v)}
             data-tooltip="Afficher un PDF à côté des notes"
@@ -619,6 +629,7 @@ export default function EditorView() {
           </div>
         </div>
       )}
+      {showMap && <MindMapModal title={title} html={content} onClose={() => setShowMap(false)} />}
     </div>
   )
 }

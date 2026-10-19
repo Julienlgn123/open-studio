@@ -11,6 +11,8 @@ import Bloat from './views/Bloat'
 import Clean from './views/Clean'
 import Auto from './views/Auto'
 import SettingsView from './views/Settings'
+import Battery from './views/Battery'
+import Repair from './views/Repair'
 
 export default function App(): JSX.Element {
   const load = useApp((s) => s.load)
@@ -41,6 +43,8 @@ export default function App(): JSX.Element {
             {view === 'apps' && <Bloat />}
             {view === 'clean' && <Clean />}
             {view === 'auto' && <Auto />}
+            {view === 'battery' && <Battery />}
+            {view === 'repair' && <Repair />}
             {view === 'settings' && <SettingsView />}
           </div>
         </main>

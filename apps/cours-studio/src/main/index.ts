@@ -4,6 +4,7 @@ import { join, extname, dirname } from 'path'
 import { pathToFileURL } from 'url'
 import { tmpdir } from 'os'
 import { getReviewStats } from './db'
+import { initPlanner, registerPlannerIpc } from './planner'
 import { initDb, getSubjects, createSubject, updateSubject, reorderSubjects,
   softDeleteSubject, restoreSubject, getTrashedSubjects, permanentlyDeleteSubject,
   getCoursesBySubject, getCourse, createCourse, updateCourse,
@@ -97,6 +98,7 @@ export function activate(): void {
   })
 
   initDb()
+  initPlanner()
   autoBackup()
   // Anything trashed more than TRASH_RETENTION_MS ago is gone for good now — the DB rows
   // are already removed by purgeOldTrash(), this just mops up the files that go with them.
@@ -601,4 +603,5 @@ function registerIpc(): void {
   ipcMain.handle('settings:set', (_, d) => { writeFileSync(settingsPath, JSON.stringify(d, null, 2)); return true })
   ipcMain.handle('app:version', () => app.getVersion())
   ipcMain.handle('review:stats', () => getReviewStats())
+  registerPlannerIpc()
 }

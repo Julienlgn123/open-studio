@@ -53,7 +53,7 @@ interface AppStore {
   activeCourseId: string | null
   activeSubjectId: string | null
 
-  view: 'home' | 'subject' | 'editor' | 'ai' | 'quiz' | 'flashcards' | 'stats' | 'trash'
+  view: 'home' | 'subject' | 'editor' | 'ai' | 'quiz' | 'flashcards' | 'stats' | 'trash' | 'planner' | 'grades'
   sidebarCollapsed: boolean
   searchQuery: string
   // Multi-select for bulk actions (move/tag/delete several courses at once)

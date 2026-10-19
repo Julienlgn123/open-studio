@@ -6,6 +6,8 @@ import SettingsFields, { Field, useContextMax } from './SettingsFields'
 import MistralKeyForm from './MistralKeyForm'
 import { ImportSection, WorkspaceSection } from './PreferencesExtras'
 import MemorySection from './MemorySection'
+import QuickPromptsSection from './QuickPromptsSection'
+import { DEFAULT_QUICK_PROMPTS } from '@shared/types'
 import type { AppPreferences } from '@shared/types'
 import { DEFAULT_SETTINGS } from '@shared/types'
 
@@ -74,6 +76,10 @@ export default function PreferencesPanel(): JSX.Element | null {
 
           <Field label="Mémoire" hint="ce que le modèle sait de toi">
             <MemorySection enabled={draft.memoryEnabled} onToggle={(memoryEnabled) => setDraft((d) => ({ ...d, memoryEnabled }))} />
+          </Field>
+
+          <Field label="Raccourcis /" hint="consignes toutes faites">
+            <QuickPromptsSection value={draft.quickPrompts ?? DEFAULT_QUICK_PROMPTS} onChange={(quickPrompts) => setDraft((d) => ({ ...d, quickPrompts }))} />
           </Field>
 
           <Field label="Anciennes conversations" hint="Claude · ChatGPT · Codex">

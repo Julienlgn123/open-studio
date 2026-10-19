@@ -52,7 +52,15 @@ const api: Api = {
     set: (patch) => ipcRenderer.invoke('settings:set', patch)
   },
   activity: { list: () => ipcRenderer.invoke('activity:list') },
-  processes: { list: () => ipcRenderer.invoke('processes:list') }
+  processes: { list: () => ipcRenderer.invoke('processes:list') },
+  battery: {
+    health: () => ipcRenderer.invoke('battery:health'),
+    openReport: (path) => ipcRenderer.invoke('battery:openReport', path)
+  },
+  repair: {
+    list: () => ipcRenderer.invoke('repair:list'),
+    run: (id) => ipcRenderer.invoke('repair:run', id)
+  }
 }
 
 contextBridge.exposeInMainWorld('api', api)

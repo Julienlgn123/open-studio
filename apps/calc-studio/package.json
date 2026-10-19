@@ -15,7 +15,7 @@
     "id": "calc-studio",
     "name": "Calculatrice",
     "tagline": "Calculs scientifiques, courbes et conversions.",
-    "description": "Calculatrice scientifique avec historique, traceur de courbes de fonctions et conversion d'unités (longueurs, masses, données, températures…).",
+    "description": "Scientifique, courbes (zéros, intersections, dérivées, tableau de valeurs), algèbre (2nd degré, systèmes, dérivées), moyennes de notes et statistiques, TVA, prêts, épargne, devises du jour, dates et jours ouvrés, conversions et mode programmeur.",
     "category": "Études",
     "accent": "#6366f1",
     "dataDirName": "open-studio-calc-studio"

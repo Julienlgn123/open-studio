@@ -13,7 +13,7 @@
     "id": "quick-notes",
     "name": "Notes rapides",
     "tagline": "Une idée ? Note-la en une seconde.",
-    "description": "Un carnet ultra simple : ouvre-le d'un raccourci depuis n'importe où, tape, c'est enregistré. Recherche, épingles, couleurs.",
+    "description": "Un carnet rapide et complet : ouvre-le d'un raccourci depuis n'importe où. Markdown avec aperçu, cases à cocher, carnets, #étiquettes, liens entre notes, rappels, modèles, corbeille, import/export.",
     "category": "Productivité",
     "accent": "#eab308",
     "dataDirName": "open-studio-quick-notes"

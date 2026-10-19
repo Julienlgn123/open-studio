@@ -101,6 +101,19 @@ const api = {
     exportAnki: (courseId?: string): Promise<{ filePath: string; count: number } | null> => ipcRenderer.invoke('flashcards:exportAnki', courseId),
     importText: (courseId: string): Promise<{ count: number } | null> => ipcRenderer.invoke('flashcards:importText', courseId)
   },
+  planner: {
+    exams: (): Promise<any[]> => ipcRenderer.invoke('exams:list'),
+    saveExam: (d: unknown): Promise<string> => ipcRenderer.invoke('exams:save', d),
+    deleteExam: (id: string) => ipcRenderer.invoke('exams:delete', id),
+    tasks: (): Promise<any[]> => ipcRenderer.invoke('tasks:list'),
+    saveTask: (d: unknown): Promise<string> => ipcRenderer.invoke('tasks:save', d),
+    toggleTask: (id: string, done: boolean) => ipcRenderer.invoke('tasks:toggle', id, done),
+    deleteTask: (id: string) => ipcRenderer.invoke('tasks:delete', id),
+    grades: (): Promise<any[]> => ipcRenderer.invoke('grades:list'),
+    saveGrade: (d: unknown): Promise<string> => ipcRenderer.invoke('grades:save', d),
+    deleteGrade: (id: string) => ipcRenderer.invoke('grades:delete', id),
+    activity: (days: number): Promise<Array<{ day: string; count: number }>> => ipcRenderer.invoke('study:activity', days)
+  },
   review: {
     stats: () => ipcRenderer.invoke('review:stats')
   },

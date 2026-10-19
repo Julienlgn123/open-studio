@@ -13,7 +13,7 @@
     "id": "servers-studio",
     "name": "Serveurs locaux",
     "tagline": "Lance et surveille tes projets.",
-    "description": "Démarre et arrête tes bots Discord, sites et scripts en un clic, avec leurs logs en direct, le redémarrage auto et le lancement avec Open Studio.",
+    "description": "Démarre et arrête tes bots, sites et scripts en un clic : groupes de projets, logs en direct avec liens cliquables, CPU et mémoire par projet, vérification du port, surveillance « répond-il ? » avec relance, commandes rapides (npm install, git pull…), lancement avec Open Studio.",
     "category": "Développement",
     "accent": "#22c55e",
     "dataDirName": "open-studio-servers-studio"

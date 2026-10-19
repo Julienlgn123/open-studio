@@ -97,6 +97,10 @@ export interface ConversationSettings {
   maxTokens: number
   /** Le modèle peut lire les dossiers autorisés et retrouver les anciennes conversations (outils). */
   fileAccess: boolean
+  /** Bibliothèques de documents consultées à chaque question (ids). */
+  knowledge?: string[]
+  /** Assistant d'origine (prompt système prédéfini), pour l'afficher. */
+  assistantId?: string | null
 }
 
 export const DEFAULT_SETTINGS: ConversationSettings = {
@@ -220,6 +224,149 @@ export interface RunningProcess {
   startedAt: number
 }
 
+/** Bibliothèque de documents indexés localement. */
+export interface KbCollection {
+  id: string
+  name: string
+  createdAt: number
+  docs: number
+  chunks: number
+  bytes: number
+}
+
+export interface KbDoc {
+  id: string
+  collectionId: string
+  path: string
+  name: string
+  size: number
+  mtime: number
+  chunks: number
+  addedAt: number
+  error: string | null
+}
+
+export interface KbHit {
+  text: string
+  docId: string
+  idx: number
+  name: string
+  path: string
+}
+
+export interface KbProgress {
+  collectionId: string
+  done: number
+  total: number
+  name: string
+}
+
+/** Assistant : un rôle prêt à l'emploi (prompt système + réglages). */
+export interface Assistant {
+  id: string
+  name: string
+  emoji: string
+  description: string
+  systemPrompt: string
+  temperature: number | null
+  /** Fourni avec l'app (modifiable, mais pas supprimable : on peut le masquer). */
+  builtin?: boolean
+}
+
+/** Raccourci « / » dans la zone de saisie : insère une consigne toute faite. */
+export interface QuickPrompt {
+  id: string
+  command: string
+  label: string
+  text: string
+}
+
+export const BUILTIN_ASSISTANTS: Assistant[] = [
+  {
+    id: 'prof',
+    name: 'Prof particulier',
+    emoji: '🎓',
+    description: 'Explique pas à pas, vérifie que tu as compris, donne des exercices.',
+    systemPrompt:
+      "Tu es un professeur patient et bienveillant. Explique les notions pas à pas, avec des exemples concrets et des analogies. Après chaque explication, pose une petite question pour vérifier la compréhension. Ne donne pas directement la réponse d'un exercice : guide l'élève avec des indices. Réponds en français.",
+    temperature: 0.5,
+    builtin: true
+  },
+  {
+    id: 'code',
+    name: 'Développeur',
+    emoji: '💻',
+    description: 'Code propre et commenté, explique les choix, signale les pièges.',
+    systemPrompt:
+      "Tu es un développeur senior. Donne du code complet, correct et idiomatique, dans des blocs avec le langage indiqué. Explique brièvement les choix importants et signale les cas limites et les failles de sécurité. Si la demande est ambiguë, pose une question avant d'écrire beaucoup de code.",
+    temperature: 0.2,
+    builtin: true
+  },
+  {
+    id: 'correcteur',
+    name: 'Correcteur',
+    emoji: '✍️',
+    description: 'Corrige orthographe, grammaire et style en gardant ton ton.',
+    systemPrompt:
+      "Tu es correcteur professionnel. Corrige l'orthographe, la grammaire, la ponctuation et la typographie française du texte fourni, en gardant le ton et le sens de l'auteur. Rends d'abord le texte corrigé, puis une courte liste des principales corrections et pourquoi.",
+    temperature: 0.2,
+    builtin: true
+  },
+  {
+    id: 'traducteur',
+    name: 'Traducteur',
+    emoji: '🌍',
+    description: 'Traduit naturellement, adapte les expressions, garde la mise en forme.',
+    systemPrompt:
+      "Tu es traducteur. Traduis le texte fourni : vers l'anglais s'il est en français, sinon vers le français (sauf si une autre langue est demandée). Traduis naturellement plutôt que mot à mot, adapte les expressions idiomatiques et garde la mise en forme. Ne réponds que par la traduction, sauf si on te pose une question.",
+    temperature: 0.3,
+    builtin: true
+  },
+  {
+    id: 'redacteur',
+    name: 'Rédacteur',
+    emoji: '📝',
+    description: 'Mails, lettres, posts : clair, bien tourné, au bon ton.',
+    systemPrompt:
+      'Tu aides à rédiger des mails, lettres, messages et publications. Écris de façon claire, concise et adaptée au destinataire. Propose un objet pour les mails. Si des informations manquent (destinataire, ton, but), fais une hypothèse raisonnable et signale-la en une ligne.',
+    temperature: 0.7,
+    builtin: true
+  },
+  {
+    id: 'brainstorm',
+    name: 'Remue-méninges',
+    emoji: '💡',
+    description: 'Beaucoup d’idées variées, puis aide à choisir.',
+    systemPrompt:
+      "Tu es un partenaire de remue-méninges créatif. Propose beaucoup d'idées variées et originales (au moins 10), regroupées par thème, des plus sûres aux plus audacieuses. Termine en suggérant les 3 plus prometteuses et pourquoi.",
+    temperature: 1.0,
+    builtin: true
+  },
+  {
+    id: 'resume',
+    name: 'Synthèse',
+    emoji: '📄',
+    description: 'Résume documents et textes en points clés.',
+    systemPrompt:
+      "Tu résumes des textes et documents. Commence par une phrase qui donne l'idée principale, puis les points clés sous forme de liste, puis les chiffres ou dates importants. Reste fidèle au texte : n'ajoute rien qui n'y est pas.",
+    temperature: 0.3,
+    builtin: true
+  }
+]
+
+export const DEFAULT_QUICK_PROMPTS: QuickPrompt[] = [
+  { id: 'resume', command: 'resume', label: 'Résumer', text: 'Résume ce texte en quelques points clés :\n\n' },
+  { id: 'simple', command: 'simple', label: 'Expliquer simplement', text: 'Explique-moi simplement, comme à un débutant : ' },
+  { id: 'corrige', command: 'corrige', label: 'Corriger les fautes', text: 'Corrige les fautes de ce texte sans changer le style :\n\n' },
+  { id: 'anglais', command: 'anglais', label: 'Traduire en anglais', text: 'Traduis en anglais :\n\n' },
+  { id: 'francais', command: 'francais', label: 'Traduire en français', text: 'Traduis en français :\n\n' },
+  { id: 'code', command: 'code', label: 'Expliquer ce code', text: 'Explique ce que fait ce code, ligne par ligne si besoin :\n\n```\n\n```' },
+  { id: 'bug', command: 'bug', label: 'Trouver le bug', text: 'Ce code ne marche pas comme prévu. Trouve le problème et propose une correction :\n\n```\n\n```' },
+  { id: 'quiz', command: 'quiz', label: 'Me faire un quiz', text: 'Fais-moi un quiz de 5 questions à choix multiples sur : ' },
+  { id: 'mail', command: 'mail', label: 'Écrire un mail', text: 'Écris un mail poli et concis pour : ' },
+  { id: 'idees', command: 'idees', label: 'Trouver des idées', text: 'Donne-moi 10 idées originales pour : ' }
+]
+
 export interface AppPreferences {
   /** Prénom affiché sur l'écran d'accueil (« Bonjour, … »). */
   userName: string
@@ -236,6 +383,11 @@ export interface AppPreferences {
   defaultEngine: EngineKind | null
   defaultModel: string | null
   defaultSettings: ConversationSettings
+  /** Assistants personnalisés et modifications des assistants fournis (même id). */
+  assistants: Assistant[]
+  /** Assistants fournis masqués. */
+  hiddenAssistants: string[]
+  quickPrompts: QuickPrompt[]
 }
 
 export const DEFAULT_PREFERENCES: AppPreferences = {
@@ -247,7 +399,17 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   memoryEnabled: true,
   defaultEngine: null,
   defaultModel: null,
-  defaultSettings: { ...DEFAULT_SETTINGS }
+  defaultSettings: { ...DEFAULT_SETTINGS },
+  assistants: [],
+  hiddenAssistants: [],
+  quickPrompts: DEFAULT_QUICK_PROMPTS
+}
+
+/** Assistants affichés : ceux fournis (éventuellement modifiés), puis les personnels. */
+export function allAssistants(prefs: Pick<AppPreferences, 'assistants' | 'hiddenAssistants'>): Assistant[] {
+  const custom = new Map((prefs.assistants ?? []).map((a) => [a.id, a]))
+  const builtins = BUILTIN_ASSISTANTS.filter((b) => !(prefs.hiddenAssistants ?? []).includes(b.id)).map((b) => ({ ...b, ...custom.get(b.id), builtin: true }))
+  return [...builtins, ...(prefs.assistants ?? []).filter((a) => !BUILTIN_ASSISTANTS.some((b) => b.id === a.id))]
 }
 
 export interface SearchHit {

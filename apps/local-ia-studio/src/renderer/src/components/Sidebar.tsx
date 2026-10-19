@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Columns2, Boxes, Check, EyeOff, ListFilter, Pencil, Pin, PinOff, Search, Settings, SquarePen, Trash2, X as XIcon } from 'lucide-react'
+import { Columns2,
+  Library, Boxes, Check, EyeOff, ListFilter, Pencil, Pin, PinOff, Search, Settings, SquarePen, Trash2, X as XIcon } from 'lucide-react'
 import { useChatStore } from '../store/chatStore'
 import ServersBar from './ServersBar'
 import type { Conversation, SearchHit } from '@shared/types'
@@ -245,6 +246,7 @@ export default function Sidebar(): JSX.Element {
         )}
         <NavRow icon={<Boxes size={15} />} label="Modèles" onClick={() => setModelManagerOpen(true)} />
         <NavRow icon={<Columns2 size={15} />} label="Comparer deux modèles" onClick={() => useChatStore.getState().setCompareOpen(true)} />
+        <NavRow icon={<Library size={15} />} label="Bibliothèque de documents" onClick={() => useChatStore.getState().setLibraryOpen(true)} />
       </div>
 
       <div className="relative flex items-center justify-between px-3 pb-0.5 pt-2">

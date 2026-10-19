@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, BarChart3, Clock, Layers, BookOpen, Target, Flame } from 'lucide-react'
 import { useStore } from '../store'
+import ActivityHeatmap from './ActivityHeatmap'
 import { DEFAULT_REVIEW_GOAL, type ReviewStats } from './ReviewGoal'
 import type { QuizResult } from '../../../shared/types'
 
@@ -80,6 +81,8 @@ export default function StatsView() {
             Record : {streak.longest} jour{streak.longest !== 1 ? 's' : ''} d'affilée
           </p>
         )}
+
+        <ActivityHeatmap />
 
         <section style={{ marginBottom: 28 }}>
           <h2 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 14 }}>

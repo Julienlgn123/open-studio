@@ -13,6 +13,8 @@ import BackupView from './views/BackupView'
 import LogsView from './views/LogsView'
 import SettingsView from './views/SettingsView'
 import SharedView from './views/SharedView'
+import SyncView from './views/SyncView'
+import CleanupView from './views/CleanupView'
 
 export default function App(): JSX.Element {
   const {
@@ -207,6 +209,8 @@ export default function App(): JSX.Element {
               {view === 'accounts' && <AccountsView />}
               {view === 'backup' && <BackupView />}
               {view === 'shared' && <SharedView />}
+              {view === 'sync' && <SyncView />}
+              {view === 'cleanup' && <CleanupView />}
               {view === 'logs' && <LogsView />}
               {view === 'settings' && <SettingsView />}
             </motion.div>

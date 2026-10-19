@@ -1,4 +1,4 @@
-import { Brush, Gauge, LayoutDashboard, Moon, Package, Rocket, Settings, SlidersHorizontal, Sun, Wand2, Zap } from 'lucide-react'
+import { BatteryMedium, Brush, Gauge, Wrench, LayoutDashboard, Moon, Package, Rocket, Settings, SlidersHorizontal, Sun, Wand2, Zap } from 'lucide-react'
 import { useApp, type View } from '../store/appStore'
 
 function TrafficLight({ color, title, onClick }: { color: string; title: string; onClick: () => void }): JSX.Element {
@@ -29,7 +29,7 @@ export function TitleBar(): JSX.Element {
   )
 }
 
-const NAV: { id: View; label: string; icon: typeof Gauge; windowsOnly?: boolean }[] = [
+const NAV: { id: View; label: string; icon: typeof Gauge; windowsOnly?: boolean; batteryOnly?: boolean }[] = [
   { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
   { id: 'profiles', label: 'Profils', icon: Zap },
   { id: 'auto', label: 'Automatique', icon: Wand2 },
@@ -37,6 +37,8 @@ const NAV: { id: View; label: string; icon: typeof Gauge; windowsOnly?: boolean 
   { id: 'startup', label: 'Démarrage', icon: Rocket },
   { id: 'apps', label: 'Apps préinstallées', icon: Package, windowsOnly: true },
   { id: 'clean', label: 'Nettoyage', icon: Brush },
+  { id: 'battery', label: 'Batterie', icon: BatteryMedium, batteryOnly: true },
+  { id: 'repair', label: 'Dépannage', icon: Wrench },
   { id: 'settings', label: 'Réglages', icon: Settings }
 ]
 
@@ -59,7 +61,7 @@ export function Sidebar(): JSX.Element {
         </div>
       </div>
       <nav className="flex flex-col gap-0.5">
-        {NAV.filter((n) => !n.windowsOnly || hw?.os === 'windows').map((n) => (
+        {NAV.filter((n) => (!n.windowsOnly || hw?.os === 'windows') && (!n.batteryOnly || hw?.hasBattery)).map((n) => (
           <button
             key={n.id}
             onClick={() => setView(n.id)}

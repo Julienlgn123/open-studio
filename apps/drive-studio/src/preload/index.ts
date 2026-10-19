@@ -18,7 +18,10 @@ import type {
   SyncLog,
   TransferProgress,
   VirtualFolder,
-  BackupSchedule
+  BackupSchedule,
+  SyncFolder,
+  SyncProgress,
+  DuplicateGroup
 } from '../shared/types'
 
 type FileFilters = {
@@ -203,6 +206,26 @@ const api = {
   },
   clipboard: {
     write: (text: string): Promise<void> => ipcRenderer.invoke('clipboard:write', text)
+  },
+  sync: {
+    list: (): Promise<SyncFolder[]> => ipcRenderer.invoke('sync:list'),
+    add: (intervalMin?: number): Promise<SyncFolder | null> => ipcRenderer.invoke('sync:add', intervalMin),
+    addPath: (path: string, intervalMin?: number): Promise<SyncFolder> => ipcRenderer.invoke('sync:addPath', path, intervalMin),
+    update: (id: string, patch: { enabled?: boolean; intervalMin?: number; exclude?: string }): Promise<boolean> =>
+      ipcRenderer.invoke('sync:update', id, patch),
+    remove: (id: string): Promise<boolean> => ipcRenderer.invoke('sync:remove', id),
+    run: (id: string): Promise<{ sent: number; failed: number } | null> => ipcRenderer.invoke('sync:run', id),
+    files: (id: string): Promise<{ relPath: string; size: number; syncedAt: number }[]> => ipcRenderer.invoke('sync:files', id),
+    open: (path: string): Promise<string> => ipcRenderer.invoke('sync:open', path),
+    onProgress: (cb: (p: SyncProgress) => void) => on<SyncProgress>('sync:progress', cb)
+  },
+  cleanup: {
+    duplicates: (): Promise<DuplicateGroup[]> => ipcRenderer.invoke('cleanup:duplicates'),
+    largest: (limit?: number): Promise<FileMeta[]> => ipcRenderer.invoke('cleanup:largest', limit),
+    old: (days: number): Promise<FileMeta[]> => ipcRenderer.invoke('cleanup:old', days),
+    byType: (): Promise<{ type: string; bytes: number; count: number }[]> => ipcRenderer.invoke('cleanup:byType'),
+    deleteMany: (ids: string[]): Promise<{ deleted: number; failed: { id: string; error: string }[] }> =>
+      ipcRenderer.invoke('cleanup:deleteMany', ids)
   }
 }
 

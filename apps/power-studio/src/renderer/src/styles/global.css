@@ -150,6 +150,14 @@ button {
   @apply btn bg-red-500 text-white hover:bg-red-400;
 }
 
+.time-input {
+  @apply rounded-lg border border-base-700 bg-base-850 px-2 py-1 text-[13px] text-base-100 outline-none focus:border-accent-500;
+  color-scheme: dark;
+}
+:root[data-theme='light'] .time-input {
+  color-scheme: light;
+}
+
 .badge {
   @apply inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide;
 }

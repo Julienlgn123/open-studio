@@ -120,12 +120,23 @@ export function parseRanges(text: string, count: number): number[] {
 export async function rebuild(bytes: Uint8Array, pages: { index: number; rotate: number }[]): Promise<Uint8Array> {
   const src = await PDFDocument.load(bytes, { ignoreEncryption: true })
   const out = await PDFDocument.create()
-  const copied = await out.copyPages(src, pages.map((p) => p.index))
-  copied.forEach((p, i) => {
-    const r = pages[i].rotate
-    if (r) p.setRotation(degrees((p.getRotation().angle + r) % 360))
+  const real = pages.filter((p) => p.index >= 0)
+  const copied = await out.copyPages(src, real.map((p) => p.index))
+  let k = 0
+  let lastSize: [number, number] = [595.28, 841.89]
+  for (const pg of pages) {
+    // Index négatif : page blanche, à la taille de la page précédente.
+    if (pg.index < 0) {
+      const blank = out.addPage(lastSize)
+      if (pg.rotate) blank.setRotation(degrees(pg.rotate))
+      continue
+    }
+    const p = copied[k++]
+    if (pg.rotate) p.setRotation(degrees((p.getRotation().angle + pg.rotate) % 360))
+    const { width, height } = p.getSize()
+    lastSize = [width, height]
     out.addPage(p)
-  })
+  }
   return out.save()
 }
 

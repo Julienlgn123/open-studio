@@ -13,7 +13,7 @@
     "id": "monitor-studio",
     "name": "Moniteur système",
     "tagline": "Ce qui ralentit ton PC, en un coup d'œil.",
-    "description": "CPU par cœur, mémoire, disques, réseau, GPU et températures en direct, avec les processus responsables. Lecture seule : rien n'est modifié.",
+    "description": "CPU, mémoire, disques, réseau, GPU et températures en direct et sur 6 h, processus (terminer avec confirmation), analyseur d'espace disque, test de débit, alertes et rapport système. Rien n'est modifié sans ta confirmation.",
     "category": "Système",
     "accent": "#06b6d4",
     "dataDirName": "open-studio-monitor-studio"

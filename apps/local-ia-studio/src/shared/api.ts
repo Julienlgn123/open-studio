@@ -2,6 +2,10 @@ import type {
   AppPreferences,
   CompareResult,
   MemoryItem,
+  KbCollection,
+  KbDoc,
+  KbHit,
+  KbProgress,
   LmStudioModel,
   RunningProcess,
   ApprovalDecision,
@@ -63,6 +67,20 @@ export interface Api {
     run: (slot: string, target: { engine: EngineKind; model: string }, prompt: string, onChunk: (chunk: string) => void) => Promise<CompareResult>
     cancel: (slot: string) => Promise<void>
     keep: (target: { engine: EngineKind; model: string }, prompt: string, answer: string) => Promise<string>
+  }
+  kb: {
+    pathFor: (file: File) => string
+    list: () => Promise<KbCollection[]>
+    create: (name: string) => Promise<KbCollection>
+    rename: (id: string, name: string) => Promise<boolean>
+    delete: (id: string) => Promise<boolean>
+    docs: (id: string) => Promise<KbDoc[]>
+    removeDoc: (id: string) => Promise<boolean>
+    addPaths: (id: string, paths: string[]) => Promise<{ added: number; skipped: number; failed: number }>
+    pick: (id: string, folder: boolean) => Promise<{ added: number; skipped: number; failed: number } | null>
+    refresh: (id: string) => Promise<{ updated: number; removed: number }>
+    search: (ids: string[], q: string) => Promise<KbHit[]>
+    onProgress: (cb: (p: KbProgress) => void) => () => void
   }
   memory: {
     list: () => Promise<MemoryItem[]>

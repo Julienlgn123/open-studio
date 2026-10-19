@@ -14,6 +14,8 @@ import { listStartup, setStartupEnabled } from './startup'
 import { getSettings, getStore, setSettings } from './store'
 import { applyTweaks, backupRoot, createRestorePoint, listTweaks, revertTweaks } from './tweaks/engine'
 import { mkdirSync } from 'fs'
+import { batteryHealth } from './battery'
+import { listRepairTools, runRepair } from './repair'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -180,6 +182,10 @@ function registerIpc(): void {
   })
   ipcMain.handle('activity:list', () => getStore().activity)
   ipcMain.handle('processes:list', () => pickableProcesses())
+  ipcMain.handle('battery:health', () => batteryHealth())
+  ipcMain.handle('battery:openReport', (_, path: string) => shell.openPath(path))
+  ipcMain.handle('repair:list', () => listRepairTools())
+  ipcMain.handle('repair:run', (_, id: string) => runRepair(id))
 }
 
 if (!app.requestSingleInstanceLock()) {

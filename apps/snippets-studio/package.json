@@ -15,7 +15,7 @@
     "id": "snippets-studio",
     "name": "Snippets",
     "tagline": "Tes bouts de code, rangés et retrouvés.",
-    "description": "Bibliothèque de bouts de code avec coloration, langages, étiquettes, recherche instantanée et copie en un clic.",
+    "description": "Bibliothèque de code : coloration de 28 langages, plusieurs fichiers par snippet, {{variables}} à remplir en copiant, exécution JS et aperçu HTML, éditeur malin, compteur d'usage, import/export et recherche depuis n'importe où (Ctrl+Alt+S).",
     "category": "Développement",
     "accent": "#84cc16",
     "dataDirName": "open-studio-snippets-studio"

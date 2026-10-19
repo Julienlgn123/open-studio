@@ -1,9 +1,11 @@
 import { spawn, execFile, type ChildProcess } from 'child_process'
 import { existsSync, readFileSync, readdirSync } from 'fs'
+import { createServer } from 'net'
 import { basename, join } from 'path'
 import { randomUUID } from 'crypto'
+import si from 'systeminformation'
 import { host } from '@open-studio/module'
-import { notify, registerKit, storeGet, storeSet } from '@open-studio/kit'
+import { kitFetch, notify, registerKit, storeGet, storeSet } from '@open-studio/kit'
 import type { Detected, LogLine, Project, RunState } from '../shared/types'
 
 // Serveurs locaux : lance les projets de l'utilisateur (bots, sites, scripts) avec la commande
@@ -111,6 +113,7 @@ function start(id: string): RunState {
       addLog(id, '■ Arrêté', false)
     } else {
       r.state.status = code === 0 ? 'stopped' : 'crashed'
+      if (code !== 0) r.state.lastCrash = Date.now()
       addLog(id, `■ Terminé tout seul (code ${code ?? '?'})`, code !== 0)
       const proj = projects().find((x) => x.id === id)
       if (code !== 0 && proj?.autoRestart) {
@@ -144,6 +147,7 @@ function stop(id: string): Promise<RunState> {
   r.state.restarts = 0
   if (!r.proc?.pid) {
     r.state.status = 'stopped'
+    r.state.usage = null
     pushState()
     return Promise.resolve(r.state)
   }
@@ -160,6 +164,128 @@ function stop(id: string): Promise<RunState> {
       }
       setTimeout(done, 300)
     }
+  })
+}
+
+/** Le port est-il libre ? (on essaie de l'ouvrir nous-mêmes un instant) */
+function portFree(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const srv = createServer()
+    srv.once('error', () => resolve(false))
+    srv.listen(port, '0.0.0.0', () => srv.close(() => resolve(true)))
+  })
+}
+
+/** Programme qui occupe un port (Windows : netstat ; ailleurs : lsof). */
+function portOwner(port: number): Promise<string | null> {
+  return new Promise((resolve) => {
+    if (process.platform === 'win32') {
+      execFile('netstat', ['-ano', '-p', 'TCP'], { windowsHide: true }, (err, out) => {
+        if (err) return resolve(null)
+        const line = out.split('\n').find((l) => new RegExp(`:${port}\\s+\\S+\\s+LISTENING`).test(l))
+        const pid = line?.trim().split(/\s+/).pop()
+        if (!pid) return resolve(null)
+        execFile('tasklist', ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'], { windowsHide: true }, (e2, o2) => resolve(e2 ? `PID ${pid}` : `${o2.split(',')[0]?.replace(/"/g, '') || 'programme'} (PID ${pid})`))
+      })
+    } else {
+      execFile('lsof', ['-i', `:${port}`, '-sTCP:LISTEN', '-n', '-P'], (err, out) => {
+        if (err) return resolve(null)
+        const l = out.split('\n')[1]?.split(/\s+/)
+        resolve(l ? `${l[0]} (PID ${l[1]})` : null)
+      })
+    }
+  })
+}
+
+/** CPU et mémoire de chaque projet (son processus et tous ses enfants). */
+async function usage(): Promise<void> {
+  const active = [...runs.values()].filter((r) => r.state.pid)
+  if (!active.length) return
+  let list: si.Systeminformation.ProcessesProcessData[]
+  try {
+    list = (await si.processes()).list
+  } catch {
+    return
+  }
+  const children = new Map<number, number[]>()
+  for (const p of list) children.set(p.parentPid, [...(children.get(p.parentPid) ?? []), p.pid])
+  const byPid = new Map(list.map((p) => [p.pid, p]))
+  for (const r of active) {
+    const seen = new Set<number>()
+    const stack = [r.state.pid!]
+    while (stack.length) {
+      const pid = stack.pop()!
+      if (seen.has(pid)) continue
+      seen.add(pid)
+      stack.push(...(children.get(pid) ?? []))
+    }
+    let cpu = 0
+    let mem = 0
+    for (const pid of seen) {
+      const p = byPid.get(pid)
+      if (p) {
+        cpu += p.cpu
+        mem += p.memRss * 1024
+      }
+    }
+    r.state.usage = { cpu: Math.round(cpu * 10) / 10, mem, procs: seen.size }
+  }
+  pushState()
+}
+
+/** Contrôle de santé : l'adresse répond-elle ? Trois échecs d'affilée → relance (si demandé). */
+const failures = new Map<string, number>()
+async function health(): Promise<void> {
+  for (const p of projects()) {
+    const r = runs.get(p.id)
+    if (!p.health || !r || r.state.status !== 'running') continue
+    // Laisse le temps de démarrer.
+    if (r.state.startedAt && Date.now() - r.state.startedAt < 20_000) continue
+    let ok = false
+    try {
+      const res = await kitFetch(p.health, { timeoutMs: 8000 })
+      ok = res.status < 500
+    } catch {
+      ok = false
+    }
+    const before = r.state.healthy
+    r.state.healthy = ok
+    if (ok) failures.delete(p.id)
+    else {
+      const n = (failures.get(p.id) ?? 0) + 1
+      failures.set(p.id, n)
+      if (n === 3) {
+        addLog(p.id, `⚠ ${p.health} ne répond plus${p.healthRestart ? ' : relance' : ''}`, true)
+        notify(`${p.name} ne répond plus`, p.healthRestart ? 'Relance automatique en cours.' : `${p.health} ne répond pas depuis 1 minute.`)
+        if (p.healthRestart) {
+          failures.delete(p.id)
+          void stop(p.id).then(() => start(p.id))
+        }
+      }
+    }
+    if (before !== ok) pushState()
+  }
+}
+
+/** Commande ponctuelle (npm install, git pull…) : sa sortie va dans les logs du projet. */
+function runTask(id: string, command: string): Promise<number> {
+  const p = projects().find((x) => x.id === id)
+  if (!p) return Promise.reject(new Error('Projet introuvable.'))
+  const r = run(id)
+  r.state.task = command
+  pushState()
+  addLog(id, `▶ ${command}`, false)
+  return new Promise((resolve) => {
+    const proc = spawn(command, { cwd: p.cwd, shell: true, windowsHide: true, env: { ...process.env, FORCE_COLOR: '0', ...parseEnv(p.env) } })
+    proc.stdout?.on('data', (d: Buffer) => addLog(id, d.toString(), false))
+    proc.stderr?.on('data', (d: Buffer) => addLog(id, d.toString(), true))
+    proc.on('error', (err) => addLog(id, `Impossible de lancer la commande : ${err.message}`, true))
+    proc.on('exit', (code) => {
+      addLog(id, `■ ${command} terminé (code ${code ?? '?'})`, code !== 0)
+      r.state.task = null
+      pushState()
+      resolve(code ?? -1)
+    })
   })
 }
 
@@ -198,7 +324,20 @@ export function activate(): void {
   ipc.handle('servers:detect', (_e, dir: string) => detect(dir))
   ipc.handle('servers:save', (_e, p: Partial<Project>) => {
     const list = projects()
-    const full: Project = { id: p.id ?? randomUUID(), name: p.name ?? 'Projet', cwd: p.cwd ?? '', command: p.command ?? '', autoStart: !!p.autoStart, autoRestart: p.autoRestart ?? true, env: p.env ?? '' }
+    const full: Project = {
+      id: p.id ?? randomUUID(),
+      name: p.name ?? 'Projet',
+      cwd: p.cwd ?? '',
+      command: p.command ?? '',
+      autoStart: !!p.autoStart,
+      autoRestart: p.autoRestart ?? true,
+      env: p.env ?? '',
+      group: p.group?.trim() || undefined,
+      port: p.port || null,
+      health: p.health?.trim() || undefined,
+      healthRestart: !!p.healthRestart,
+      tasks: (p.tasks ?? []).filter((t) => t.command.trim())
+    }
     saveProjects(list.some((x) => x.id === full.id) ? list.map((x) => (x.id === full.id ? full : x)) : [...list, full])
     return projects()
   })
@@ -208,12 +347,45 @@ export function activate(): void {
     saveProjects(projects().filter((x) => x.id !== id))
     return projects()
   })
-  ipc.handle('servers:start', (_e, id: string) => start(id))
+  ipc.handle('servers:start', async (_e, id: string, force?: boolean) => {
+    const p = projects().find((x) => x.id === id)
+    // Port déjà pris : on prévient au lieu de lancer un serveur qui plantera aussitôt.
+    if (p?.port && !force && !run(id).proc && !(await portFree(p.port))) {
+      const who = await portOwner(p.port)
+      throw new Error(`Le port ${p.port} est déjà utilisé${who ? ` par ${who}` : ''}. Arrête ce programme, ou change le port du projet.`)
+    }
+    return start(id)
+  })
+  ipc.handle('servers:startGroup', (_e, group: string) => {
+    for (const p of projects().filter((x) => (x.group ?? '') === group)) {
+      try {
+        start(p.id)
+      } catch (err) {
+        addLog(p.id, String(err), true)
+      }
+    }
+    return true
+  })
+  ipc.handle('servers:stopGroup', (_e, group: string) => Promise.all(projects().filter((x) => (x.group ?? '') === group).map((p) => stop(p.id))))
+  ipc.handle('servers:stopAll', () => Promise.all([...runs.keys()].map((id) => stop(id))))
+  ipc.handle('servers:task', (_e, id: string, command: string) => runTask(id, command))
+  ipc.handle('servers:openIn', (_e, id: string, app: 'code' | 'terminal') => {
+    const p = projects().find((x) => x.id === id)
+    if (!p) return false
+    if (app === 'code') spawn('code', ['.'], { cwd: p.cwd, shell: true, detached: true, windowsHide: true }).unref()
+    else if (process.platform === 'win32') spawn('cmd', ['/c', 'start', 'cmd', '/K', `cd /d "${p.cwd}"`], { detached: true, windowsHide: true }).unref()
+    else if (process.platform === 'darwin') spawn('open', ['-a', 'Terminal', p.cwd], { detached: true }).unref()
+    else spawn('x-terminal-emulator', [], { cwd: p.cwd, detached: true }).unref()
+    return true
+  })
   ipc.handle('servers:stop', (_e, id: string) => stop(id))
   ipc.handle('servers:restart', async (_e, id: string) => {
     await stop(id)
     return start(id)
   })
+
+  setInterval(() => void usage(), 4000)
+  setInterval(() => void health(), 20_000)
 
   // Lancement avec Open Studio pour les projets cochés.
   for (const p of projects()) if (p.autoStart) setTimeout(() => {

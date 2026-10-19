@@ -1,7 +1,7 @@
 {
   "name": "power-studio",
-  "version": "1.1.0",
-  "description": "Profils d'alimentation adaptés à ton matériel (performance max, économie max) et optimisation du système",
+  "version": "1.2.0",
+  "description": "Profils d'alimentation adaptés à ton matériel, changement automatique (jeux, batterie, horaires), santé de la batterie, dépannage Windows en un clic et optimisation du système",
   "author": {
     "name": "Julienlgn123",
     "email": "129546749+Julienlgn123@users.noreply.github.com"

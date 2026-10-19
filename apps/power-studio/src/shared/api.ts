@@ -11,7 +11,10 @@ import type {
   ProfileId,
   StartupItem,
   TweakInfo,
-  TweakResult
+  TweakResult,
+  BatteryHealth,
+  RepairResult,
+  RepairTool
 } from './types'
 
 export interface Api {
@@ -45,4 +48,6 @@ export interface Api {
   settings: { get: () => Promise<AppSettings>; set: (patch: Partial<AppSettings>) => Promise<AppSettings> }
   activity: { list: () => Promise<ActivityEntry[]> }
   processes: { list: () => Promise<string[]> }
+  battery: { health: () => Promise<BatteryHealth | null>; openReport: (path: string) => Promise<string> }
+  repair: { list: () => Promise<RepairTool[]>; run: (id: string) => Promise<RepairResult> }
 }

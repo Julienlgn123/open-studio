@@ -224,7 +224,7 @@ export default function ChatView(): JSX.Element {
           disabled={!conv.model}
           isStreaming={isStreaming}
           engine={conv.engine}
-          placeholder="Réponds…"
+          placeholder="Réponds… (/ pour les raccourcis)"
           onSend={(text, attachments) => {
             stickToBottom.current = true
             sendMessage(text, attachments)
@@ -237,6 +237,10 @@ export default function ChatView(): JSX.Element {
               workspaceRoots.length
                 ? updateConversationSettings(conv.id, { ...conv.settings, fileAccess: !conv.settings.fileAccess })
                 : setPreferencesOpen(true)
+          }}
+          knowledge={{
+            selected: conv.settings.knowledge ?? [],
+            onChange: (ids) => updateConversationSettings(conv.id, { ...conv.settings, knowledge: ids })
           }}
           toolbar={
             <ModelPicker

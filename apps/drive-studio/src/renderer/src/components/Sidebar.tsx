@@ -10,7 +10,9 @@ import {
   Plus,
   Trash2,
   Pencil,
-  RefreshCw
+  RefreshCw,
+  FolderSync,
+  Eraser
 } from 'lucide-react'
 import { useStore, type ViewName } from '../store'
 import ContextMenu from './ContextMenu'
@@ -23,6 +25,8 @@ const NAV: { view: ViewName; label: string; icon: JSX.Element }[] = [
   { view: 'files', label: 'Fichiers', icon: <Files size={15} /> },
   { view: 'accounts', label: 'Comptes', icon: <Users size={15} /> },
   { view: 'backup', label: 'Backup', icon: <DatabaseBackup size={15} /> },
+  { view: 'sync', label: 'Synchro PC', icon: <FolderSync size={15} /> },
+  { view: 'cleanup', label: 'Faire de la place', icon: <Eraser size={15} /> },
   { view: 'shared', label: 'Partages', icon: <Share2 size={15} /> },
   { view: 'logs', label: 'Logs', icon: <ScrollText size={15} /> },
   { view: 'settings', label: 'Réglages', icon: <Settings size={15} /> }

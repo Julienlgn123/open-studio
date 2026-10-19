@@ -8,7 +8,7 @@ const capture = (e: React.PointerEvent): void => {
     /* pas de capture possible */
   }
 }
-import { ArrowLeft, Bookmark, Eraser, Hand, Highlighter, Minus, PenLine, Plus, Save, Signature, Square, Type, Undo2 } from 'lucide-react'
+import { ArrowLeft, Bookmark, Eraser, Hand, Highlighter, Minus, MoveHorizontal, Moon, PenLine, Plus, Save, Search, Signature, Square, Sun, Type, Undo2, X } from 'lucide-react'
 import { Modal, errorText, toast, uid, usePersisted, usePrompt } from '@ui'
 import { baseName, flatten, writePdf, type Annotation, type PdfJsDoc } from './pdf'
 
@@ -42,6 +42,73 @@ export default function Viewer({ path, doc, bytes, docKey, onClose }: { path: st
   const [saving, setSaving] = useState(false)
   const scroller = useRef<HTMLDivElement>(null)
   const [promptNode, ask] = usePrompt()
+  const [night, setNight] = usePersisted('night', false)
+  const [q, setQ] = useState('')
+  const [results, setResults] = useState<{ page: number; before: string; hit: string; after: string }[] | null>(null)
+  const [searching, setSearching] = useState(false)
+  const searchRef = useRef<HTMLInputElement>(null)
+  const texts = useRef<string[] | null>(null)
+
+  /** Recherche dans le texte de toutes les pages (texte lu une seule fois). */
+  const search = async (query: string): Promise<void> => {
+    const needle = query.trim().toLowerCase()
+    if (!needle) return setResults(null)
+    setSearching(true)
+    if (!texts.current) {
+      const all: string[] = []
+      for (let i = 1; i <= doc.numPages; i++) {
+        const c = await (await doc.getPage(i)).getTextContent()
+        all.push((c.items as { str: string }[]).map((x) => x.str).join(' ').replace(/\s+/g, ' '))
+      }
+      texts.current = all
+    }
+    const out: { page: number; before: string; hit: string; after: string }[] = []
+    texts.current.forEach((t, i) => {
+      const low = t.toLowerCase()
+      let at = low.indexOf(needle)
+      while (at >= 0 && out.length < 200) {
+        out.push({ page: i + 1, before: t.slice(Math.max(0, at - 40), at), hit: t.slice(at, at + needle.length), after: t.slice(at + needle.length, at + needle.length + 40) })
+        at = low.indexOf(needle, at + needle.length)
+      }
+    })
+    setResults(out)
+    setSearching(false)
+  }
+
+  const fitWidth = async (): Promise<void> => {
+    const el = scroller.current
+    if (!el) return
+    const vp = (await doc.getPage(page)).getViewport({ scale: 1 })
+    setZoom(Math.max(0.5, Math.min(3, +((el.clientWidth - 64) / vp.width).toFixed(2))))
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      const t = e.target as HTMLElement
+      const typing = t.tagName === 'INPUT' || t.tagName === 'TEXTAREA'
+      const ctrl = e.ctrlKey || e.metaKey
+      if (ctrl && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        searchRef.current?.focus()
+        searchRef.current?.select()
+      } else if (ctrl && (e.key === '+' || e.key === '=')) {
+        e.preventDefault()
+        setZoom((z) => Math.min(3, +(z + 0.2).toFixed(1)))
+      } else if (ctrl && e.key === '-') {
+        e.preventDefault()
+        setZoom((z) => Math.max(0.5, +(z - 0.2).toFixed(1)))
+      } else if (!typing && (e.key === 'PageDown' || (e.key === 'ArrowRight' && !e.shiftKey))) {
+        e.preventDefault()
+        goTo(Math.min(doc.numPages, page + 1))
+      } else if (!typing && (e.key === 'PageUp' || e.key === 'ArrowLeft')) {
+        e.preventDefault()
+        goTo(Math.max(1, page - 1))
+      } else if (!typing && e.key === 'Home') goTo(1)
+      else if (!typing && e.key === 'End') goTo(doc.numPages)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
 
   useEffect(() => {
     if (tool === 'sign' && !signature) setSignOpen(true)
@@ -88,6 +155,25 @@ export default function Viewer({ path, doc, bytes, docKey, onClose }: { path: st
         <b className="viewer-title" title={path}>
           {baseName(path)}
         </b>
+        <label className="search viewer-search">
+          <Search size={13} />
+          <input
+            ref={searchRef}
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value)
+              if (!e.target.value) setResults(null)
+            }}
+            onKeyDown={(e) => e.key === 'Enter' && void search(q)}
+            placeholder="Rechercher (Ctrl+F)"
+          />
+          {searching && <span className="spinner" />}
+          {results && (
+            <button className="clear" onClick={() => (setQ(''), setResults(null))}>
+              <X size={12} />
+            </button>
+          )}
+        </label>
         <div className="spacer" />
         <div className="tools">
           {TOOLS.map((t) => (
@@ -109,6 +195,9 @@ export default function Viewer({ path, doc, bytes, docKey, onClose }: { path: st
             Changer la signature
           </button>
         )}
+        <button className={`btn btn-sm btn-icon ${night ? 'on' : 'btn-ghost'}`} onClick={() => setNight(!night)} title="Mode nuit (pages sombres)">
+          {night ? <Sun size={15} /> : <Moon size={15} />}
+        </button>
         <button className="btn btn-ghost btn-sm btn-icon" onClick={undo} disabled={!annotations.length} title="Annuler">
           <Undo2 size={15} />
         </button>
@@ -135,6 +224,23 @@ export default function Viewer({ path, doc, bytes, docKey, onClose }: { path: st
               <Bookmark size={14} />
             </button>
           </div>
+          {results && (
+            <div className="results">
+              <div className="faint results-head">
+                {results.length ? `${results.length}${results.length >= 200 ? '+' : ''} résultat${results.length > 1 ? 's' : ''}` : 'Aucun résultat'}
+              </div>
+              {results.map((r, i) => (
+                <button key={i} className="result" onClick={() => goTo(r.page)}>
+                  <span className="faint">p. {r.page}</span>
+                  <span>
+                    …{r.before}
+                    <mark>{r.hit}</mark>
+                    {r.after}…
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
           {marks.length > 0 && (
             <div className="marks">
               {marks.map((m) => (
@@ -157,7 +263,7 @@ export default function Viewer({ path, doc, bytes, docKey, onClose }: { path: st
           ))}
         </aside>
 
-        <div className="pages" ref={scroller} onScroll={onScroll}>
+        <div className={`pages${night ? ' night' : ''}`} ref={scroller} onScroll={onScroll}>
           {Array.from({ length: doc.numPages }, (_, i) => (
             <PageView
               key={i}
@@ -180,6 +286,9 @@ export default function Viewer({ path, doc, bytes, docKey, onClose }: { path: st
             <Minus size={14} />
           </button>
           <span>{Math.round(zoom * 100)} %</span>
+          <button className="btn btn-secondary btn-sm btn-icon" onClick={() => void fitWidth()} title="Ajuster à la largeur">
+            <MoveHorizontal size={14} />
+          </button>
           <button className="btn btn-secondary btn-sm btn-icon" onClick={() => setZoom((z) => Math.min(3, +(z + 0.2).toFixed(1)))}>
             <Plus size={14} />
           </button>

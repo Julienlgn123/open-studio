@@ -3,6 +3,7 @@ import { host } from '@open-studio/module'
 import { initDb } from './db'
 import { registerIpc } from './ipc'
 import { startScheduler, stopScheduler } from './scheduler'
+import { startFolderSync, stopFolderSync } from './folderSync'
 import { setLaunchAtStartup, getPublicSettings } from './settings'
 import { refreshAllAccountTokens } from './google/accounts'
 
@@ -21,6 +22,7 @@ export function activate(): void {
   initDb()
   registerIpc()
   startScheduler()
+  startFolderSync()
 
   // Rafraîchit les tokens de tous les comptes à chaque démarrage (sinon le refresh_token d'un
   // compte inutilisé longtemps risque d'expirer côté Google).
@@ -34,4 +36,5 @@ export function activate(): void {
 
 export function deactivate(): void {
   stopScheduler()
+  stopFolderSync()
 }

@@ -1,8 +1,12 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type {
   AppPreferences,
   CompareResult,
   MemoryItem,
+  KbCollection,
+  KbDoc,
+  KbHit,
+  KbProgress,
   LmStudioModel,
   RunningProcess,
   ApprovalDecision,
@@ -107,6 +111,25 @@ const api: Api = {
     cancel: (slot: string): Promise<void> => ipcRenderer.invoke('compare:cancel', slot),
     keep: (target: { engine: EngineKind; model: string }, prompt: string, answer: string): Promise<string> =>
       ipcRenderer.invoke('compare:keep', target, prompt, answer)
+  },
+  kb: {
+    /** Chemin d'un fichier glissé-déposé. */
+    pathFor: (file: File): string => webUtils.getPathForFile(file),
+    list: (): Promise<KbCollection[]> => ipcRenderer.invoke('kb:list'),
+    create: (name: string): Promise<KbCollection> => ipcRenderer.invoke('kb:create', name),
+    rename: (id: string, name: string): Promise<boolean> => ipcRenderer.invoke('kb:rename', id, name),
+    delete: (id: string): Promise<boolean> => ipcRenderer.invoke('kb:delete', id),
+    docs: (id: string): Promise<KbDoc[]> => ipcRenderer.invoke('kb:docs', id),
+    removeDoc: (id: string): Promise<boolean> => ipcRenderer.invoke('kb:removeDoc', id),
+    addPaths: (id: string, paths: string[]) => ipcRenderer.invoke('kb:addPaths', id, paths),
+    pick: (id: string, folder: boolean) => ipcRenderer.invoke('kb:pick', id, folder),
+    refresh: (id: string) => ipcRenderer.invoke('kb:refresh', id),
+    search: (ids: string[], q: string): Promise<KbHit[]> => ipcRenderer.invoke('kb:search', ids, q),
+    onProgress: (cb: (p: KbProgress) => void): (() => void) => {
+      const handler = (_: unknown, p: KbProgress): void => cb(p)
+      ipcRenderer.on('kb:progress', handler)
+      return () => ipcRenderer.removeListener('kb:progress', handler)
+    }
   },
   memory: {
     list: (): Promise<MemoryItem[]> => ipcRenderer.invoke('memory:list'),

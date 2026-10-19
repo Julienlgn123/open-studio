@@ -22,6 +22,8 @@ export type ViewName =
   | 'settings'
   | 'folder'
   | 'shared'
+  | 'sync'
+  | 'cleanup'
 
 export interface ToastMsg {
   id: number

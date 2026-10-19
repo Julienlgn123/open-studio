@@ -1,6 +1,6 @@
 {
   "name": "gdrive-backup-manager",
-  "version": "1.6.1",
+  "version": "1.7.0",
   "description": "Gestionnaire multi-comptes Google Drive : centralisation, distribution intelligente et backup",
   "author": {
     "name": "Julienlgn123",
@@ -145,7 +145,7 @@
     "id": "drive-studio",
     "name": "Drive Studio",
     "tagline": "Tous tes Google Drive, au même endroit.",
-    "description": "Plusieurs comptes Google Drive réunis : envois répartis automatiquement, dossiers virtuels, backups planifiés, partages et chiffrement de tes fichiers.",
+    "description": "Plusieurs comptes Google Drive réunis : envois répartis automatiquement, dossiers virtuels, synchro automatique de dossiers du PC, backups planifiés, doublons et nettoyage, partages et chiffrement de tes fichiers.",
     "category": "Stockage",
     "accent": "#38bdf8",
     "dataDirName": "gdrive-backup-manager",

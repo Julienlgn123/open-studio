@@ -203,6 +203,40 @@ export interface DriveRevision {
   lastModifyingUser?: string
 }
 
+/** Dossier du PC envoyé automatiquement sur les Drive (PC → Drive). */
+export interface SyncFolder {
+  id: string
+  path: string
+  name: string
+  /** Dossier virtuel qui regroupe ses fichiers. */
+  folderId: string | null
+  enabled: boolean
+  intervalMin: number
+  /** Motifs exclus (*.iso, Cache…), séparés par des virgules ou des retours à la ligne. */
+  exclude: string
+  lastScan: number | null
+  lastError: string | null
+  files: number
+  bytes: number
+  running: boolean
+  exists: boolean
+}
+
+export interface SyncProgress {
+  syncId: string
+  done: number
+  total: number
+  current: string
+}
+
+/** Groupe de fichiers identiques (même contenu) ou probablement identiques (même nom et taille). */
+export interface DuplicateGroup {
+  key: string
+  exact: boolean
+  size: number
+  files: FileMeta[]
+}
+
 export interface AddAccountResult {
   account: Account
 }

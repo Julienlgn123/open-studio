@@ -1,21 +1,53 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Binary, Braces, CaseSensitive, Clock, Copy, Fingerprint, Hash, KeyRound, Link, Palette, Regex } from 'lucide-react'
+import { Binary, Braces, CalendarClock, CaseSensitive, Clock, Code, Copy, FileDiff, Fingerprint, Globe2, Hash, Image, KeyRound, Link, LockKeyhole, Palette, QrCode, Regex, Repeat2, Search, Shield, Star, Text } from 'lucide-react'
 import { Layout, NavItem, Page, Segmented, SideTitle, Toasts, toast, usePersisted } from '@ui'
+import { ChmodTool, ConvertTool, CronTool, DiffTool, HtmlEntitiesTool, HttpCodesTool, ImageB64Tool, LoremTool, PasswordTool, QrTool } from './more'
 import './devtools.css'
 
-type Tool = 'json' | 'base64' | 'url' | 'hash' | 'regex' | 'color' | 'uuid' | 'time' | 'jwt' | 'text'
-const TOOLS: { id: Tool; label: string; icon: JSX.Element }[] = [
-  { id: 'json', label: 'JSON', icon: <Braces size={15} /> },
-  { id: 'base64', label: 'Base64', icon: <Binary size={15} /> },
-  { id: 'url', label: 'URL', icon: <Link size={15} /> },
-  { id: 'hash', label: 'Hash', icon: <Hash size={15} /> },
-  { id: 'regex', label: 'Regex', icon: <Regex size={15} /> },
-  { id: 'color', label: 'Couleurs', icon: <Palette size={15} /> },
-  { id: 'uuid', label: 'UUID', icon: <Fingerprint size={15} /> },
-  { id: 'time', label: 'Horodatage', icon: <Clock size={15} /> },
-  { id: 'jwt', label: 'JWT', icon: <KeyRound size={15} /> },
-  { id: 'text', label: 'Texte', icon: <CaseSensitive size={15} /> }
+type Tool =
+  | 'json'
+  | 'base64'
+  | 'url'
+  | 'hash'
+  | 'regex'
+  | 'color'
+  | 'uuid'
+  | 'time'
+  | 'jwt'
+  | 'text'
+  | 'password'
+  | 'diff'
+  | 'convert'
+  | 'qr'
+  | 'imgb64'
+  | 'entities'
+  | 'cron'
+  | 'chmod'
+  | 'http'
+  | 'lorem'
+const TOOLS: { id: Tool; label: string; icon: JSX.Element; cat: string; keywords?: string }[] = [
+  { id: 'json', label: 'JSON', icon: <Braces size={15} />, cat: 'Données', keywords: 'formater valider minifier' },
+  { id: 'convert', label: 'JSON ⇄ YAML ⇄ CSV', icon: <Repeat2 size={15} />, cat: 'Données', keywords: 'typescript interface tableur excel' },
+  { id: 'diff', label: 'Comparer deux textes', icon: <FileDiff size={15} />, cat: 'Données', keywords: 'différence diff' },
+  { id: 'regex', label: 'Regex', icon: <Regex size={15} />, cat: 'Données', keywords: 'expression régulière' },
+  { id: 'base64', label: 'Base64', icon: <Binary size={15} />, cat: 'Encodage' },
+  { id: 'imgb64', label: 'Image ⇄ Base64', icon: <Image size={15} />, cat: 'Encodage', keywords: 'data uri' },
+  { id: 'url', label: 'URL', icon: <Link size={15} />, cat: 'Encodage', keywords: 'encoder décoder paramètres' },
+  { id: 'entities', label: 'Entités HTML', icon: <Code size={15} />, cat: 'Encodage', keywords: 'amp lt gt' },
+  { id: 'qr', label: 'QR code', icon: <QrCode size={15} />, cat: 'Encodage', keywords: 'wifi contact' },
+  { id: 'password', label: 'Mots de passe', icon: <LockKeyhole size={15} />, cat: 'Sécurité', keywords: 'générateur pin phrase' },
+  { id: 'hash', label: 'Hash', icon: <Hash size={15} />, cat: 'Sécurité', keywords: 'md5 sha256' },
+  { id: 'jwt', label: 'JWT', icon: <KeyRound size={15} />, cat: 'Sécurité', keywords: 'jeton token' },
+  { id: 'uuid', label: 'UUID', icon: <Fingerprint size={15} />, cat: 'Sécurité', keywords: 'identifiant guid' },
+  { id: 'chmod', label: 'Permissions Unix', icon: <Shield size={15} />, cat: 'Système', keywords: 'chmod droits linux' },
+  { id: 'cron', label: 'Expression cron', icon: <CalendarClock size={15} />, cat: 'Système', keywords: 'planification tâche' },
+  { id: 'time', label: 'Horodatage', icon: <Clock size={15} />, cat: 'Système', keywords: 'timestamp unix date' },
+  { id: 'http', label: 'Codes HTTP', icon: <Globe2 size={15} />, cat: 'Web', keywords: '404 500 statut' },
+  { id: 'color', label: 'Couleurs', icon: <Palette size={15} />, cat: 'Web', keywords: 'hex rgb hsl' },
+  { id: 'text', label: 'Texte', icon: <CaseSensitive size={15} />, cat: 'Texte', keywords: 'majuscules compter' },
+  { id: 'lorem', label: 'Faux texte', icon: <Text size={15} />, cat: 'Texte', keywords: 'lorem ipsum' }
 ]
+const CATS = ['Données', 'Encodage', 'Sécurité', 'Système', 'Web', 'Texte']
 
 const copy = (s: string): void => void window.kit.clipboard.write(s).then(() => toast('Copié', 'success'))
 
@@ -38,19 +70,68 @@ const b64dec = (s: string): string => new TextDecoder().decode(Uint8Array.from(a
 
 export default function App(): JSX.Element {
   const [tool, setTool] = usePersisted<Tool>('tool', 'json')
-  const t = TOOLS.find((x) => x.id === tool)!
+  const [favs, setFavs] = usePersisted<Tool[]>('favs', [])
+  const [q, setQ] = useState('')
+  const t = TOOLS.find((x) => x.id === tool) ?? TOOLS[0]
+  const match = (x: (typeof TOOLS)[number]): boolean => !q || `${x.label} ${x.keywords ?? ''} ${x.cat}`.toLowerCase().includes(q.toLowerCase())
+  const item = (x: (typeof TOOLS)[number]): JSX.Element => <NavItem key={x.id} icon={x.icon} label={x.label} active={tool === x.id} onClick={() => setTool(x.id)} />
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        document.querySelector<HTMLInputElement>('.tool-search input')?.focus()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+  const isFav = favs.includes(tool)
   return (
     <Layout
       side={
         <>
           <SideTitle>Boîte à outils</SideTitle>
-          {TOOLS.map((x) => (
-            <NavItem key={x.id} icon={x.icon} label={x.label} active={tool === x.id} onClick={() => setTool(x.id)} />
-          ))}
+          <label className="search tool-search">
+            <Search size={13} />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Chercher un outil (Ctrl+K)"
+              onKeyDown={(e) => {
+                const first = TOOLS.find(match)
+                if (e.key === 'Enter' && first) {
+                  setTool(first.id)
+                  setQ('')
+                }
+              }}
+            />
+          </label>
+          {!q && favs.length > 0 && (
+            <>
+              <div className="ui-side-section">Favoris</div>
+              {TOOLS.filter((x) => favs.includes(x.id)).map(item)}
+            </>
+          )}
+          {CATS.map((c) => {
+            const list = TOOLS.filter((x) => x.cat === c && match(x) && (q || !favs.includes(x.id)))
+            return list.length ? (
+              <div key={c}>
+                <div className="ui-side-section">{c}</div>
+                {list.map(item)}
+              </div>
+            ) : null
+          })}
         </>
       }
     >
-      <Page title={t.label}>
+      <Page
+        title={t.label}
+        tools={
+          <button className={`btn btn-sm ${isFav ? 'on' : 'btn-ghost'}`} onClick={() => setFavs(isFav ? favs.filter((x) => x !== tool) : [...favs, tool])} title="Épingler cet outil en haut">
+            <Star size={14} fill={isFav ? 'currentColor' : 'none'} /> {isFav ? 'Favori' : 'Ajouter aux favoris'}
+          </button>
+        }
+      >
         {tool === 'json' && <JsonTool />}
         {tool === 'base64' && <Base64Tool />}
         {tool === 'url' && <UrlTool />}
@@ -61,6 +142,16 @@ export default function App(): JSX.Element {
         {tool === 'time' && <TimeTool />}
         {tool === 'jwt' && <JwtTool />}
         {tool === 'text' && <TextTool />}
+        {tool === 'password' && <PasswordTool />}
+        {tool === 'diff' && <DiffTool />}
+        {tool === 'convert' && <ConvertTool />}
+        {tool === 'qr' && <QrTool />}
+        {tool === 'imgb64' && <ImageB64Tool />}
+        {tool === 'entities' && <HtmlEntitiesTool />}
+        {tool === 'cron' && <CronTool />}
+        {tool === 'chmod' && <ChmodTool />}
+        {tool === 'http' && <HttpCodesTool />}
+        {tool === 'lorem' && <LoremTool />}
       </Page>
       <Toasts />
     </Layout>

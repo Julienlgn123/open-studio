@@ -13,7 +13,7 @@
     "id": "api-studio",
     "name": "Client API",
     "tagline": "Teste tes requêtes HTTP.",
-    "description": "Un mini Postman : méthodes, en-têtes, corps JSON, historique et collections, réponse formatée avec statut, durée et taille.",
+    "description": "Client HTTP complet : collection en dossiers, environnements (dev/prod), variables et variables dynamiques, tests automatiques, extraction de jetons, import cURL et Postman, export en code (cURL, fetch, Python…), envoi en rafale, recherche et aperçu des réponses.",
     "category": "Développement",
     "accent": "#f59e0b",
     "dataDirName": "open-studio-api-studio"

@@ -35,6 +35,8 @@ import { runBackup, isBackupRunning } from './backup'
 import { exportFiles } from './zipexport'
 import { exportData, importData, resetAllData, openBackupsFolder, latestBackupInfo } from './datatransfer'
 import { computeNextRun } from './db'
+import { addSyncFolder, listSyncFolders, removeSyncFolder, runSync, syncedFiles, updateSyncFolder } from './folderSync'
+import { findDuplicates, largestFiles, oldFiles, spaceByType } from './cleanup'
 import type {
   AccountRole,
   BackupMode,
@@ -276,6 +278,45 @@ export function registerIpc(): void {
       db.getAccounts().map((a) => a.id)
     )
   )
+
+  // ─── Dossiers synchronisés (PC → Drive) ──────────────────────────────────
+  ipcMain.handle('sync:list', () => listSyncFolders())
+  ipcMain.handle('sync:add', async (_, intervalMin?: number) => {
+    const res = await dialog.showOpenDialog(getWin(), { title: 'Dossier à sauvegarder automatiquement', properties: ['openDirectory'] })
+    if (res.canceled || !res.filePaths.length) return null
+    return addSyncFolder(res.filePaths[0], intervalMin)
+  })
+  ipcMain.handle('sync:addPath', (_, path: string, intervalMin?: number) => addSyncFolder(path, intervalMin))
+  ipcMain.handle('sync:update', (_, id: string, patch: { enabled?: boolean; intervalMin?: number; exclude?: string }) => {
+    updateSyncFolder(id, patch)
+    return true
+  })
+  ipcMain.handle('sync:remove', (_, id: string) => {
+    removeSyncFolder(id)
+    return true
+  })
+  ipcMain.handle('sync:run', (_, id: string) => runSync(id))
+  ipcMain.handle('sync:files', (_, id: string) => syncedFiles(id))
+  ipcMain.handle('sync:open', (_, path: string) => shell.openPath(path))
+
+  // ─── Faire de la place ───────────────────────────────────────────────────
+  ipcMain.handle('cleanup:duplicates', () => findDuplicates())
+  ipcMain.handle('cleanup:largest', (_, limit?: number) => largestFiles(limit))
+  ipcMain.handle('cleanup:old', (_, days: number) => oldFiles(days))
+  ipcMain.handle('cleanup:byType', () => spaceByType())
+  ipcMain.handle('cleanup:deleteMany', async (_, ids: string[]) => {
+    let deleted = 0
+    const failed: { id: string; error: string }[] = []
+    for (const id of ids) {
+      try {
+        await deleteFileEverywhere(id)
+        deleted++
+      } catch (err) {
+        failed.push({ id, error: err instanceof Error ? err.message : String(err) })
+      }
+    }
+    return { deleted, failed }
+  })
 
   // ─── Divers ──────────────────────────────────────────────────────────────
   ipcMain.handle('shell:openExternal', (_, url: string) => shell.openExternal(url))

@@ -1,3 +1,4 @@
+import { AssistantsBar } from './Assistants'
 import { useState } from 'react'
 import { Code2, Download, FileText, GraduationCap, HardDrive, Lightbulb, Loader2, PenLine, Rocket, Wand2 } from 'lucide-react'
 import { useChatStore } from '../store/chatStore'
@@ -63,6 +64,8 @@ export default function WelcomeView(): JSX.Element {
   const draftFileAccess = useChatStore((s) => s.draftFileAccess)
   const setDraftFileAccess = useChatStore((s) => s.setDraftFileAccess)
   const workspaceRoots = useChatStore((s) => s.preferences.workspaceRoots)
+  const draftKnowledge = useChatStore((s) => s.draftKnowledge)
+  const setDraftKnowledge = useChatStore((s) => s.setDraftKnowledge)
   const [prefill, setPrefill] = useState<{ text: string; n: number } | undefined>()
   const [advice, setAdvice] = useState<ModelAdvice | null>(null)
   const [adviceError, setAdviceError] = useState<string | null>(null)
@@ -110,7 +113,7 @@ export default function WelcomeView(): JSX.Element {
           isStreaming={false}
           engine={target?.engine ?? null}
           prefill={prefill}
-          placeholder="Comment puis-je t’aider aujourd’hui ?"
+          placeholder="Comment puis-je t’aider aujourd’hui ? (/ pour les raccourcis)"
           onSend={(text, attachments) => sendMessage(text, attachments)}
           onStop={() => {}}
           fileAccess={{
@@ -118,6 +121,7 @@ export default function WelcomeView(): JSX.Element {
             configured: workspaceRoots.length > 0,
             onToggle: () => (workspaceRoots.length ? setDraftFileAccess(!draftFileAccess) : setPreferencesOpen(true))
           }}
+          knowledge={{ selected: draftKnowledge, onChange: setDraftKnowledge }}
           extraAction={{
             label: advising ? 'Analyse…' : 'Conseil',
             icon: advising ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />,
@@ -215,6 +219,8 @@ export default function WelcomeView(): JSX.Element {
             ))}
           </div>
         )}
+
+        {!advice && <AssistantsBar />}
       </div>
     </div>
   )

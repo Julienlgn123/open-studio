@@ -208,3 +208,356 @@
   pointer-events: none;
   line-height: 1.6;
 }
+
+/* ───── Paint 2D : barres, menus, couleurs, calques ───── */
+.options-bar {
+  min-height: 40px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  background: var(--surface-2);
+  font-size: 12px;
+}
+.opt-title {
+  min-width: 90px;
+  font-size: 12px;
+}
+.opt input[type='range'] {
+  width: 90px;
+}
+.hint-right {
+  font-size: 11px;
+  white-space: nowrap;
+}
+.coords {
+  font-size: 12px;
+  margin-right: 6px;
+}
+.select-sm {
+  height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+.btn.on {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.menu-wrap {
+  position: relative;
+}
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 50;
+  min-width: 240px;
+  padding: 6px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-pop);
+  display: flex;
+  flex-direction: column;
+}
+.menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  text-align: left;
+  color: var(--text);
+  font-size: 13px;
+}
+.menu button:hover:not(:disabled) {
+  background: var(--hover);
+}
+.menu button:disabled {
+  opacity: 0.4;
+}
+.menu button kbd {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.menu hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 4px 2px;
+}
+.menu-note {
+  margin: 4px 10px 2px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.shapes-menu {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-width: 320px;
+}
+.toolbox {
+  width: 104px;
+}
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 40px);
+  gap: 4px;
+}
+.colors-pair {
+  position: relative;
+  width: 76px;
+  height: 58px;
+  margin-top: 12px;
+}
+.swatch {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+  box-shadow: 0 0 0 1px var(--border-strong), inset 0 0 0 2px var(--surface);
+}
+.swatch.front {
+  left: 0;
+  top: 0;
+  z-index: 1;
+}
+.swatch.back {
+  right: 6px;
+  bottom: 0;
+}
+.swatch input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+.swap {
+  position: absolute;
+  right: 0;
+  top: 0;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.hex-input {
+  width: 84px;
+  height: 26px;
+  margin-top: 6px;
+  font-size: 11px;
+  padding: 0 6px;
+  text-align: center;
+}
+.toolbox .palette {
+  grid-template-columns: repeat(4, 16px);
+  gap: 4px;
+}
+.toolbox .palette button {
+  width: 16px;
+  height: 16px;
+}
+.tiny {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 11px;
+}
+.board-wrap {
+  position: relative;
+  flex-shrink: 0;
+  margin: auto;
+}
+.board-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.board.panning {
+  cursor: grab;
+}
+.board.tool-select,
+.board.tool-move {
+  cursor: move;
+}
+.board.tool-select {
+  cursor: crosshair;
+}
+.stage {
+  position: relative;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+.stage.drop,
+.stage3d.drop {
+  outline: 2px dashed var(--accent);
+  outline-offset: -6px;
+}
+.float-bar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  padding: 5px;
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+  z-index: 5;
+}
+.layers {
+  width: 250px;
+}
+.layers-head b {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.layers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 60px;
+  overflow-y: auto;
+}
+.layer-thumb {
+  flex-shrink: 0;
+  border-radius: 4px;
+  background: conic-gradient(#d1d5db 25%, #fff 0 50%, #d1d5db 0 75%, #fff 0) 0 0 / 8px 8px;
+  box-shadow: 0 0 0 1px var(--border);
+}
+.layer .btn-icon {
+  width: 24px;
+  height: 24px;
+}
+.faint-icon {
+  opacity: 0.35;
+}
+.layer-btns {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+.layer-tools label .select {
+  width: 100%;
+}
+.adjust .opt input[type='range'] {
+  flex: 1;
+  width: auto;
+}
+.adjust .opt {
+  justify-content: space-between;
+}
+.custom-size .input {
+  width: 90px;
+}
+.mini-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px var(--border-strong);
+}
+.anchor-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 28px);
+  gap: 4px;
+  margin-top: 12px;
+}
+.anchor-grid button {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  box-shadow: 0 0 0 1px var(--border);
+}
+.anchor-grid button.on {
+  background: var(--accent);
+}
+
+/* ───── Paint 3D ───── */
+.outliner {
+  border-left: 0;
+  border-right: 1px solid var(--border);
+}
+.obj-icon {
+  display: flex;
+  color: var(--text-3);
+  padding-left: 4px;
+}
+.tiny-p {
+  font-size: 12px;
+  padding: 4px;
+  line-height: 1.5;
+}
+.props .layer-tools.first {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.vec-row {
+  display: grid;
+  grid-template-columns: 62px repeat(3, 1fr);
+  gap: 4px;
+  align-items: center;
+  font-size: 11px;
+}
+.vec-input {
+  height: 26px;
+  padding: 0 4px;
+  font-size: 11px;
+  min-width: 0;
+}
+.wrap-row {
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.hint3d p {
+  margin: 8px 0 0;
+}
+.shortcuts {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 16px;
+  align-items: center;
+  font-size: 13px;
+}
+.shortcuts kbd {
+  justify-self: end;
+}
+.paint .ui-toolbar .select-sm {
+  width: auto;
+  flex: none;
+}
+.num,
+.coords {
+  white-space: nowrap;
+}
+.layer-tools label.opt {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.layer-tools label.opt input[type='range'] {
+  flex: 1;
+  width: auto;
+}
+.layer-tools label.ui-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.mode-switch {
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.paint > .ui-toolbar {
+  overflow: visible;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 20;
+}
+.paint > .ui-toolbar.options-bar {
+  z-index: 19;
+}

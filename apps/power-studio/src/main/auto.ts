@@ -1,4 +1,5 @@
-import type { HardwareProfile, ProfileApplyResult, ProfileId } from '@shared/types'
+import type { HardwareProfile, ProfileApplyResult, ProfileId, ScheduleRule } from '@shared/types'
+import si from 'systeminformation'
 import { onAcPower } from './monitor'
 import { OS, run } from './platform/exec'
 import { applyProfile } from './profiles'
@@ -28,6 +29,24 @@ export async function pickableProcesses(): Promise<string[]> {
   return (await runningProcesses()).filter((n) => !SYSTEM.test(n) && !/^power studio$/.test(n)).sort()
 }
 
+const minutes = (hhmm: string): number => {
+  const [h, m] = hhmm.split(':').map(Number)
+  return (h || 0) * 60 + (m || 0)
+}
+
+/** La plage peut passer minuit (23:00 → 07:00) : elle appartient alors au jour où elle commence. */
+export function inSchedule(r: ScheduleRule, now: Date): boolean {
+  const t = now.getHours() * 60 + now.getMinutes()
+  const a = minutes(r.from)
+  const b = minutes(r.to)
+  const day = now.getDay()
+  const days = r.days?.length ? r.days : [0, 1, 2, 3, 4, 5, 6]
+  if (a === b) return false
+  if (a < b) return days.includes(day) && t >= a && t < b
+  // Passe minuit : avant minuit le jour J, après minuit le lendemain de J.
+  return (t >= a && days.includes(day)) || (t < b && days.includes((day + 6) % 7))
+}
+
 let timer: NodeJS.Timeout | null = null
 let lastCondition = ''
 let busy = false
@@ -50,6 +69,21 @@ async function tick(getHw: () => Promise<HardwareProfile>, onApplied: (r: Profil
       if (hit) {
         target = hit.profile
         condition = `app:${hit.process}`
+      }
+    }
+    if (!target && auto.lowBattery) {
+      const b = await si.battery().catch(() => null)
+      if (b?.hasBattery && !b.acConnected && b.percent <= auto.lowBattery.percent) {
+        target = auto.lowBattery.profile
+        condition = 'lowbattery'
+      }
+    }
+    if (!target && auto.schedule?.length) {
+      const now = new Date()
+      const hit = auto.schedule.find((r) => inSchedule(r, now))
+      if (hit) {
+        target = hit.profile
+        condition = `schedule:${hit.from}-${hit.to}`
       }
     }
     if (!target) {

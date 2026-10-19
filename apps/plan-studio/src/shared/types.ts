@@ -11,6 +11,20 @@ export interface PlanEvent {
   emoji: string
   notes: string | null
   created_at: number
+  /** Ajouts (colonnes facultatives, absentes des anciennes bases) */
+  repeat?: Repeat | null
+  repeat_until?: string | null
+  location?: string | null
+  color?: string | null
+  /** Minutes avant l'événement pour la notification (0 = aucune). */
+  remind?: number | null
+}
+
+export type Repeat = 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'yearly'
+
+export interface SubTask {
+  text: string
+  done: boolean
 }
 
 export type Priority = 'low' | 'medium' | 'high'
@@ -24,6 +38,12 @@ export interface PlanTask {
   priority: Priority
   notes: string | null
   created_at: number
+  repeat?: Repeat | null
+  /** JSON de SubTask[] */
+  subtasks?: string | null
+  list?: string | null
+  goal_id?: string | null
+  done_at?: number | null
 }
 
 export interface PlanGoal {
@@ -35,4 +55,20 @@ export interface PlanGoal {
   progress: number
   done: number
   created_at: number
+}
+
+export interface Habit {
+  id: string
+  name: string
+  emoji: string
+  /** Jours cochés, AAAA-MM-JJ */
+  days: string[]
+  createdAt: number
+}
+
+export interface FocusSession {
+  at: number
+  minutes: number
+  taskId?: string
+  label?: string
 }

@@ -144,3 +144,94 @@
   font-family: var(--mono);
   cursor: pointer;
 }
+
+/* ───── Ajouts ───── */
+.group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.group-head .mini {
+  display: flex;
+  padding: 3px;
+  border-radius: 5px;
+}
+.group-head .mini:hover {
+  background: var(--hover);
+}
+.proj-cpu {
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+.dot.unhealthy {
+  background: #f97316 !important;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.menu-wrap {
+  position: relative;
+}
+.menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  min-width: 280px;
+  padding: 6px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-pop);
+  display: flex;
+  flex-direction: column;
+}
+.menu button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  text-align: left;
+}
+.menu button b {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.menu button code {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.menu button:hover:not(:disabled) {
+  background: var(--hover);
+}
+.menu hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 4px 2px;
+}
+.log-link {
+  color: var(--accent-text);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.two-fields {
+  gap: 10px;
+}
+.two-fields .field {
+  flex: 1;
+}
+.task-edit {
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.task-edit .input:first-child {
+  width: 150px;
+  flex: none;
+}

@@ -47,6 +47,7 @@ import { recommendModel, type InstalledModel, type JsonCompleter } from './advis
 import { runAttempt } from './agent'
 import { cancelCompare, keepCompare, runCompare } from './compare'
 import { addMemory, deleteMemory, listMemories, memoryRequest, updateMemory } from './memory'
+import { addPaths, contextPrompt, createCollection, deleteCollection, listCollections, listDocs, refreshCollection, removeDoc, renameCollection, search as kbSearch } from './knowledge'
 import { checkLmStudio, completeJsonLmStudio, downloadMlxRepo, getLmStudioContextLength, listLmStudioModels, mlxRepoSize, searchMlxModels } from './providers/lmstudio'
 import { listServers, openInBrowser, stopAllServers, stopServer } from './webTools'
 import {
@@ -383,6 +384,24 @@ function registerIpc(): void {
       }
     }
 
+    // Bibliothèques branchées : les extraits les plus proches de la question sont joints au
+    // dernier message (pour le modèle seulement ; le message enregistré reste celui tapé).
+    let kbLabel: string | null = null
+    const kbIds = req.settings.knowledge ?? []
+    if (kbIds.length) {
+      const lastUser = fullMessages.map((m) => m.role).lastIndexOf('user')
+      if (lastUser >= 0) {
+        const hits = kbSearch(kbIds, fullMessages[lastUser].content)
+        if (hits.length) {
+          const budget = Math.max(1500, Math.min(14000, (req.settings.contextLength - req.settings.maxTokens / 2 - 800) * 2.5))
+          const msg = fullMessages[lastUser]
+          fullMessages = [...fullMessages.slice(0, lastUser), { ...msg, content: `${contextPrompt(hits, budget)}\n\n---\n\nQuestion : ${msg.content}` }, ...fullMessages.slice(lastUser + 1)]
+          const names = [...new Set(hits.map((h) => h.name))]
+          kbLabel = `Bibliothèque : ${hits.length} extrait${hits.length > 1 ? 's' : ''} (${names.slice(0, 4).join(', ')}${names.length > 4 ? '…' : ''})`
+        } else kbLabel = 'Bibliothèque : rien de pertinent trouvé'
+      }
+    }
+
     // Plan d'essais : le modèle choisi, puis (si Mistral est saturé) d'autres modèles Mistral,
     // puis un modèle local. On ne bascule que si rien n'a encore été affiché.
     const primary: Target = { engine: req.engine, model: req.model }
@@ -422,6 +441,7 @@ function registerIpc(): void {
         event.sender.send(`chat:approval:${req.conversationId}`, { ...approval, id })
       })
     const writeMode = getPreferences().writeMode
+    if (kbLabel) onTool(kbLabel)
 
     try {
       for (let i = 0; i < plan.length; i++) {
@@ -440,7 +460,7 @@ function registerIpc(): void {
             )
           // Pas de nouvel essai si du texte est affiché ou si des outils ont déjà tourné (écritures).
           const res = target.engine === 'mistral' ? await withMistralRetry(attempt, () => !full && !toolCalls) : await attempt()
-          tools = res.tools
+          tools = kbLabel ? [kbLabel, ...res.tools] : res.tools
           notice = res.notice
           if (i > 0) {
             result.fallback = target
@@ -481,6 +501,29 @@ function registerIpc(): void {
   ipcMain.handle('compare:keep', (_, target: { engine: EngineKind; model: string }, prompt: string, answer: string) =>
     keepCompare(target, prompt, answer)
   )
+  // --- Bibliothèque de documents ---
+  const kbProgress = (sender: Electron.WebContents, collectionId: string) => (done: number, total: number, name: string): void => {
+    if (!sender.isDestroyed()) sender.send('kb:progress', { collectionId, done, total, name })
+  }
+  ipcMain.handle('kb:list', () => listCollections())
+  ipcMain.handle('kb:create', (_, name: string) => createCollection(name))
+  ipcMain.handle('kb:rename', (_, id: string, name: string) => (renameCollection(id, name), true))
+  ipcMain.handle('kb:delete', (_, id: string) => (deleteCollection(id), true))
+  ipcMain.handle('kb:docs', (_, id: string) => listDocs(id))
+  ipcMain.handle('kb:removeDoc', (_, id: string) => (removeDoc(id), true))
+  ipcMain.handle('kb:addPaths', (event, id: string, paths: string[]) => addPaths(id, paths, kbProgress(event.sender, id)))
+  ipcMain.handle('kb:pick', async (event, id: string, folder: boolean) => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win(), {
+      title: folder ? 'Ajouter un dossier à la bibliothèque' : 'Ajouter des fichiers à la bibliothèque',
+      properties: folder ? ['openDirectory', 'multiSelections'] : ['openFile', 'multiSelections'],
+      filters: folder ? undefined : [{ name: 'Documents', extensions: ['pdf', 'docx', 'odt', 'txt', 'md', 'csv', 'json', 'html', 'py', 'js', 'ts', 'java', 'c', 'cpp', 'cs', 'go', 'rs', 'php', 'sql', 'tex'] }, { name: 'Tous les fichiers', extensions: ['*'] }]
+    })
+    if (canceled || !filePaths.length) return null
+    return addPaths(id, filePaths, kbProgress(event.sender, id))
+  })
+  ipcMain.handle('kb:refresh', (event, id: string) => refreshCollection(id, kbProgress(event.sender, id)))
+  ipcMain.handle('kb:search', (_, ids: string[], q: string) => kbSearch(ids, q, 8))
+
   ipcMain.handle('memory:list', () => listMemories())
   ipcMain.handle('memory:add', (_, content: string) => addMemory(content))
   ipcMain.handle('memory:update', (_, id: string, content: string) => { updateMemory(id, content); return true })

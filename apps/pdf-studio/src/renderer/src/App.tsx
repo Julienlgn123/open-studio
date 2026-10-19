@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { FileStack, FileText, FolderOpen, Layers, Minimize2, RotateCw, Scissors, Trash2, Upload, X } from 'lucide-react'
+import { CopyPlus, FileImage, FileInput, FilePlus2, FileStack, FileText, FolderOpen, Hash, Images, Info, Layers, Minimize2, RotateCw, Scissors, Stamp, TextSelect, Trash2, Upload, X } from 'lucide-react'
 import { Empty, Layout, NavItem, Page, Progress, Segmented, SideTitle, Toasts, errorText, formatBytes, relativeTime, toast, useFileDrop, usePersisted } from '@ui'
 import Viewer from './Viewer'
+import { ExtractText, FormFill, ImagesToPdf, Metadata, PageNumbers, PdfToImages, Watermark } from './tools'
 import { baseName, compress, fileName, fingerprint, merge, openForView, parseRanges, readPdf, rebuild, writePdf, type PdfJsDoc } from './pdf'
 import './pdf.css'
 
-type View = 'library' | 'merge' | 'split' | 'organize' | 'compress'
+type View = 'library' | 'merge' | 'split' | 'organize' | 'compress' | 'img2pdf' | 'pdf2img' | 'watermark' | 'numbers' | 'text' | 'meta' | 'form'
 interface Recent {
   path: string
   pages: number
@@ -28,7 +29,7 @@ async function saveAs(defaultPath: string, bytes: Uint8Array): Promise<void> {
 }
 
 export default function App(): JSX.Element {
-  const [view, setView] = useState<View>('library')
+  const [view, setView] = usePersisted<View>('view', 'library')
   const [recent, setRecent] = usePersisted<Recent[]>('recent', [])
   const [open, setOpen] = useState<{ path: string; bytes: Uint8Array; doc: PdfJsDoc; key: string } | null>(null)
   const [loading, setLoading] = useState(false)
@@ -60,6 +61,15 @@ export default function App(): JSX.Element {
           <NavItem icon={<Scissors size={15} />} label="Extraire des pages" active={view === 'split'} onClick={() => setView('split')} />
           <NavItem icon={<RotateCw size={15} />} label="Organiser les pages" active={view === 'organize'} onClick={() => setView('organize')} />
           <NavItem icon={<Minimize2 size={15} />} label="Compresser" active={view === 'compress'} onClick={() => setView('compress')} />
+          <div className="ui-side-section">Convertir</div>
+          <NavItem icon={<Images size={15} />} label="Images → PDF" active={view === 'img2pdf'} onClick={() => setView('img2pdf')} />
+          <NavItem icon={<FileImage size={15} />} label="PDF → images" active={view === 'pdf2img'} onClick={() => setView('pdf2img')} />
+          <NavItem icon={<TextSelect size={15} />} label="Extraire le texte" active={view === 'text'} onClick={() => setView('text')} />
+          <div className="ui-side-section">Modifier</div>
+          <NavItem icon={<FileInput size={15} />} label="Remplir un formulaire" active={view === 'form'} onClick={() => setView('form')} />
+          <NavItem icon={<Stamp size={15} />} label="Filigrane" active={view === 'watermark'} onClick={() => setView('watermark')} />
+          <NavItem icon={<Hash size={15} />} label="Numéroter les pages" active={view === 'numbers'} onClick={() => setView('numbers')} />
+          <NavItem icon={<Info size={15} />} label="Informations" active={view === 'meta'} onClick={() => setView('meta')} />
         </>
       }
     >
@@ -68,6 +78,13 @@ export default function App(): JSX.Element {
       {view === 'split' && <SplitTool />}
       {view === 'organize' && <OrganizeTool />}
       {view === 'compress' && <CompressTool />}
+      {view === 'img2pdf' && <ImagesToPdf />}
+      {view === 'pdf2img' && <PdfToImages />}
+      {view === 'watermark' && <Watermark />}
+      {view === 'numbers' && <PageNumbers />}
+      {view === 'text' && <ExtractText />}
+      {view === 'meta' && <Metadata />}
+      {view === 'form' && <FormFill />}
       <Toasts />
     </Layout>
   )
@@ -325,7 +342,7 @@ function OrganizeTool(): JSX.Element {
   return (
     <Page
       title="Organiser les pages"
-      sub="Glisse les pages pour changer l’ordre, fais-les pivoter ou supprime celles en trop."
+      sub="Glisse les pages pour changer l’ordre ; pivote, duplique, ajoute des pages blanches ou supprime celles en trop."
       tools={
         pdf.doc && (
           <button className="btn btn-primary" disabled={busy || !pages.length} onClick={() => void save()}>
@@ -357,9 +374,15 @@ function OrganizeTool(): JSX.Element {
                 setDrag(i)
               }}
             >
-              <Thumb doc={pdf.doc!} n={p.index + 1} rotate={p.rotate} />
+              {p.index >= 0 ? <Thumb doc={pdf.doc!} n={p.index + 1} rotate={p.rotate} /> : <div className="blank-page">Page blanche</div>}
               <div className="org-bar">
                 <span>{i + 1}</span>
+                <button className="btn btn-ghost btn-sm btn-icon" title="Dupliquer" onClick={() => setPages((all) => [...all.slice(0, i + 1), { ...p }, ...all.slice(i + 1)])}>
+                  <CopyPlus size={13} />
+                </button>
+                <button className="btn btn-ghost btn-sm btn-icon" title="Insérer une page blanche après" onClick={() => setPages((all) => [...all.slice(0, i + 1), { index: -1, rotate: 0 }, ...all.slice(i + 1)])}>
+                  <FilePlus2 size={13} />
+                </button>
                 <button className="btn btn-ghost btn-sm btn-icon" title="Pivoter" onClick={() => setPages((all) => all.map((x, j) => (j === i ? { ...x, rotate: (x.rotate + 90) % 360 } : x)))}>
                   <RotateCw size={13} />
                 </button>

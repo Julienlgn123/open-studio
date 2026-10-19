@@ -1,7 +1,7 @@
 import { safeStorage } from 'electron'
 import { host } from '@open-studio/module'
 import { kitFetch, registerKit, storeGet, storeSet } from '@open-studio/kit'
-import type { AiSettings, Analysis, Line, Provider, Track, VideoInfo } from '../shared/types'
+import type { AiSettings, Analysis, AnalyzeOptions, Chapter, Line, Provider, QA, QuizQuestion, Track, VideoInfo } from '../shared/types'
 
 // Résumé YouTube : transcription d'une vidéo (sous-titres de YouTube, manuels ou automatiques),
 // puis résumé, points clés et flashcards par l'IA (Ollama en local, ou Mistral).
@@ -48,7 +48,15 @@ async function getInfo(input: string): Promise<VideoInfo> {
     url: t.baseUrl
   }))
   const thumbs: { url: string; width: number }[] = d.thumbnail?.thumbnails ?? []
+  // Chapitres : les horodatages de la description (« 0:00 Introduction »), s'il y en a au moins 3.
+  const chapters: Chapter[] = []
+  for (const line of String(d.shortDescription ?? '').split('\n')) {
+    const m = /^\s*(?:[-•▶►]\s*)?\(?((?:\d{1,2}:)?\d{1,2}:\d{2})\)?\s*[-–—:|]?\s*(.+)$/.exec(line)
+    if (m) chapters.push({ t: m[1].split(':').reduce((a, n) => a * 60 + Number(n), 0), title: m[2].trim() })
+  }
+  const okChapters = chapters.length >= 3 && chapters[0].t === 0 ? chapters : undefined
   return {
+    chapters: okChapters,
     id,
     title: d.title ?? 'Vidéo YouTube',
     author: d.author ?? '',
@@ -137,9 +145,21 @@ async function chat(system: string, user: string, json: boolean): Promise<{ text
 const SYSTEM =
   'Tu aides un étudiant à retenir le contenu d’une vidéo. Tu réponds toujours en français, de façon claire et fidèle à la vidéo, sans inventer.'
 
+const LENGTHS = { short: 'en 1 paragraphe court', normal: 'en 2 à 4 paragraphes', long: 'de façon détaillée, en 5 à 8 paragraphes' }
+const STYLES = {
+  summary: 'un résumé fidèle',
+  revision: 'une fiche de révision structurée (définitions, idées principales, exemples, à retenir), en Markdown avec titres ## et listes',
+  outline: 'un plan de cours détaillé (parties I, II, III avec sous-parties A, B), en Markdown',
+  tweet: 'un résumé ultra court et percutant, comme un fil de 3 à 5 messages'
+}
+
+function compact(lines: Line[]): string {
+  return lines.map((l) => l.text).join(' ')
+}
+
 /** Résumé + points clés + flashcards. Les longues vidéos sont d'abord résumées par morceaux. */
-async function analyze(title: string, lines: Line[], onStep: (s: string) => void): Promise<Analysis> {
-  let text = lines.map((l) => l.text).join(' ')
+async function analyze(title: string, lines: Line[], opts: AnalyzeOptions, onStep: (s: string) => void): Promise<Analysis> {
+  let text = compact(lines)
   const CHUNK = 12_000
   let model = ''
   if (text.length > CHUNK * 1.5) {
@@ -155,21 +175,17 @@ async function analyze(title: string, lines: Line[], onStep: (s: string) => void
     text = notes.join('\n\n')
   }
   onStep('Rédaction du résumé…')
+  const lang = opts.lang === 'en' ? 'Write everything (summary, points, cards) in English.' : 'Tout en français.'
   const r = await chat(
     SYSTEM,
     `Vidéo : « ${title} ».\n${text.length > CHUNK * 1.5 ? 'Notes prises sur la vidéo' : 'Transcription'} :\n\n${text}\n\n` +
-      'Réponds UNIQUEMENT avec un objet JSON de la forme {"summary": "résumé en 2 à 4 paragraphes", "points": ["point clé", …] (5 à 10), "cards": [{"q": "question", "a": "réponse courte"}, …] (6 à 12)}.',
+      `Dans "summary", écris ${STYLES[opts.style]}, ${LENGTHS[opts.length]}. ${lang}\n` +
+      'Réponds UNIQUEMENT avec un objet JSON de la forme {"summary": "…", "points": ["point clé", …] (5 à 10), "cards": [{"q": "question", "a": "réponse courte"}, …] (6 à 12)}.',
     true
   )
   model = r.model
-  const start = r.text.indexOf('{')
-  const end = r.text.lastIndexOf('}')
-  let parsed: Partial<Analysis> = {}
-  try {
-    parsed = JSON.parse(r.text.slice(start, end + 1))
-  } catch {
-    return { summary: r.text, points: [], cards: [], model }
-  }
+  const parsed = parseJson<Partial<Analysis>>(r.text)
+  if (!parsed) return { summary: r.text, points: [], cards: [], model }
   return {
     summary: String(parsed.summary ?? ''),
     points: Array.isArray(parsed.points) ? parsed.points.map(String) : [],
@@ -178,12 +194,82 @@ async function analyze(title: string, lines: Line[], onStep: (s: string) => void
   }
 }
 
+function parseJson<T>(text: string): T | null {
+  const start = text.indexOf('{')
+  const end = text.lastIndexOf('}')
+  try {
+    return JSON.parse(text.slice(start, end + 1)) as T
+  } catch {
+    return null
+  }
+}
+
+const clock = (s: number): string => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+
+/**
+ * Passages de la transcription les plus utiles pour une question (mots en commun), avec leur
+ * horodatage, dans la limite du budget : la vidéo entière si elle tient.
+ */
+function relevant(lines: Line[], question: string, budget = 36_000): string {
+  const full = lines.map((l) => `[${clock(l.t)}] ${l.text}`)
+  if (full.join('\n').length <= budget) return full.join('\n')
+  const words = new Set(question.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').match(/[a-z0-9]{4,}/g) ?? [])
+  const score = lines.map((l) => {
+    const w = l.text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').match(/[a-z0-9]{4,}/g) ?? []
+    return w.filter((x) => words.has(x)).length
+  })
+  const keep = new Set<number>()
+  let size = 0
+  for (const i of [...score.keys()].sort((a, b) => score[b] - score[a])) {
+    for (let j = Math.max(0, i - 6); j <= Math.min(lines.length - 1, i + 6); j++) {
+      if (keep.has(j)) continue
+      keep.add(j)
+      size += full[j].length
+    }
+    if (size > budget) break
+  }
+  return [...keep].sort((a, b) => a - b).map((i) => full[i]).join('\n')
+}
+
+async function ask(title: string, lines: Line[], question: string, previous: QA[]): Promise<string> {
+  const context = relevant(lines, question)
+  const prev = previous
+    .slice(-4)
+    .map((x) => `Question : ${x.q}\nRéponse : ${x.a}`)
+    .join('\n\n')
+  const r = await chat(
+    `${SYSTEM} Tu réponds uniquement d’après la transcription fournie. Si la vidéo n’en parle pas, dis-le. Cite les moments utiles sous la forme [m:ss].`,
+    `Vidéo : « ${title} ». Transcription horodatée :\n\n${context}\n\n${prev ? `Échanges précédents :\n${prev}\n\n` : ''}Question : ${question}`,
+    false
+  )
+  return r.text
+}
+
+async function quiz(title: string, lines: Line[], count: number): Promise<QuizQuestion[]> {
+  let text = compact(lines)
+  if (text.length > 30_000) text = text.slice(0, 30_000)
+  const r = await chat(
+    SYSTEM,
+    `Vidéo : « ${title} ». Transcription :\n\n${text}\n\nCrée un quiz de ${count} questions à choix multiples pour vérifier la compréhension. ` +
+      'Réponds UNIQUEMENT avec un objet JSON {"questions": [{"q": "question", "choices": ["A", "B", "C", "D"], "answer": index de la bonne réponse (0 à 3), "why": "explication courte"}]}.',
+    true
+  )
+  const parsed = parseJson<{ questions?: QuizQuestion[] }>(r.text)
+  const list = (parsed?.questions ?? []).filter((x) => x && x.q && Array.isArray(x.choices) && x.choices.length >= 2 && Number.isInteger(x.answer) && x.answer >= 0 && x.answer < x.choices.length)
+  if (!list.length) throw new Error('L’IA n’a pas produit de quiz utilisable : réessaie, ou choisis un modèle plus grand.')
+  return list.map((x) => ({ q: String(x.q), choices: x.choices.map(String), answer: x.answer, why: x.why ? String(x.why) : undefined }))
+}
+
 export function activate(): void {
   registerKit()
   const ipc = host.ipcMain
   ipc.handle('yt:info', (_e, url: string) => getInfo(url))
   ipc.handle('yt:lines', (_e, track: Track, translate?: string) => getLines(track, translate))
-  ipc.handle('yt:analyze', (e, title: string, lines: Line[]) => analyze(title, lines, (s) => e.sender.send('yt:step', s)))
+  ipc.handle('yt:analyze', (e, title: string, lines: Line[], opts?: AnalyzeOptions) =>
+    analyze(title, lines, { length: 'normal', style: 'summary', lang: 'fr', ...opts }, (s) => e.sender.send('yt:step', s))
+  )
+  ipc.handle('yt:ask', (_e, title: string, lines: Line[], question: string, previous: QA[]) => ask(title, lines, question, previous ?? []))
+  ipc.handle('yt:quiz', (_e, title: string, lines: Line[], count: number) => quiz(title, lines, count ?? 8))
   ipc.handle('yt:settings', () => settings())
   ipc.handle('yt:models', () => ollamaModels())
   ipc.handle('yt:setSettings', (_e, patch: Partial<AiSettings> & { provider?: Provider }) => {

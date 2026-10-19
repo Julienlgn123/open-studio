@@ -10,6 +10,8 @@ import AIStudio from './components/AIStudio'
 import QuizStudio from './components/QuizStudio'
 import FlashcardStudio from './components/FlashcardStudio'
 import StatsView from './components/StatsView'
+import PlannerView from './components/PlannerView'
+import GradesView from './components/GradesView'
 import TrashView from './components/TrashView'
 import Toast from './components/Toast'
 import AIBanner from './components/AIBanner'
@@ -152,6 +154,18 @@ export default function App() {
               <motion.div key="stats" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
                 initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
                 <StatsView />
+              </motion.div>
+            )}
+            {view === 'planner' && (
+              <motion.div key="planner" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+                initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+                <PlannerView />
+              </motion.div>
+            )}
+            {view === 'grades' && (
+              <motion.div key="grades" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+                initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+                <GradesView />
               </motion.div>
             )}
             {view === 'trash' && (

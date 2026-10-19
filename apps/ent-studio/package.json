@@ -13,7 +13,7 @@
     "id": "ent-studio",
     "name": "ENT Studio",
     "tagline": "Ton emploi du temps de la fac, toujours à jour.",
-    "description": "Ton emploi du temps ADE en direct : semaine claire avec cours, prof, salle et horaires, mise à jour au lancement et alerte dès qu'un cours change.",
+    "description": "Ton emploi du temps ADE toujours à jour : vues semaine, mois et liste, examens avec compte à rebours, heures par matière, filtres des options, notes et devoirs par cours, rappel avant chaque cours, résumé du matin, alertes de changement et export .ics.",
     "category": "Études",
     "accent": "#f97316",
     "dataDirName": "open-studio-ent-studio"

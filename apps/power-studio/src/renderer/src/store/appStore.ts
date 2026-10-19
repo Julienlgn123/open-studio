@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { AppSettings, HardwareProfile, ProfileDef, ProfileId } from '@shared/types'
 import { DEFAULT_SETTINGS } from '@shared/types'
 
-export type View = 'dashboard' | 'profiles' | 'tweaks' | 'startup' | 'apps' | 'clean' | 'auto' | 'settings'
+export type View = 'dashboard' | 'profiles' | 'tweaks' | 'startup' | 'apps' | 'clean' | 'auto' | 'battery' | 'repair' | 'settings'
 
 export interface Toast {
   id: number

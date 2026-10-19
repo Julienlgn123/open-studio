@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { startRecording, transcribe, type Recorder } from '../lib/voice'
 import { Loader2, Mic, ArrowUp, FileText, FolderSearch, Plus, Square, X } from 'lucide-react'
-import type { Attachment, EngineKind } from '@shared/types'
+import type { Attachment, EngineKind, QuickPrompt } from '@shared/types'
+import { DEFAULT_QUICK_PROMPTS } from '@shared/types'
+import { useChatStore } from '../store/chatStore'
+import { KnowledgeButton } from './LibraryModal'
 import { imageSrc, readAttachment } from '../lib/readAttachment'
 
 const MAX_ATTACHMENTS = 8
@@ -15,9 +18,10 @@ export default function Composer({
   toolbar,
   variant = 'dock',
   prefill,
-  placeholder = 'Écris ton message…',
+  placeholder = 'Écris ton message… (/ pour les raccourcis)',
   extraAction,
-  fileAccess
+  fileAccess,
+  knowledge
 }: {
   disabled: boolean
   isStreaming: boolean
@@ -41,8 +45,34 @@ export default function Composer({
   }
   /** Interrupteur « le modèle peut lire mes dossiers ». `configured` = au moins un dossier autorisé. */
   fileAccess?: { on: boolean; configured: boolean; onToggle: () => void }
+  /** Bibliothèques de documents consultées. */
+  knowledge?: { selected: string[]; onChange: (ids: string[]) => void }
 }): JSX.Element {
   const [value, setValue] = useState('')
+  // Raccourcis « / » : « /resume » + Entrée insère la consigne toute faite.
+  const quickPrompts = useChatStore((s) => s.preferences.quickPrompts) ?? DEFAULT_QUICK_PROMPTS
+  const [slashIndex, setSlashIndex] = useState(0)
+  const [slashClosed, setSlashClosed] = useState(false)
+  const slashQuery = /^\/[\p{L}\d-]*$/u.test(value) ? value.slice(1).toLowerCase() : null
+  const norm = (t: string): string => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const slashMatches: QuickPrompt[] =
+    slashQuery === null || slashClosed
+      ? []
+      : quickPrompts.filter((p) => norm(p.command).startsWith(norm(slashQuery)) || norm(p.label).includes(norm(slashQuery))).slice(0, 8)
+  const applyQuick = (p: QuickPrompt): void => {
+    setValue(p.text)
+    setSlashIndex(0)
+    requestAnimationFrame(() => {
+      const el = ref.current
+      if (!el) return
+      resize(el)
+      el.focus()
+      // Curseur dans le bloc de code s'il y en a un, sinon à la fin.
+      const fence = p.text.indexOf('```\n')
+      const pos = fence >= 0 ? fence + 4 : p.text.length
+      el.setSelectionRange(pos, pos)
+    })
+  }
   // Dictée : enregistrement du micro puis transcription locale (Whisper).
   const [voice, setVoice] = useState<'idle' | 'recording' | 'transcribing'>('idle')
   const [voiceModelPct, setVoiceModelPct] = useState<number | null>(null)
@@ -179,6 +209,29 @@ export default function Composer({
           </div>
         )}
 
+        {slashMatches.length > 0 && (
+          <div className="relative">
+            <div className={`absolute left-3 right-3 z-30 overflow-hidden rounded-[14px] border border-base-700 bg-base-850 p-1 shadow-panel ${variant === 'hero' ? 'top-[112px]' : 'bottom-1'}`}>
+              {slashMatches.map((p, i) => (
+                <button
+                  key={p.id}
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    applyQuick(p)
+                  }}
+                  onMouseEnter={() => setSlashIndex(i)}
+                  className={`flex w-full items-center gap-3 rounded-[10px] px-3 py-1.5 text-left text-[13px] ${i === slashIndex % slashMatches.length ? 'bg-base-800 text-base-50' : 'text-base-300'}`}
+                >
+                  <span className="w-20 shrink-0 font-mono text-accent-400">/{p.command}</span>
+                  <span className="shrink-0">{p.label}</span>
+                  <span className="min-w-0 flex-1 truncate text-[11.5px] text-base-500">{p.text.replace(/\s+/g, ' ')}</span>
+                </button>
+              ))}
+              <div className="px-3 pb-1 pt-1.5 text-[10.5px] text-base-500">↑ ↓ pour choisir · Entrée ou Tab pour insérer · Échap pour fermer · Préférences → Raccourcis</div>
+            </div>
+          </div>
+        )}
+
         <textarea
           ref={ref}
           value={value}
@@ -186,6 +239,8 @@ export default function Composer({
           rows={variant === 'hero' ? 2 : 1}
           onChange={(e) => {
             setValue(e.target.value)
+            setSlashClosed(false)
+            setSlashIndex(0)
             resize(e.target)
           }}
           onPaste={(e) => {
@@ -196,6 +251,23 @@ export default function Composer({
             }
           }}
           onKeyDown={(e) => {
+            if (slashMatches.length) {
+              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault()
+                setSlashIndex((i) => (i + (e.key === 'ArrowDown' ? 1 : slashMatches.length - 1)) % slashMatches.length)
+                return
+              }
+              if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault()
+                applyQuick(slashMatches[slashIndex % slashMatches.length])
+                return
+              }
+              if (e.key === 'Escape') {
+                e.preventDefault()
+                setSlashClosed(true)
+                return
+              }
+            }
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
               submit()
@@ -252,6 +324,7 @@ export default function Composer({
               Fichiers
             </button>
           )}
+          {knowledge && <KnowledgeButton selected={knowledge.selected} onChange={knowledge.onChange} />}
           <button
             onClick={(e) => {
               e.stopPropagation()

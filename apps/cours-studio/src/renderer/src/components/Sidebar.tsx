@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Home, BookOpen, MoreHorizontal, Trash2, Wifi } from 'lucide-react'
+import { Plus, Home, BookOpen, CalendarDays, Award, MoreHorizontal, Trash2, Wifi } from 'lucide-react'
 import { useStore } from '../store'
 import SubjectModal from './SubjectModal'
 import ContextMenu from './ContextMenu'
@@ -77,6 +77,15 @@ export default function Sidebar() {
           >
             <Home size={15} />
             <span className="sidebar-item-name">Accueil</span>
+          </button>
+
+          <button className={`sidebar-item ${view === 'planner' ? 'active' : ''}`} style={{ width: '100%' }} onClick={() => setView('planner')}>
+            <CalendarDays size={15} />
+            <span className="sidebar-item-name">Planning</span>
+          </button>
+          <button className={`sidebar-item ${view === 'grades' ? 'active' : ''}`} style={{ width: '100%' }} onClick={() => setView('grades')}>
+            <Award size={15} />
+            <span className="sidebar-item-name">Notes</span>
           </button>
         </div>
 

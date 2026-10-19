@@ -109,3 +109,79 @@
   color: var(--success);
   font-weight: 600;
 }
+
+/* ───── Retouches ───── */
+.pending-block {
+  border-bottom: 1px solid var(--border);
+}
+.pending-block:last-of-type {
+  border-bottom: 0;
+}
+.pending-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.pending-name .info {
+  font-size: 11.5px;
+  font-weight: 400;
+}
+.btn.on {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 22px;
+  padding: 12px 14px 14px 46px;
+  background: var(--surface-2);
+  border-radius: 10px;
+  margin: 0 0 10px;
+}
+.opt-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.opt-group .select {
+  min-width: 150px;
+}
+.select-sm {
+  height: 28px;
+  font-size: 12px;
+  width: auto;
+}
+.time-in {
+  width: 100px;
+}
+.opt-actions {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.ui-row.wrap {
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+.preset-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 4px;
+}
+.preset-chip button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.preset-chip .x {
+  opacity: 0.6;
+}
+.tiny-chip {
+  font-size: 10.5px;
+  margin-left: 6px;
+}

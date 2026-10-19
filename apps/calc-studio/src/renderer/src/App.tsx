@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeftRight, Calculator, Delete, LineChart, Plus, Trash2, X } from 'lucide-react'
+import { ArrowLeftRight, Binary, CalendarDays, Calculator, Coins, Copy, Delete, Download, Euro, LineChart, Plus, Sigma, Table2, Trash2, Variable, X } from 'lucide-react'
 import { all, create, type MathJsInstance } from 'mathjs'
-import { Layout, NavItem, Page, Segmented, SideTitle, Toasts, uid, usePersisted, useTheme } from '@ui'
+import { Layout, Modal, NavItem, Page, Segmented, SideTitle, Toasts, toast, uid, usePersisted, useTheme } from '@ui'
+import { AlgebraView, CurrencyView, DatesView, FinanceView, ProgrammerView, StatsView } from './tools'
 import './calc.css'
 
-type View = 'calc' | 'graph' | 'units'
+type View = 'calc' | 'graph' | 'units' | 'prog' | 'fx' | 'dates' | 'money' | 'stats' | 'algebra'
 type Angle = 'deg' | 'rad'
 
 /** Instance mathjs dont sin/cos/tan suivent l'unité d'angle choisie. */
@@ -44,21 +45,36 @@ function format(v: unknown, math: MathJsInstance): string {
 }
 
 export default function App(): JSX.Element {
-  const [view, setView] = useState<View>('calc')
+  const [view, setView] = usePersisted<View>('view', 'calc')
+  const nav = (id: View, icon: JSX.Element, label: string): JSX.Element => <NavItem icon={icon} label={label} active={view === id} onClick={() => setView(id)} />
   return (
     <Layout
       side={
         <>
           <SideTitle>Calculatrice</SideTitle>
-          <NavItem icon={<Calculator size={15} />} label="Scientifique" active={view === 'calc'} onClick={() => setView('calc')} />
-          <NavItem icon={<LineChart size={15} />} label="Courbes" active={view === 'graph'} onClick={() => setView('graph')} />
-          <NavItem icon={<ArrowLeftRight size={15} />} label="Conversions" active={view === 'units'} onClick={() => setView('units')} />
+          {nav('calc', <Calculator size={15} />, 'Scientifique')}
+          {nav('graph', <LineChart size={15} />, 'Courbes')}
+          {nav('algebra', <Variable size={15} />, 'Algèbre')}
+          {nav('stats', <Sigma size={15} />, 'Moyennes et stats')}
+          <div className="ui-side-section">Quotidien</div>
+          {nav('money', <Euro size={15} />, 'Pourcentages et argent')}
+          {nav('fx', <Coins size={15} />, 'Devises')}
+          {nav('dates', <CalendarDays size={15} />, 'Dates')}
+          {nav('units', <ArrowLeftRight size={15} />, 'Conversions')}
+          <div className="ui-side-section">Informatique</div>
+          {nav('prog', <Binary size={15} />, 'Programmeur')}
         </>
       }
     >
       {view === 'calc' && <CalcView />}
       {view === 'graph' && <GraphView />}
       {view === 'units' && <UnitsView />}
+      {view === 'prog' && <ProgrammerView />}
+      {view === 'fx' && <CurrencyView />}
+      {view === 'dates' && <DatesView />}
+      {view === 'money' && <FinanceView />}
+      {view === 'stats' && <StatsView />}
+      {view === 'algebra' && <AlgebraView />}
       <Toasts />
     </Layout>
   )
@@ -142,7 +158,14 @@ function CalcView(): JSX.Element {
               placeholder="0"
               spellCheck={false}
             />
-            <div className="screen-preview">{preview && `= ${preview}`}</div>
+            <div className="screen-preview">
+              {preview && `= ${preview}`}
+              {preview && (
+                <button className="btn btn-ghost btn-sm btn-icon" onClick={() => void window.kit.clipboard.write(preview.replace(',', '.')).then(() => toast('Résultat copié', 'success'))} title="Copier le résultat">
+                  <Copy size={13} />
+                </button>
+              )}
+            </div>
           </div>
           <div className="keypad">
             {KEYS.flat().map((k) => (
@@ -167,7 +190,21 @@ function CalcView(): JSX.Element {
               <b className={h.result.startsWith('Erreur') ? 'err' : ''}>{h.result.startsWith('Erreur') ? h.result : `= ${h.result}`}</b>
             </button>
           ))}
-          {!history.length && <span className="faint">Tes calculs apparaîtront ici.</span>}
+          {!history.length && <span className="faint">Tes calculs apparaîtront ici. Astuce : « r = 5 » puis « π r^2 » réutilise r.</span>}
+          {Object.keys(scope.current).filter((k) => k !== 'ans').length > 0 && (
+            <div className="vars-box">
+              <b className="faint">Variables</b>
+              {Object.entries(scope.current)
+                .filter(([k]) => k !== 'ans')
+                .map(([k, v]) => (
+                  <button key={k} className="hist" onClick={() => setExpr((e) => e + k)}>
+                    <span>
+                      {k} = {format(v, math)}
+                    </span>
+                  </button>
+                ))}
+            </div>
+          )}
         </aside>
       </div>
     </Page>
@@ -181,6 +218,14 @@ interface Fn {
   expr: string
   color: string
   visible: boolean
+  deriv?: boolean
+}
+interface Mark {
+  x: number
+  y: number
+  kind: 'zéro' | 'intersection' | 'extremum'
+  color: string
+  label: string
 }
 const FN_COLORS = ['#6366f1', '#ef4444', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4']
 
@@ -196,6 +241,7 @@ function GraphView(): JSX.Element {
   const drag = useRef<{ x: number; y: number; cx: number; cy: number } | null>(null)
   const theme = useTheme()
   const math = useMemo(() => makeMath('rad'), [])
+  const [tableOpen, setTableOpen] = useState(false)
 
   const compiled = useMemo(
     () =>
@@ -209,6 +255,79 @@ function GraphView(): JSX.Element {
       }),
     [fns, math]
   )
+
+  /** Zéros, extremums et intersections dans la zone visible (recherche par changement de signe). */
+  const marks = useMemo<Mark[]>(() => {
+    const el = box.current
+    if (!el) return []
+    const W = el.clientWidth || 800
+    const x0 = view.cx - W / 2 / view.scale
+    const x1 = view.cx + W / 2 / view.scale
+    const N = 800
+    const h = (x1 - x0) / N
+    const out: Mark[] = []
+    const solve = (g: (x: number) => number, a: number, b: number): number | null => {
+      let lo = a
+      let hi = b
+      for (let k = 0; k < 50; k++) {
+        const m = (lo + hi) / 2
+        if (g(lo) * g(m) <= 0) hi = m
+        else lo = m
+      }
+      const r = (lo + hi) / 2
+      return Math.abs(g(r)) < 1e-6 * Math.max(1, Math.abs(r)) ? r : null
+    }
+    const scan = (g: (x: number) => number, push: (x: number) => void): void => {
+      let px = x0
+      let py = g(x0)
+      for (let i = 1; i <= N; i++) {
+        const x = x0 + i * h
+        const y = g(x)
+        if (Number.isFinite(py) && Number.isFinite(y) && py * y <= 0 && !(py === 0 && i > 1)) {
+          const r = y === 0 ? x : solve(g, px, x)
+          if (r !== null) push(r)
+        }
+        px = x
+        py = y
+      }
+    }
+    const vis = compiled.filter((f) => f.visible && f.fn)
+    for (const f of vis) {
+      const fn = f.fn!
+      scan(fn, (x) => out.push({ x, y: 0, kind: 'zéro', color: f.color, label: f.expr }))
+      const d = (x: number): number => (fn(x + 1e-5) - fn(x - 1e-5)) / 2e-5
+      scan(d, (x) => {
+        const y = fn(x)
+        if (Number.isFinite(y)) out.push({ x, y, kind: 'extremum', color: f.color, label: f.expr })
+      })
+    }
+    for (let i = 0; i < vis.length; i++)
+      for (let j = i + 1; j < vis.length; j++) {
+        const a = vis[i].fn!
+        const b = vis[j].fn!
+        scan(
+          (x) => a(x) - b(x),
+          (x) => out.push({ x, y: a(x), kind: 'intersection', color: 'var(--text)', label: `${vis[i].expr} ∩ ${vis[j].expr}` })
+        )
+      }
+    return out.slice(0, 60)
+  }, [compiled, view])
+
+  const exportPng = async (): Promise<void> => {
+    const c = canvas.current
+    if (!c) return
+    const out = document.createElement('canvas')
+    out.width = c.width
+    out.height = c.height
+    const ctx = out.getContext('2d')!
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#111'
+    ctx.fillRect(0, 0, out.width, out.height)
+    ctx.drawImage(c, 0, 0)
+    const path = await window.kit.files.save({ title: 'Enregistrer le graphique', defaultPath: 'courbes.png', filters: [{ name: 'PNG', extensions: ['png'] }] })
+    if (!path) return
+    await window.kit.files.writeBase64(path, out.toDataURL('image/png').split(',')[1])
+    toast('Graphique enregistré', 'success')
+  }
 
   useEffect(() => {
     const c = canvas.current
@@ -289,6 +408,37 @@ function GraphView(): JSX.Element {
         lastY = py
       }
       ctx.stroke()
+      if (f.deriv) {
+        const fn = f.fn
+        ctx.setLineDash([6, 5])
+        ctx.lineWidth = 1.8
+        ctx.beginPath()
+        let pen2 = false
+        for (let px = 0; px <= W; px++) {
+          const x = toX(px)
+          const y = (fn(x + 1e-5) - fn(x - 1e-5)) / 2e-5
+          const py = toPx(0, y)[1]
+          if (!isFinite(y) || Math.abs(py) > H * 4) {
+            pen2 = false
+            continue
+          }
+          if (pen2) ctx.lineTo(px, py)
+          else ctx.moveTo(px, py)
+          pen2 = true
+        }
+        ctx.stroke()
+        ctx.setLineDash([])
+      }
+    }
+    for (const m of marks) {
+      const [px, py] = toPx(m.x, m.y)
+      ctx.beginPath()
+      ctx.arc(px, py, 4, 0, Math.PI * 2)
+      ctx.fillStyle = css.getPropertyValue('--bg').trim() || '#000'
+      ctx.fill()
+      ctx.lineWidth = 2
+      ctx.strokeStyle = m.color.startsWith('var') ? axis : m.color
+      ctx.stroke()
     }
     if (cursor) {
       for (const f of compiled) {
@@ -302,7 +452,7 @@ function GraphView(): JSX.Element {
         ctx.fill()
       }
     }
-  }, [compiled, view, cursor, theme])
+  }, [compiled, view, cursor, theme, marks])
 
   useEffect(() => {
     const ro = new ResizeObserver(() => setView((v) => ({ ...v })))
@@ -324,6 +474,9 @@ function GraphView(): JSX.Element {
             <button className="fn-dot" style={{ background: f.visible ? f.color : 'transparent', borderColor: f.color }} onClick={() => setFns((all) => all.map((x, j) => (j === i ? { ...x, visible: !x.visible } : x)))} title="Afficher / masquer" />
             <span className="faint fn-name">y =</span>
             <input className={`input mono${f.error ? ' bad' : ''}`} value={f.expr} onChange={(e) => setFns((all) => all.map((x, j) => (j === i ? { ...x, expr: e.target.value } : x)))} title={f.error ?? undefined} />
+            <button className={`btn btn-sm btn-icon ${f.deriv ? 'on' : 'btn-ghost'}`} onClick={() => setFns((all) => all.map((x, j) => (j === i ? { ...x, deriv: !x.deriv } : x)))} title="Tracer aussi la dérivée (pointillés)">
+              f′
+            </button>
             <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setFns((all) => all.filter((_, j) => j !== i))}>
               <X size={13} />
             </button>
@@ -333,9 +486,31 @@ function GraphView(): JSX.Element {
           <Plus size={13} /> Ajouter une fonction
         </button>
         <p className="faint graph-help">Exemples : 2x+1, sqrt(x), 1/x, exp(-x^2), abs(sin(x)). Glisse pour te déplacer, molette pour zoomer.</p>
-        <button className="btn btn-ghost btn-sm" onClick={() => setView({ cx: 0, cy: 0, scale: 50 })}>
-          Recentrer
-        </button>
+        <div className="ui-row wrap-row">
+          <button className="btn btn-ghost btn-sm" onClick={() => setView({ cx: 0, cy: 0, scale: 50 })}>
+            Recentrer
+          </button>
+          <button className="btn btn-ghost btn-sm" onClick={() => setTableOpen(true)}>
+            <Table2 size={13} /> Tableau de valeurs
+          </button>
+          <button className="btn btn-ghost btn-sm" onClick={() => void exportPng()}>
+            <Download size={13} /> Image
+          </button>
+        </div>
+        {marks.length > 0 && (
+          <div className="marks">
+            <b className="faint">Points remarquables (zone visible)</b>
+            {marks.slice(0, 14).map((m, i) => (
+              <button key={i} className="mark-row" onClick={() => setView((v) => ({ ...v, cx: m.x, cy: m.y }))} title={m.label}>
+                <span className="fn-dot small" style={{ background: m.color }} />
+                <span className="faint">{m.kind}</span>
+                <b>
+                  ({m.x.toFixed(3).replace('.', ',')} ; {m.y.toFixed(3).replace('.', ',')})
+                </b>
+              </button>
+            ))}
+          </div>
+        )}
         {cursor && (
           <div className="cursor-values">
             <div>
@@ -370,7 +545,69 @@ function GraphView(): JSX.Element {
       >
         <canvas ref={canvas} />
       </div>
+      {tableOpen && <ValuesTable fns={compiled} onClose={() => setTableOpen(false)} />}
     </div>
+  )
+}
+
+function ValuesTable({ fns, onClose }: { fns: { id: string; expr: string; color: string; fn: ((x: number) => number) | null }[]; onClose: () => void }): JSX.Element {
+  const [start, setStart] = useState('-5')
+  const [step, setStep] = useState('1')
+  const [count, setCount] = useState('11')
+  const xs = Array.from({ length: Math.min(200, Math.max(1, Math.round(Number(count) || 0))) }, (_, i) => Number(start.replace(',', '.')) + i * Number(step.replace(',', '.')))
+  const usable = fns.filter((f) => f.fn)
+  const cell = (v: number): string => (Number.isFinite(v) ? (+v.toFixed(6)).toString().replace('.', ',') : '—')
+  const csv = ['x;' + usable.map((f) => f.expr).join(';'), ...xs.map((x) => [cell(x), ...usable.map((f) => cell(f.fn!(x)))].join(';'))].join('\n')
+  return (
+    <Modal
+      title="Tableau de valeurs"
+      onClose={onClose}
+      width={640}
+      footer={
+        <button className="btn btn-secondary" onClick={() => void window.kit.clipboard.write(csv).then(() => toast('Tableau copié (collable dans un tableur)', 'success'))}>
+          <Copy size={14} /> Copier pour un tableur
+        </button>
+      }
+    >
+      <div className="ui-row">
+        <label className="field">
+          <span className="field-label">x de départ</span>
+          <input className="input" value={start} onChange={(e) => setStart(e.target.value)} />
+        </label>
+        <label className="field">
+          <span className="field-label">Pas</span>
+          <input className="input" value={step} onChange={(e) => setStep(e.target.value)} />
+        </label>
+        <label className="field">
+          <span className="field-label">Nombre de lignes</span>
+          <input className="input" value={count} onChange={(e) => setCount(e.target.value)} />
+        </label>
+      </div>
+      <div className="values-wrap">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>x</th>
+              {usable.map((f) => (
+                <th key={f.id} style={{ color: f.color }}>
+                  {f.expr}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {xs.map((x, i) => (
+              <tr key={i}>
+                <td>{cell(x)}</td>
+                {usable.map((f) => (
+                  <td key={f.id}>{cell(f.fn!(x))}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Modal>
   )
 }
 

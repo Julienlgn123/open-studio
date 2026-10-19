@@ -15,8 +15,8 @@
   "openStudioModule": {
     "id": "pdf-studio",
     "name": "PDF Studio",
-    "tagline": "Lire, annoter, fusionner, signer tes PDF.",
-    "description": "Lecteur PDF avec annotations et signets, fusion, découpage, rotation, réorganisation des pages, signature manuscrite et compression.",
+    "tagline": "Lire, annoter, signer, remplir, convertir tes PDF.",
+    "description": "Lecteur avec recherche, mode nuit, surlignage, dessin, texte, signature et signets ; fusion, extraction, organisation (pages blanches, doublons), compression, images ↔ PDF, filigrane, numéros de page, texte extrait, formulaires à remplir et métadonnées. 100 % local.",
     "category": "Documents",
     "accent": "#ef4444",
     "dataDirName": "pdf-studio",

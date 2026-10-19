@@ -23,6 +23,11 @@ import type {
 
 let db: Database.Database
 
+/** Accès direct pour les tables des fonctions ajoutées (synchro de dossiers). */
+export function rawDb(): Database.Database {
+  return db
+}
+
 export function getDbPath(): string {
   return join(app.getPath('userData'), 'drive-backup-manager.db')
 }

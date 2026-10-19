@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, ArrowDown, ArrowUp, Cpu, Gauge, HardDrive, Info, ListTree, MemoryStick, Monitor, Network, Search, Thermometer, Zap } from 'lucide-react'
-import { Layout, NavItem, Page, SideTitle, Toasts, formatBytes, useTheme } from '@ui'
+import { useEffect, useMemo, useState } from 'react'
+import { C, Chart, HISTORY, Meter } from './chart'
+import { AlertsView, HistoryView, SpaceView, SpeedView, systemReport, useVolumes } from './extras'
+import { Activity, ArrowDown, ArrowUp, Bell, Copy, Cpu, FolderOpen, Gauge, HardDrive, History, Info, ListTree, MemoryStick, Monitor, Network, PieChart, Save, Search, Thermometer, Wifi, X, Zap } from 'lucide-react'
+import { Layout, Modal, NavItem, Page, Segmented, SideTitle, Toasts, errorText, formatBytes, toast } from '@ui'
 import type { ProcessInfo, Sample, SystemInfo, Volume } from '../../shared/types'
 import './monitor.css'
 
-type View = 'summary' | 'perf' | 'processes' | 'disks' | 'system'
-const HISTORY = 120 // 2 minutes à 1 mesure par seconde
+type View = 'summary' | 'perf' | 'history' | 'processes' | 'disks' | 'space' | 'speed' | 'alerts' | 'system'
 
 const pct = (v: number | null | undefined, digits = 0): string => (v == null ? '—' : `${v.toFixed(digits)} %`)
 const rate = (v: number | null): string => (v == null ? '—' : `${formatBytes(v)}/s`)
@@ -52,13 +53,17 @@ export default function App(): JSX.Element {
           </SideTitle>
           <NavItem icon={<Gauge size={15} />} label="Résumé" active={view === 'summary'} onClick={() => setView('summary')} />
           <NavItem icon={<Activity size={15} />} label="Performances" active={view === 'perf'} onClick={() => setView('perf')} />
+          <NavItem icon={<History size={15} />} label="Historique" active={view === 'history'} onClick={() => setView('history')} />
           <NavItem icon={<ListTree size={15} />} label="Processus" active={view === 'processes'} onClick={() => setView('processes')} />
           <NavItem icon={<HardDrive size={15} />} label="Disques" active={view === 'disks'} onClick={() => setView('disks')} />
+          <NavItem icon={<PieChart size={15} />} label="Espace occupé" active={view === 'space'} onClick={() => setView('space')} />
+          <NavItem icon={<Wifi size={15} />} label="Test de débit" active={view === 'speed'} onClick={() => setView('speed')} />
+          <NavItem icon={<Bell size={15} />} label="Alertes" active={view === 'alerts'} onClick={() => setView('alerts')} />
           <NavItem icon={<Info size={15} />} label="Système" active={view === 'system'} onClick={() => setView('system')} />
           <div className="ui-side-foot credit">
             <span className={`live${last ? ' on' : ''}`} /> {last ? 'Mesures en direct' : 'Connexion aux capteurs…'}
             <p>
-              Lecture seule : rien n’est modifié sur ton PC. Inspiré de{' '}
+              Rien n’est modifié sur ton PC sans ta confirmation. Inspiré de{' '}
               <button className="link" onClick={() => void window.kit.openExternal('https://tmog.org/')}>
                 TMOG (tmog.org)
               </button>
@@ -70,100 +75,17 @@ export default function App(): JSX.Element {
     >
       {view === 'summary' && <Summary samples={samples} info={info} />}
       {view === 'perf' && <Performance samples={samples} info={info} />}
+      {view === 'history' && <HistoryView />}
       {view === 'processes' && <Processes />}
       {view === 'disks' && <Disks info={info} />}
+      {view === 'space' && <SpaceView />}
+      {view === 'speed' && <SpeedView />}
+      {view === 'alerts' && <AlertsView />}
       {view === 'system' && <SystemView info={info} />}
       <Toasts />
     </Layout>
   )
 }
-
-// ─── Graphique ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Courbe en direct. Une mesure manquante (null) laisse un trou : on ne trace jamais une ligne
- * à travers des données qu'on n'a pas.
- */
-function Chart({ series, max, height = 120, colors }: { series: (number | null)[][]; max?: number; height?: number; colors: string[] }): JSX.Element {
-  const ref = useRef<HTMLCanvasElement>(null)
-  const theme = useTheme()
-  useEffect(() => {
-    const c = ref.current
-    if (!c) return
-    const ratio = window.devicePixelRatio || 1
-    const W = c.clientWidth
-    const H = height
-    c.width = W * ratio
-    c.height = H * ratio
-    const ctx = c.getContext('2d')!
-    ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
-    ctx.clearRect(0, 0, W, H)
-    const css = getComputedStyle(document.documentElement)
-    ctx.strokeStyle = css.getPropertyValue('--border').trim()
-    ctx.lineWidth = 1
-    for (let i = 1; i < 4; i++) {
-      ctx.beginPath()
-      ctx.moveTo(0, (H / 4) * i)
-      ctx.lineTo(W, (H / 4) * i)
-      ctx.stroke()
-    }
-    const top = max ?? Math.max(1, ...series.flat().filter((v): v is number => v != null)) * 1.15
-    const dx = W / (HISTORY - 1)
-    series.forEach((s, si) => {
-      const off = HISTORY - s.length
-      const col = colors[si]
-      const segment = (fill: boolean): void => {
-        ctx.beginPath()
-        let pen = false
-        let startX = 0
-        let lastX = 0
-        const close = (): void => {
-          if (fill && pen) {
-            ctx.lineTo(lastX, H)
-            ctx.lineTo(startX, H)
-            ctx.closePath()
-            ctx.fill()
-            ctx.beginPath()
-          }
-        }
-        s.forEach((v, i) => {
-          const x = (off + i) * dx
-          if (v == null) {
-            close()
-            pen = false
-            return
-          }
-          const y = H - (Math.min(v, top) / top) * (H - 2) - 1
-          if (!pen) {
-            ctx.moveTo(x, fill ? H : y)
-            if (fill) ctx.lineTo(x, y)
-            startX = x
-          } else ctx.lineTo(x, y)
-          pen = true
-          lastX = x
-        })
-        if (fill) close()
-        else ctx.stroke()
-      }
-      ctx.fillStyle = `${col}22`
-      segment(true)
-      ctx.strokeStyle = col
-      ctx.lineWidth = 1.8
-      segment(false)
-    })
-  }, [series, max, height, colors, theme])
-  return <canvas ref={ref} className="chart" style={{ height }} />
-}
-
-function Meter({ value, color }: { value: number | null; color: string }): JSX.Element {
-  return (
-    <div className="meter">
-      <div style={{ width: `${Math.min(100, value ?? 0)}%`, background: color, opacity: value == null ? 0 : 1 }} />
-    </div>
-  )
-}
-
-const C = { cpu: '#22d3ee', mem: '#a78bfa', disk: '#fbbf24', net: '#34d399', netTx: '#f472b6', gpu: '#fb7185' }
 
 // ─── Résumé ────────────────────────────────────────────────────────────────────────────────
 
@@ -386,35 +308,57 @@ function Performance({ samples, info }: { samples: Sample[]; info: SystemInfo | 
 function Processes(): JSX.Element {
   const [list, setList] = useState<ProcessInfo[] | null>(null)
   const [sort, setSort] = useState<'cpu' | 'mem' | 'name'>('cpu')
+  const [grouped, setGrouped] = useState<'group' | 'pid'>('group')
   const [q, setQ] = useState('')
+  const [confirm, setConfirm] = useState<ProcessInfo | null>(null)
+  const [paused, setPaused] = useState(false)
   useEffect(() => {
     let alive = true
-    const load = (): void => void window.kit.invoke<ProcessInfo[]>('monitor:processes').then((p) => alive && setList(p))
+    setList(null)
+    const load = (): void => void window.kit.invoke<ProcessInfo[]>('monitor:processes', grouped === 'group').then((p) => alive && setList(p))
     load()
+    if (paused) return () => void (alive = false)
     const t = setInterval(load, 3000)
     return () => {
       alive = false
       clearInterval(t)
     }
-  }, [])
+  }, [grouped, paused])
   const rows = (list ?? [])
-    .filter((p) => !q || p.name.toLowerCase().includes(q.toLowerCase()))
+    .filter((p) => !q || p.name.toLowerCase().includes(q.toLowerCase()) || String(p.pid) === q)
     .sort((a, b) => (sort === 'name' ? a.name.localeCompare(b.name) : sort === 'mem' ? b.mem - a.mem : b.cpu - a.cpu))
+  const totalCpu = (list ?? []).reduce((a, p) => a + p.cpu, 0)
   const th = (id: typeof sort, label: string, num = false): JSX.Element => (
     <th className={`sortable${num ? ' num' : ''}`} onClick={() => setSort(id)}>
       {label}
       {sort === id ? ' ↓' : ''}
     </th>
   )
+  const kill = async (p: ProcessInfo): Promise<void> => {
+    setConfirm(null)
+    try {
+      const n = await window.kit.invoke<number>('monitor:kill', grouped === 'group' ? { name: p.name } : { pid: p.pid })
+      toast(n > 1 ? `${p.name} terminé (${n} processus).` : `${p.name} terminé.`, 'success')
+      setList((l) => (l ?? []).filter((x) => x !== p))
+    } catch (e) {
+      toast(errorText(e), 'error')
+    }
+  }
   return (
     <Page
       title="Processus"
-      sub="Les programmes regroupés par nom (un navigateur en lance des dizaines). Mise à jour toutes les 3 s."
+      sub={`${list?.length ?? '…'} ${grouped === 'group' ? 'programmes' : 'processus'} · ${totalCpu.toFixed(0)} % de processeur au total. Clic droit ou ✕ pour terminer.`}
       tools={
-        <label className="search">
-          <Search size={14} />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filtrer" />
-        </label>
+        <>
+          <Segmented value={grouped} onChange={setGrouped} options={[{ id: 'group', label: 'Par programme' }, { id: 'pid', label: 'Par processus' }]} />
+          <button className={`btn btn-ghost${paused ? ' on' : ''}`} onClick={() => setPaused((x) => !x)} title="Figer la liste pour la lire tranquillement">
+            {paused ? 'Reprendre' : 'Figer'}
+          </button>
+          <label className="search">
+            <Search size={14} />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nom ou PID" />
+          </label>
+        </>
       }
     >
       <div className="ui-card proc-card">
@@ -422,15 +366,26 @@ function Processes(): JSX.Element {
           <thead>
             <tr>
               {th('name', 'Programme')}
+              {grouped === 'pid' ? <th className="num">PID</th> : <th className="num">Processus</th>}
               {th('cpu', 'Processeur', true)}
               {th('mem', 'Mémoire', true)}
               <th>Utilisateur</th>
+              <th />
             </tr>
           </thead>
           <tbody>
             {rows.map((p) => (
-              <tr key={p.name} title={p.path}>
+              <tr
+                key={grouped === 'group' ? p.name : p.pid}
+                title={p.path}
+                className="proc-row"
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  setConfirm(p)
+                }}
+              >
                 <td>{p.name}</td>
+                <td className="num faint">{grouped === 'pid' ? p.pid : (p.count ?? 1)}</td>
                 <td className="num">
                   <div className="cell-bar">
                     <Meter value={p.cpu} color={C.cpu} />
@@ -439,12 +394,43 @@ function Processes(): JSX.Element {
                 </td>
                 <td className="num">{formatBytes(p.mem)}</td>
                 <td className="faint">{p.user || '—'}</td>
+                <td className="proc-actions">
+                  {p.path && (
+                    <button className="btn btn-ghost btn-sm" title="Ouvrir l’emplacement du programme" onClick={() => void window.kit.files.reveal(p.path)}>
+                      <FolderOpen size={13} />
+                    </button>
+                  )}
+                  <button className="btn btn-ghost btn-sm btn-danger" title="Terminer…" onClick={() => setConfirm(p)}>
+                    <X size={13} />
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
         {!list && <div className="faint" style={{ padding: 14 }}>Lecture des processus…</div>}
       </div>
+      {confirm && (
+        <Modal
+          title={`Terminer ${confirm.name} ?`}
+          onClose={() => setConfirm(null)}
+          footer={
+            <>
+              <button className="btn btn-ghost" onClick={() => setConfirm(null)}>
+                Annuler
+              </button>
+              <button className="btn btn-danger" onClick={() => void kill(confirm)}>
+                Terminer
+              </button>
+            </>
+          }
+        >
+          <p>
+            {grouped === 'group' && (confirm.count ?? 1) > 1 ? `Ses ${confirm.count} processus seront arrêtés immédiatement.` : 'Le programme sera arrêté immédiatement.'} Tout travail non enregistré dedans sera perdu.
+          </p>
+          <p className="faint">Les programmes indispensables à Windows ou à Open Studio sont protégés et ne peuvent pas être terminés d’ici.</p>
+        </Modal>
+      )}
     </Page>
   )
 }
@@ -503,6 +489,7 @@ function Disks({ info }: { info: SystemInfo | null }): JSX.Element {
 }
 
 function SystemView({ info }: { info: SystemInfo | null }): JSX.Element {
+  const vols = useVolumes()
   if (!info) return <Page title="Système">Lecture des informations…</Page>
   const up = info.uptime
   const rows: [string, string][] = [
@@ -514,8 +501,26 @@ function SystemView({ info }: { info: SystemInfo | null }): JSX.Element {
     ['Cartes graphiques', info.gpus.map((g) => `${g.model}${g.vram ? ` (${formatBytes(g.vram)})` : ''}`).join(' · ') || '—'],
     ['Allumé depuis', `${Math.floor(up / 86400)} j ${Math.floor((up % 86400) / 3600)} h ${Math.floor((up % 3600) / 60)} min`]
   ]
+  const report = (): string => systemReport(info, vols)
+  const save = async (): Promise<void> => {
+    const path = await window.kit.files.save({ defaultPath: `rapport-${info.host}.md`, filters: [{ name: 'Markdown', extensions: ['md'] }, { name: 'Texte', extensions: ['txt'] }] })
+    if (path && (await window.kit.files.writeText(path, report()))) toast('Rapport enregistré.', 'success')
+  }
   return (
-    <Page title="Système" sub="Ce qu’il y a dans ton PC.">
+    <Page
+      title="Système"
+      sub="Ce qu’il y a dans ton PC."
+      tools={
+        <>
+          <button className="btn btn-ghost" onClick={() => void window.kit.clipboard.write(report()).then(() => toast('Rapport copié : colle-le dans un message d’aide.', 'success'))}>
+            <Copy size={14} /> Copier le rapport
+          </button>
+          <button className="btn btn-ghost" onClick={() => void save()}>
+            <Save size={14} /> Enregistrer
+          </button>
+        </>
+      }
+    >
       <div className="ui-card">
         <table className="table">
           <tbody>

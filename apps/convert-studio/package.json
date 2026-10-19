@@ -13,7 +13,7 @@
     "id": "convert-studio",
     "name": "Convertisseur",
     "tagline": "Images, vidéos et sons dans le format voulu.",
-    "description": "Glisse tes fichiers et choisis le format : mp4 → mp3, mov → mp4, webp → png, compression de vidéos et d'images, en lot.",
+    "description": "Glisse tes fichiers et choisis le format (vidéo, son, image) : découpage, redimensionnement, rotation, vitesse, volume, « tenir en 10 Mo », capture d'image à un instant précis, métadonnées retirées, préréglages perso, en lot et 100 % local.",
     "category": "Outils",
     "accent": "#14b8a6",
     "dataDirName": "open-studio-convert-studio"

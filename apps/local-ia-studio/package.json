@@ -1,6 +1,6 @@
 {
   "name": "local-ia-studio",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "description": "Chat avec des modèles IA en local, ultra simple et optimisé",
   "author": {
     "name": "Julienlgn123",
@@ -160,7 +160,7 @@
     "id": "local-ia-studio",
     "name": "Local IA Studio",
     "tagline": "Discute avec une IA, sur ton ordinateur.",
-    "description": "Modèles 100 % locaux (Ollama, GGUF de Hugging Face, LM Studio) ou Mistral : fichiers et images joints, mémoire, comparaison de modèles, dictée et lecture à voix haute.",
+    "description": "Modèles 100 % locaux (Ollama, GGUF de Hugging Face, LM Studio) ou Mistral : bibliothèque de documents (le modèle cherche dans tes PDF et notes et cite ses sources), assistants prêts à l'emploi, raccourcis /, fichiers et images joints, mémoire, comparaison de modèles, dictée.",
     "category": "IA",
     "accent": "#a78bfa",
     "dataDirName": "local-ia-studio",

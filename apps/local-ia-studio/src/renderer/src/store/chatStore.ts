@@ -14,12 +14,23 @@ import type {
   LlamaModelEntry,
   MistralModel,
   MistralStatus,
-  ModelInfo
+  ModelInfo,
+  Assistant,
+  KbCollection
 } from '@shared/types'
 import { DEFAULT_PREFERENCES, DEFAULT_TITLE, autoTitle } from '@shared/types'
 import { mentionsWorkspacePath } from '@shared/attachments'
 
 interface ChatState {
+  /** Bibliothèques et assistant choisis sur l'accueil, appliqués à la conversation créée. */
+  draftKnowledge: string[]
+  draftAssistant: Assistant | null
+  setDraftKnowledge: (ids: string[]) => void
+  setDraftAssistant: (a: Assistant | null) => void
+  kbCollections: KbCollection[]
+  refreshKb: () => Promise<void>
+  libraryOpen: boolean
+  setLibraryOpen: (v: boolean) => void
   conversations: Conversation[]
   activeId: string | null
   messages: Record<string, ChatMessage[]>
@@ -203,6 +214,14 @@ export const useChatStore = create<ChatState>((set, get) => {
     streamingTools: {},
     pendingApprovals: {},
     draftFileAccess: false,
+    draftKnowledge: [],
+    draftAssistant: null,
+    setDraftKnowledge: (ids) => set({ draftKnowledge: ids }),
+    setDraftAssistant: (a) => set({ draftAssistant: a }),
+    kbCollections: [],
+    refreshKb: async () => set({ kbCollections: await window.api.kb.list() }),
+    libraryOpen: false,
+    setLibraryOpen: (v) => set({ libraryOpen: v }),
     isStreaming: {},
     errors: {},
     engineStatus: null,
@@ -236,6 +255,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       get().refreshMistral()
       get().refreshLlamaModels()
       get().refreshLmStudioModels()
+      void get().refreshKb()
     },
 
     refreshEngines: async () => {
@@ -296,7 +316,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     },
 
     newConversation: () =>
-      set((s) => ({ activeId: null, draft: null, settingsOpen: false, draftFileAccess: s.preferences.defaultSettings.fileAccess })),
+      set((s) => ({ activeId: null, draft: null, settingsOpen: false, draftFileAccess: s.preferences.defaultSettings.fileAccess, draftKnowledge: [], draftAssistant: null })),
 
     setDraftFileAccess: (v) => set({ draftFileAccess: v }),
 
@@ -425,8 +445,19 @@ export const useChatStore = create<ChatState>((set, get) => {
           return
         }
         let created = await window.api.conversations.create(target.engine, target.model)
-        if (created.settings.fileAccess !== get().draftFileAccess) {
-          created = { ...created, settings: { ...created.settings, fileAccess: get().draftFileAccess } }
+        const { draftAssistant: assistant, draftKnowledge: knowledge, draftFileAccess: fileAccess } = get()
+        if (created.settings.fileAccess !== fileAccess || assistant || knowledge.length) {
+          created = {
+            ...created,
+            settings: {
+              ...created.settings,
+              fileAccess,
+              ...(knowledge.length ? { knowledge } : {}),
+              ...(assistant
+                ? { systemPrompt: assistant.systemPrompt, assistantId: assistant.id, ...(assistant.temperature != null ? { temperature: assistant.temperature } : {}) }
+                : {})
+            }
+          }
           await window.api.conversations.update(created.id, { settings: created.settings })
         }
         set((s) => ({

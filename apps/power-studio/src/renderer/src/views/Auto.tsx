@@ -1,6 +1,8 @@
-import { Gamepad2, Plus, Trash2 } from 'lucide-react'
+import { BatteryLow, Clock, Gamepad2, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import type { AutoRules, ProfileId } from '@shared/types'
+import type { AutoRules, ProfileId, ScheduleRule } from '@shared/types'
+
+const DAYS = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
 import { PROFILE_ORDER } from '@shared/types'
 import { useApp } from '../store/appStore'
 import { InfoBox, Modal, PageHeader, Spinner, Toggle } from '../components/ui'
@@ -126,7 +128,83 @@ export default function Auto(): JSX.Element {
           )}
         </div>
 
+        <div className="card p-5">
+          <h2 className="mb-1 flex items-center gap-2 text-[15px] font-semibold text-base-50">
+            <Clock size={16} /> Selon l’heure
+          </h2>
+          <p className="mb-4 text-[12.5px] text-base-400">Ex. « Silencieux » la nuit, « Performance max » le soir pour jouer. Une plage peut passer minuit.</p>
+          {(auto.schedule ?? []).length > 0 && (
+            <div className="mb-4 divide-y divide-base-800 rounded-xl border border-base-800">
+              {(auto.schedule ?? []).map((r, i) => {
+                const upd = (patch: Partial<ScheduleRule>): void => void save({ schedule: auto.schedule.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
+                return (
+                  <div key={i} className="flex flex-wrap items-center gap-3 px-3 py-2">
+                    <input type="time" value={r.from} onChange={(e) => upd({ from: e.target.value })} className="time-input" />
+                    <span className="text-base-400">→</span>
+                    <input type="time" value={r.to} onChange={(e) => upd({ to: e.target.value })} className="time-input" />
+                    <div className="flex gap-1">
+                      {[1, 2, 3, 4, 5, 6, 0].map((k) => {
+                        const d = DAYS[k]
+                        const on = r.days.includes(k)
+                        return (
+                          <button
+                            key={k}
+                            onClick={() => upd({ days: on ? r.days.filter((x) => x !== k) : [...r.days, k].sort() })}
+                            className={`h-7 w-7 rounded-lg text-[11.5px] font-medium ${on ? 'bg-accent-500/20 text-accent-400' : 'bg-base-850 text-base-500'}`}
+                          >
+                            {d}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <span className="ml-auto text-[12px] text-base-400">→</span>
+                    <ProfileSelect value={r.profile} onChange={(v) => v && upd({ profile: v })} />
+                    <button className="text-base-400 hover:text-red-400" onClick={() => void save({ schedule: auto.schedule.filter((_, j) => j !== i) })}>
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          <button className="btn-ghost" onClick={() => void save({ schedule: [...(auto.schedule ?? []), { from: '23:00', to: '07:00', days: [0, 1, 2, 3, 4, 5, 6], profile: 'silent' }] })}>
+            <Plus size={14} /> Ajouter une plage horaire
+          </button>
+        </div>
+
+        {hw?.hasBattery && (
+          <div className="card flex items-center justify-between gap-4 p-5">
+            <div>
+              <h2 className="flex items-center gap-2 text-[15px] font-semibold text-base-50">
+                <BatteryLow size={16} /> Batterie faible
+              </h2>
+              <p className="text-[12.5px] text-base-400">Passe en économie quand il reste peu de batterie, pour tenir jusqu’au chargeur.</p>
+            </div>
+            <div className="flex items-center gap-2 text-[13px] text-base-200">
+              sous
+              <select
+                value={auto.lowBattery?.percent ?? 0}
+                onChange={(e) => {
+                  const v = Number(e.target.value)
+                  void save({ lowBattery: v ? { percent: v, profile: auto.lowBattery?.profile ?? 'eco' } : null })
+                }}
+                className="rounded-lg border border-base-700 bg-base-850 px-2.5 py-1.5 text-[13px] text-base-100 outline-none"
+              >
+                <option value={0}>jamais</option>
+                {[10, 15, 20, 30, 40].map((v) => (
+                  <option key={v} value={v}>
+                    {v} %
+                  </option>
+                ))}
+              </select>
+              {auto.lowBattery && <ProfileSelect value={auto.lowBattery.profile} onChange={(v) => v && void save({ lowBattery: { ...auto.lowBattery!, profile: v } })} />}
+            </div>
+          </div>
+        )}
+
         <InfoBox>
+          Priorité : programme ouvert, puis batterie faible, puis plage horaire, puis branché / sur batterie.
+          <br />
           Power Studio doit rester ouvert (dans la zone de notification) pour changer de profil tout seul. Il n’agit que quand la situation change : un profil choisi à la main reste
           en place jusque-là. La limite de la carte graphique n’est jamais changée automatiquement (elle demande les droits administrateur).
         </InfoBox>

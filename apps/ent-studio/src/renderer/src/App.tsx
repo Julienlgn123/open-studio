@@ -1,8 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
+  BarChart3,
   Bell,
   CalendarDays,
+  CalendarRange,
+  Copy,
+  Download,
+  Filter,
+  GraduationCap,
+  NotebookPen,
+  Search,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -16,7 +24,7 @@ import {
 } from 'lucide-react'
 import { Empty, Layout, Modal, Segmented, Switch, Toasts, errorText, relativeTime, toast } from '@ui'
 import type { Change, ChangeSet, Course } from '../../shared/ics'
-import type { EntSettings, EntState } from '../../shared/types'
+import { isHidden, subjectKey, type EntSettings, type EntState } from '../../shared/types'
 import './ent.css'
 
 const DAY_MS = 86_400_000
@@ -44,6 +52,12 @@ const KIND_CLASS: Record<string, string> = { CM: 'info', TD: 'success', TP: 'war
 /** « DUPONT JEAN, MARTIN LÉA +3 » : jamais une ligne interminable. */
 const teachersOf = (c: Course, max = 2): string =>
   c.teachers.length > max ? `${c.teachers.slice(0, max).join(', ')} +${c.teachers.length - max}` : c.teachers.join(', ')
+
+/** « 3 h 30 » à partir de millisecondes. */
+const fmtHours = (ms: number): string => {
+  const m = Math.round(ms / 60_000)
+  return `${Math.floor(m / 60)} h${m % 60 ? ` ${String(m % 60).padStart(2, '0')}` : ''}`
+}
 
 const hm = (t: number): string => new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 const startOfDay = (t: number): number => {
@@ -219,13 +233,19 @@ function Setup({ onConnected }: { onConnected: (s: EntState) => void }): JSX.Ele
 
 // ─── Emploi du temps ───────────────────────────────────────────────────────────────────────
 
-type ViewMode = 'week' | 'list'
+type ViewMode = 'week' | 'month' | 'list' | 'exams' | 'stats'
 
 function Timetable({ state, onChanges, onSettings }: { state: EntState; onChanges: () => void; onSettings: () => void }): JSX.Element {
   const [mode, setMode] = useState<ViewMode>('week')
   const [weekStart, setWeekStart] = useState(() => startOfWeek(Date.now()))
   const [now, setNow] = useState(Date.now())
   const [open, setOpen] = useState<Course | null>(null)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [monthStart, setMonthStart] = useState(() => {
+    const d = new Date()
+    return new Date(d.getFullYear(), d.getMonth(), 1).getTime()
+  })
+  const visible = useMemo(() => state.courses.filter((c) => !isHidden(c, state.settings.hidden)), [state.courses, state.settings.hidden])
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000)
@@ -235,7 +255,7 @@ function Timetable({ state, onChanges, onSettings }: { state: EntState; onChange
   /** Semaine « actuelle » : celle-ci, ou la suivante s'il ne reste plus aucun cours cette semaine (week-end). */
   const currentWeek = (): number => {
     const w = startOfWeek(Date.now())
-    return state.courses.some((c) => c.end >= Date.now() && c.start < w + 7 * DAY_MS) ? w : w + 7 * DAY_MS
+    return visible.some((c) => c.end >= Date.now() && c.start < w + 7 * DAY_MS) ? w : w + 7 * DAY_MS
   }
   useEffect(() => setWeekStart(currentWeek()), [])
 
@@ -246,7 +266,7 @@ function Timetable({ state, onChanges, onSettings }: { state: EntState; onChange
     return s
   }, [state.history])
 
-  const next = state.courses.find((c) => c.end > now)
+  const next = visible.find((c) => c.end > now)
   const current = next && next.start <= now ? next : null
   const weekEnd = weekStart + 7 * DAY_MS
   const isThisWeek = weekStart === currentWeek()
@@ -261,21 +281,45 @@ function Timetable({ state, onChanges, onSettings }: { state: EntState; onChange
   return (
     <>
       <div className="ui-toolbar">
-        <div className="segmented-nav">
-          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setWeekStart(weekStart - 7 * DAY_MS)} title="Semaine précédente">
-            <ChevronLeft size={16} />
-          </button>
-          <button className={`btn btn-sm ${isThisWeek ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => setWeekStart(currentWeek())}>
-            Aujourd’hui
-          </button>
-          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setWeekStart(weekStart + 7 * DAY_MS)} title="Semaine suivante">
-            <ChevronRight size={16} />
-          </button>
-        </div>
+        {(mode === 'week' || mode === 'month') && (
+          <div className="segmented-nav">
+            <button
+              className="btn btn-ghost btn-sm btn-icon"
+              onClick={() => (mode === 'week' ? setWeekStart(weekStart - 7 * DAY_MS) : setMonthStart(new Date(new Date(monthStart).getFullYear(), new Date(monthStart).getMonth() - 1, 1).getTime()))}
+              title="Précédent"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <button
+              className={`btn btn-sm ${isThisWeek && mode === 'week' ? 'btn-secondary' : 'btn-ghost'}`}
+              onClick={() => {
+                setWeekStart(currentWeek())
+                const d = new Date()
+                setMonthStart(new Date(d.getFullYear(), d.getMonth(), 1).getTime())
+              }}
+            >
+              Aujourd’hui
+            </button>
+            <button
+              className="btn btn-ghost btn-sm btn-icon"
+              onClick={() => (mode === 'week' ? setWeekStart(weekStart + 7 * DAY_MS) : setMonthStart(new Date(new Date(monthStart).getFullYear(), new Date(monthStart).getMonth() + 1, 1).getTime()))}
+              title="Suivant"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
         <div className="week-label">
           {mode === 'week'
             ? `${dayLabel(weekStart, { day: 'numeric', month: 'long' })} – ${dayLabel(weekEnd - DAY_MS, { day: 'numeric', month: 'long', year: 'numeric' })}`
-            : 'Prochains cours'}
+            : mode === 'month'
+              ? new Date(monthStart).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+              : mode === 'exams'
+                ? 'Examens à venir'
+                : mode === 'stats'
+                  ? 'Volume horaire'
+                  : 'Prochains cours'}
+          {mode === 'week' && <span className="faint week-hours-total"> · {fmtHours(visible.filter((c) => c.start >= weekStart && c.start < weekEnd).reduce((n, c) => n + (c.end - c.start), 0))} de cours</span>}
         </div>
         <div className="spacer" />
         <span className="faint sync-note" title={state.lastError ?? undefined}>
@@ -288,12 +332,18 @@ function Timetable({ state, onChanges, onSettings }: { state: EntState; onChange
           <Bell size={14} />
           {unseen ? `${unseen} modification${unseen > 1 ? 's' : ''}` : 'Modifications'}
         </button>
+        <button className={`btn btn-sm btn-icon ${state.settings.hidden.length ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => setFilterOpen(true)} title="Matières et types affichés">
+          <Filter size={14} />
+        </button>
         <Segmented<ViewMode>
           value={mode}
           onChange={setMode}
           options={[
             { id: 'week', label: <><CalendarDays size={13} /> Semaine</> },
-            { id: 'list', label: <><List size={13} /> Liste</> }
+            { id: 'month', label: <><CalendarRange size={13} /> Mois</> },
+            { id: 'list', label: <><List size={13} /> Liste</> },
+            { id: 'exams', label: <><GraduationCap size={13} /> Examens</> },
+            { id: 'stats', label: <><BarChart3 size={13} /> Stats</> }
           ]}
         />
         <button className="btn btn-ghost btn-sm btn-icon" onClick={onSettings} title="Réglages">
@@ -313,13 +363,23 @@ function Timetable({ state, onChanges, onSettings }: { state: EntState; onChange
 
       {next && <NextCourse course={next} current={!!current} now={now} onOpen={() => setOpen(next)} />}
 
-      {mode === 'week' ? (
-        <WeekView courses={state.courses} weekStart={weekStart} now={now} changed={changedUids} onOpen={setOpen} />
-      ) : (
-        <ListView courses={state.courses.filter((c) => c.end > now)} changed={changedUids} onOpen={setOpen} />
+      {mode === 'week' && <WeekView courses={visible} weekStart={weekStart} now={now} changed={changedUids} onOpen={setOpen} />}
+      {mode === 'month' && (
+        <MonthView
+          courses={visible}
+          monthStart={monthStart}
+          onDay={(d) => {
+            setWeekStart(startOfWeek(d))
+            setMode('week')
+          }}
+        />
       )}
+      {mode === 'list' && <ListView courses={visible.filter((c) => c.end > now)} changed={changedUids} notes={state.notes} onOpen={setOpen} />}
+      {mode === 'exams' && <ExamsView courses={visible} now={now} notes={state.notes} onOpen={setOpen} />}
+      {mode === 'stats' && <StatsView courses={visible} now={now} />}
 
-      {open && <CourseModal course={open} onClose={() => setOpen(null)} />}
+      {open && <CourseModal course={open} note={state.notes[open.uid] ?? ''} subjectNote={state.notes[`matiere:${subjectKey(open)}`] ?? ''} onClose={() => setOpen(null)} />}
+      {filterOpen && <FilterModal state={state} onClose={() => setFilterOpen(false)} />}
     </>
   )
 }
@@ -473,16 +533,25 @@ function WeekView({ courses, weekStart, now, changed, onOpen }: { courses: Cours
   )
 }
 
-function ListView({ courses, changed, onOpen }: { courses: Course[]; changed: Set<string>; onOpen: (c: Course) => void }): JSX.Element {
+function ListView({ courses: all, changed, notes, onOpen }: { courses: Course[]; changed: Set<string>; notes: Record<string, string>; onOpen: (c: Course) => void }): JSX.Element {
+  const [q, setQ] = useState('')
+  const courses = q.trim()
+    ? all.filter((c) => `${c.name} ${c.code ?? ''} ${c.location} ${c.teachers.join(' ')} ${c.kind ?? ''} ${c.groups.join(' ')}`.toLowerCase().includes(q.trim().toLowerCase()))
+    : all
   const byDay = new Map<number, Course[]>()
   for (const c of courses.slice(0, 200)) {
     const d = startOfDay(c.start)
     byDay.set(d, [...(byDay.get(d) ?? []), c])
   }
-  if (!courses.length) return <Empty icon={<CalendarDays size={24} />} title="Aucun cours à venir" />
   return (
     <div className="ui-page">
       <div className="ui-page-inner list">
+        <label className="search list-search">
+          <Search size={14} />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher une matière, une salle, un enseignant…" />
+          {q && <span className="faint">{courses.length} cours</span>}
+        </label>
+        {!courses.length && <Empty icon={<CalendarDays size={24} />} title={q ? 'Aucun cours ne correspond' : 'Aucun cours à venir'} />}
         {[...byDay.entries()].map(([d, list]) => (
           <section key={d}>
             <h2 className="ui-section-title">{dayLabel(d)}</h2>
@@ -498,7 +567,9 @@ function ListView({ courses, changed, onOpen }: { courses: Course[]; changed: Se
                       {c.name}
                       {c.kind && <span className={`kind ${KIND_CLASS[c.kind] ?? ''}`}>{c.kind}</span>}
                       {changed.has(c.uid) && <span className="chip warning">Modifié</span>}
+                      {notes[c.uid] && <NotebookPen size={12} className="note-icon" />}
                     </span>
+                    {notes[c.uid] && <span className="row-note">📝 {notes[c.uid]}</span>}
                     <span className="row-meta">
                       {c.location && (
                         <span>
@@ -522,9 +593,24 @@ function ListView({ courses, changed, onOpen }: { courses: Course[]; changed: Se
   )
 }
 
-function CourseModal({ course: c, onClose }: { course: Course; onClose: () => void }): JSX.Element {
+function CourseModal({ course: c, note: note0, subjectNote: sub0, onClose }: { course: Course; note: string; subjectNote: string; onClose: () => void }): JSX.Element {
+  const [note, setNote] = useState(note0)
+  const [subNote, setSubNote] = useState(sub0)
+  const close = (): void => {
+    if (note !== note0) void window.kit.invoke('ent:note', c.uid, note)
+    if (subNote !== sub0) void window.kit.invoke('ent:note', `matiere:${subjectKey(c)}`, subNote)
+    onClose()
+  }
   return (
-    <Modal title={c.name} onClose={onClose} footer={<button className="btn btn-secondary" onClick={onClose}>Fermer</button>}>
+    <Modal
+      title={c.name}
+      onClose={close}
+      footer={
+        <button className="btn btn-secondary" onClick={close}>
+          Fermer
+        </button>
+      }
+    >
       <div className="detail" style={{ ['--c' as string]: colorOf(c) }}>
         <div className="detail-row">
           <CalendarDays size={15} />
@@ -558,6 +644,16 @@ function CourseModal({ course: c, onClose }: { course: Course; onClose: () => vo
         <div className="detail-raw faint">
           {c.code && <span className="chip">{c.code}</span>} {c.kind && <span className={`chip ${KIND_CLASS[c.kind] ?? ''}`}>{c.kind}</span>} {c.summary}
         </div>
+        <label className="field">
+          <span className="field-label">
+            <NotebookPen size={12} /> Note pour cette séance (devoir, à apporter…)
+          </span>
+          <textarea className="textarea" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex. rendre l’exercice 3, apporter la calculatrice" />
+        </label>
+        <label className="field">
+          <span className="field-label">Note pour toute la matière</span>
+          <textarea className="textarea" rows={2} value={subNote} onChange={(e) => setSubNote(e.target.value)} placeholder="Ex. coefficient 3, contact du prof, lien du cours en ligne" />
+        </label>
       </div>
     </Modal>
   )
@@ -683,6 +779,34 @@ function SettingsModal({ state, onState, onClose }: { state: EntState; onState: 
           ]}
         />
       </div>
+      <div className="ui-row" style={{ justifyContent: 'space-between' }}>
+        <div>
+          <div className="field-label">Me rappeler chaque cours</div>
+          <div className="field-hint">Notification avec la salle (et ta note) juste avant le cours.</div>
+        </div>
+        <select className="select" style={{ width: 'auto' }} value={state.settings.remindBefore} onChange={(e) => patch({ remindBefore: Number(e.target.value) })}>
+          <option value={0}>Jamais</option>
+          <option value={5}>5 min avant</option>
+          <option value={10}>10 min avant</option>
+          <option value={15}>15 min avant</option>
+          <option value={30}>30 min avant</option>
+        </select>
+      </div>
+      <div className="ui-row" style={{ justifyContent: 'space-between' }}>
+        <div>
+          <div className="field-label">Résumé du matin</div>
+          <div className="field-hint">Vers 7 h : nombre de cours, premier cours et salle.</div>
+        </div>
+        <Switch on={state.settings.morning} onChange={(v) => patch({ morning: v })} />
+      </div>
+      <div className="ui-row" style={{ flexWrap: 'wrap', gap: 6 }}>
+        <button className="btn btn-secondary btn-sm" onClick={() => void exportIcs(state)}>
+          <Download size={13} /> Exporter en .ics (cours affichés)
+        </button>
+        <button className="btn btn-ghost btn-sm" onClick={() => void window.kit.clipboard.write(state.settings.url).then(() => toast('Lien copié : abonne-toi avec dans Google Agenda (« À partir de l’URL »)', 'success'))}>
+          <Copy size={13} /> Copier le lien d’abonnement
+        </button>
+      </div>
       <button
         className="btn btn-danger"
         style={{ alignSelf: 'flex-start' }}
@@ -693,6 +817,279 @@ function SettingsModal({ state, onState, onClose }: { state: EntState; onState: 
       >
         Déconnecter cet emploi du temps
       </button>
+    </Modal>
+  )
+}
+
+// ─── Export .ics ───────────────────────────────────────────────────────────────────────────
+
+async function exportIcs(state: EntState): Promise<void> {
+  const path = await window.kit.files.save({ title: 'Exporter l’emploi du temps', defaultPath: 'emploi-du-temps.ics', filters: [{ name: 'Calendrier', extensions: ['ics'] }] })
+  if (!path) return
+  const esc = (x: string): string => x.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/[,;]/g, (c) => `\\${c}`)
+  const d = (t: number): string => new Date(t).toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '')
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Open Studio//ENT Studio//FR']
+  for (const c of state.courses.filter((x) => !isHidden(x, state.settings.hidden))) {
+    const note = state.notes[c.uid]
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:${c.uid}`,
+      `DTSTAMP:${d(Date.now())}`,
+      `DTSTART:${d(c.start)}`,
+      `DTEND:${d(c.end)}`,
+      `SUMMARY:${esc(`${c.name}${c.kind ? ` (${c.kind})` : ''}`)}`,
+      ...(c.location ? [`LOCATION:${esc(c.location)}`] : []),
+      `DESCRIPTION:${esc([c.teachers.join(', '), note ? `Note : ${note}` : ''].filter(Boolean).join('\n'))}`,
+      'END:VEVENT'
+    )
+  }
+  lines.push('END:VCALENDAR')
+  await window.kit.files.writeText(path, lines.join('\r\n'))
+  toast('Emploi du temps exporté', 'success')
+}
+
+// ─── Vue mois ──────────────────────────────────────────────────────────────────────────────
+
+function MonthView({ courses, monthStart, onDay }: { courses: Course[]; monthStart: number; onDay: (d: number) => void }): JSX.Element {
+  const first = startOfWeek(monthStart)
+  const month = new Date(monthStart).getMonth()
+  const cells = Array.from({ length: 42 }, (_, i) => first + i * DAY_MS + 3_600_000 * 2).map(startOfDay)
+  const today = startOfDay(Date.now())
+  return (
+    <div className="ui-page">
+      <div className="ui-page-inner wide">
+        <div className="ent-month">
+          {['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'].map((x) => (
+            <div key={x} className="dow">
+              {x}
+            </div>
+          ))}
+          {cells.map((d) => {
+            const list = courses.filter((c) => c.start >= d && c.start < d + DAY_MS)
+            const hours = list.reduce((n, c) => n + (c.end - c.start), 0)
+            const exam = list.some((c) => c.kind === 'Examen')
+            return (
+              <button key={d} className={`mcell${new Date(d).getMonth() !== month ? ' out' : ''}${d === today ? ' today' : ''}${exam ? ' exam' : ''}`} onClick={() => onDay(d)}>
+                <span className="mnum">{new Date(d).getDate()}</span>
+                {list.length > 0 && (
+                  <>
+                    <span className="mdots">
+                      {list.slice(0, 8).map((c) => (
+                        <i key={c.uid} style={{ background: colorOf(c) }} title={`${hm(c.start)} ${c.name}`} />
+                      ))}
+                    </span>
+                    <span className="faint mh">
+                      {list.length} cours · {fmtHours(hours)}
+                    </span>
+                    {exam && <span className="chip danger mexam">Examen</span>}
+                  </>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Examens ───────────────────────────────────────────────────────────────────────────────
+
+function ExamsView({ courses, now, notes, onOpen }: { courses: Course[]; now: number; notes: Record<string, string>; onOpen: (c: Course) => void }): JSX.Element {
+  const exams = courses.filter((c) => c.kind === 'Examen')
+  const upcoming = exams.filter((c) => c.end > now)
+  const past = exams.filter((c) => c.end <= now)
+  if (!exams.length)
+    return (
+      <div className="ui-page">
+        <Empty icon={<GraduationCap size={24} />} title="Aucun examen dans l’emploi du temps">
+          Les séances marquées DS, CC, examen, partiel ou contrôle apparaîtront ici avec un compte à rebours.
+        </Empty>
+      </div>
+    )
+  return (
+    <div className="ui-page">
+      <div className="ui-page-inner">
+        <div className="exams">
+          {upcoming.map((c) => {
+            const days = Math.ceil((startOfDay(c.start) - startOfDay(now)) / DAY_MS)
+            return (
+              <button key={c.uid} className={`exam-card${days <= 3 ? ' soon' : ''}`} style={{ ['--c' as string]: colorOf(c) }} onClick={() => onOpen(c)}>
+                <span className="countdown">
+                  <b>{days <= 0 ? 'Aujourd’hui' : days === 1 ? 'Demain' : days}</b>
+                  {days > 1 && <span>jours</span>}
+                </span>
+                <span className="exam-main">
+                  <b>{c.name}</b>
+                  <span className="faint">
+                    {dayLabel(c.start)} · {hm(c.start)}–{hm(c.end)}
+                    {c.location ? ` · ${c.location}` : ''}
+                  </span>
+                  {notes[c.uid] && <span className="row-note">📝 {notes[c.uid]}</span>}
+                </span>
+              </button>
+            )
+          })}
+          {!upcoming.length && <p className="faint">Plus d’examen à venir 🎉</p>}
+        </div>
+        {past.length > 0 && (
+          <>
+            <h2 className="ui-section-title">Passés</h2>
+            {past
+              .slice(-10)
+              .reverse()
+              .map((c) => (
+                <div key={c.uid} className="faint past-exam">
+                  {dayLabel(c.start, { day: 'numeric', month: 'short' })} — {c.name}
+                </div>
+              ))}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Statistiques ──────────────────────────────────────────────────────────────────────────
+
+function StatsView({ courses, now }: { courses: Course[]; now: number }): JSX.Element {
+  const total = courses.reduce((n, c) => n + (c.end - c.start), 0)
+  const done = courses.filter((c) => c.end <= now).reduce((n, c) => n + (c.end - c.start), 0)
+  const bySubject = new Map<string, { c: Course; total: number; done: number; n: number }>()
+  for (const c of courses) {
+    const k = subjectKey(c)
+    const e = bySubject.get(k) ?? { c, total: 0, done: 0, n: 0 }
+    e.total += c.end - c.start
+    if (c.end <= now) e.done += c.end - c.start
+    e.n++
+    bySubject.set(k, e)
+  }
+  const subjects = [...bySubject.values()].sort((a, b) => b.total - a.total)
+  const byKind = new Map<string, number>()
+  for (const c of courses) byKind.set(c.kind ?? 'Autre', (byKind.get(c.kind ?? 'Autre') ?? 0) + (c.end - c.start))
+  // Heures par semaine, sur toute la période.
+  const weeks = new Map<number, number>()
+  for (const c of courses) weeks.set(startOfWeek(c.start), (weeks.get(startOfWeek(c.start)) ?? 0) + (c.end - c.start))
+  const wk = [...weeks.entries()].sort((a, b) => a[0] - b[0])
+  const maxW = Math.max(1, ...wk.map((w) => w[1]))
+  const maxS = Math.max(1, ...subjects.map((x) => x.total))
+  const thisWeek = startOfWeek(now)
+  return (
+    <div className="ui-page">
+      <div className="ui-page-inner">
+        <div className="stats-top">
+          <div className="ui-card st">
+            <span className="faint">Total de la période</span>
+            <b>{fmtHours(total)}</b>
+          </div>
+          <div className="ui-card st">
+            <span className="faint">Déjà faits</span>
+            <b>{fmtHours(done)}</b>
+            <span className="faint small">{total ? Math.round((done / total) * 100) : 0} %</span>
+          </div>
+          <div className="ui-card st">
+            <span className="faint">Restants</span>
+            <b>{fmtHours(total - done)}</b>
+          </div>
+          <div className="ui-card st">
+            <span className="faint">Cette semaine</span>
+            <b>{fmtHours(weeks.get(thisWeek) ?? 0)}</b>
+          </div>
+        </div>
+        <section className="ui-card">
+          <div className="ui-card-title">Par semaine</div>
+          <div className="wbars">
+            {wk.map(([w, ms]) => (
+              <div key={w} className={`wbar${w === thisWeek ? ' now' : ''}${w + 7 * DAY_MS <= now ? ' past' : ''}`} title={`Semaine du ${dayLabel(w, { day: 'numeric', month: 'short' })} : ${fmtHours(ms)}`}>
+                <div style={{ height: `${(ms / maxW) * 100}%` }} />
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="ui-card">
+          <div className="ui-card-title">Par type</div>
+          <div className="kinds">
+            {[...byKind.entries()]
+              .sort((a, b) => b[1] - a[1])
+              .map(([k, ms]) => (
+                <span key={k} className={`chip ${KIND_CLASS[k] ?? ''}`}>
+                  {k} · {fmtHours(ms)} ({total ? Math.round((ms / total) * 100) : 0} %)
+                </span>
+              ))}
+          </div>
+        </section>
+        <section className="ui-card">
+          <div className="ui-card-title">Par matière</div>
+          {subjects.map(({ c, total: t, done: d, n }) => (
+            <div key={subjectKey(c)} className="subj">
+              <span className="subj-name">
+                <i style={{ background: colorOf(c) }} />
+                {c.code && <span className="faint">{c.code}</span>} {c.name}
+              </span>
+              <span className="subj-bar">
+                <span className="all" style={{ width: `${(t / maxS) * 100}%` }}>
+                  <span className="done" style={{ width: `${t ? (d / t) * 100 : 0}%`, background: colorOf(c) }} />
+                </span>
+              </span>
+              <span className="faint subj-h">
+                {fmtHours(d)} / {fmtHours(t)} · {n} séance{n > 1 ? 's' : ''}
+              </span>
+            </div>
+          ))}
+        </section>
+      </div>
+    </div>
+  )
+}
+
+// ─── Filtres ───────────────────────────────────────────────────────────────────────────────
+
+function FilterModal({ state, onClose }: { state: EntState; onClose: () => void }): JSX.Element {
+  const [hidden, setHidden] = useState(state.settings.hidden)
+  const subjects = [...new Map(state.courses.map((c) => [subjectKey(c), c])).values()].sort((a, b) => subjectKey(a).localeCompare(subjectKey(b), 'fr', { numeric: true }))
+  const kinds = [...new Set(state.courses.map((c) => c.kind).filter(Boolean) as string[])]
+  const toggle = (k: string): void => setHidden(hidden.includes(k) ? hidden.filter((x) => x !== k) : [...hidden, k])
+  const save = (): void => {
+    void window.kit.invoke('ent:settings', { hidden })
+    onClose()
+  }
+  return (
+    <Modal
+      title="Ce que tu suis"
+      onClose={save}
+      width={560}
+      footer={
+        <>
+          <button className="btn btn-ghost" onClick={() => setHidden([])}>
+            Tout afficher
+          </button>
+          <button className="btn btn-primary" onClick={save}>
+            Appliquer
+          </button>
+        </>
+      }
+    >
+      <p className="faint">Décoche les options que tu ne suis pas : elles disparaissent de l’emploi du temps, des rappels et des statistiques.</p>
+      <div className="field-label">Types de séance</div>
+      <div className="ui-row" style={{ flexWrap: 'wrap', gap: 6 }}>
+        {kinds.map((k) => (
+          <label key={k} className={`chip filter-chip${hidden.includes(`type:${k}`) ? '' : ' on'}`}>
+            <input type="checkbox" checked={!hidden.includes(`type:${k}`)} onChange={() => toggle(`type:${k}`)} /> {k}
+          </label>
+        ))}
+      </div>
+      <div className="field-label" style={{ marginTop: 12 }}>
+        Matières
+      </div>
+      <div className="filter-list">
+        {subjects.map((c) => (
+          <label key={subjectKey(c)} className="filter-row">
+            <input type="checkbox" checked={!hidden.includes(subjectKey(c))} onChange={() => toggle(subjectKey(c))} />
+            <i style={{ background: colorOf(c) }} />
+            {c.code && <span className="faint">{c.code}</span>} {c.name}
+          </label>
+        ))}
+      </div>
     </Modal>
   )
 }
