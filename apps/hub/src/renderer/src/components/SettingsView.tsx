@@ -118,7 +118,7 @@ function Customize(): JSX.Element {
 }
 
 export default function SettingsView(): JSX.Element {
-  const { settings, setTheme, setLaunchAtStartup, catalog, openTour } = useStore()
+  const { settings, setTheme, setLaunchAtStartup, setAutoUpdate, catalog, openTour } = useStore()
   const [version, setVersion] = useState('')
   useEffect(() => {
     window.api.app.getVersion().then(setVersion).catch(() => {})
@@ -160,6 +160,21 @@ export default function SettingsView(): JSX.Element {
               role="switch"
               aria-checked={settings.launchAtStartup}
               onClick={() => void setLaunchAtStartup(!settings.launchAtStartup)}
+            >
+              <span />
+            </button>
+          </div>
+
+          <div className="setting">
+            <div>
+              <div className="setting-name">Mises à jour automatiques</div>
+              <div className="setting-desc">Au lancement, Open Studio et ses modules se mettent à jour tout seuls. Un bandeau permet d’annuler. Désactivées, tu choisis quand installer.</div>
+            </div>
+            <button
+              className={`switch${settings.autoUpdate ? ' on' : ''}`}
+              role="switch"
+              aria-checked={settings.autoUpdate}
+              onClick={() => void setAutoUpdate(!settings.autoUpdate)}
             >
               <span />
             </button>

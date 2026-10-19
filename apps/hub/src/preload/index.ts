@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webFrame } from 'electron'
-import type { AppSettings, Layout, CatalogState, ModuleInfo, ModuleProgress, Theme, ThemeSetting } from '../shared/types'
+import type { AppSettings, Layout, CatalogState, ModuleInfo, ModuleProgress, Theme, ThemeSetting, UpdateState } from '../shared/types'
 
 function on<T>(channel: string, cb: (payload: T) => void): () => void {
   const handler = (_: unknown, payload: T): void => cb(payload)
@@ -19,6 +19,7 @@ const api = {
     get: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
     setTheme: (theme: ThemeSetting): Promise<Settings> => ipcRenderer.invoke('settings:setTheme', theme),
     setLaunchAtStartup: (enabled: boolean): Promise<Settings> => ipcRenderer.invoke('settings:setLaunchAtStartup', enabled),
+    setAutoUpdate: (enabled: boolean): Promise<Settings> => ipcRenderer.invoke('settings:setAutoUpdate', enabled),
     setLayout: (p: Partial<Layout> | null): Promise<Settings> => ipcRenderer.invoke('settings:setLayout', p),
     setTourSeen: (): Promise<Settings> => ipcRenderer.invoke('settings:setTourSeen'),
     onTheme: (cb: (t: Theme) => void) => on<Theme>('studio:theme', cb)
@@ -35,6 +36,14 @@ const api = {
     onChanged: (cb: () => void) => on<null>('modules:changed', cb),
     onAutoUpdated: (cb: (p: { id: string; name: string; version: string | null }) => void) =>
       on<{ id: string; name: string; version: string | null }>('modules:autoUpdated', cb)
+  },
+  updates: {
+    state: (): Promise<UpdateState> => ipcRenderer.invoke('updates:state'),
+    cancel: (): Promise<void> => ipcRenderer.invoke('updates:cancel'),
+    start: (): Promise<void> => ipcRenderer.invoke('updates:start'),
+    installNow: (): Promise<void> => ipcRenderer.invoke('updates:installNow'),
+    onState: (cb: (s: UpdateState) => void) => on<UpdateState>('updates:state', cb),
+    onCancelled: (cb: () => void) => on<null>('modules:updateCancelled', cb)
   },
   shell: {
     openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:openExternal', url)

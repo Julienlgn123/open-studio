@@ -12,6 +12,7 @@ interface StoredData {
   lastModule?: string | null
   trayHintSeen?: boolean
   tourSeen?: boolean
+  autoUpdate?: boolean
   layout?: Partial<Layout>
 }
 
@@ -38,6 +39,7 @@ export function getSettings(): AppSettings {
     launchAtStartup: raw.launchAtStartup ?? false,
     lastModule: raw.lastModule ?? null,
     tourSeen: raw.tourSeen ?? false,
+    autoUpdate: raw.autoUpdate ?? true,
     layout: { ...DEFAULT_LAYOUT, ...(raw.layout ?? {}) }
   }
 }
@@ -87,4 +89,13 @@ export function getTrayHintSeen(): boolean {
 
 export function setTrayHintSeen(): void {
   patch({ trayHintSeen: true })
+}
+
+/** Mises à jour automatiques d'Open Studio et des modules (activées par défaut). */
+export function getAutoUpdate(): boolean {
+  return readRaw().autoUpdate ?? true
+}
+
+export function setAutoUpdate(enabled: boolean): void {
+  patch({ autoUpdate: enabled })
 }

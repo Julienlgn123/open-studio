@@ -1,6 +1,6 @@
 import { app, ipcMain, BrowserWindow, shell, nativeTheme } from 'electron'
 import type { Layout, ThemeSetting } from '@shared/types'
-import { effectiveTheme, getSettings, setLastModule, setLaunchAtStartup, setLayout, setTheme, setTourSeen } from './store'
+import { effectiveTheme, getSettings, setLastModule, setAutoUpdate, setLaunchAtStartup, setLayout, setTheme, setTourSeen } from './store'
 import { getCatalogState, installModule, listModules, removeLegacyApp, uninstallModule } from './modules/manager'
 import { broadcastTheme, moduleOfGuest, setCurrentModule } from './modules/runtime'
 import { broadcast } from './events'
@@ -23,6 +23,10 @@ export function registerIpc(getWin: () => BrowserWindow | null, onModulesChanged
   })
   ipcMain.handle('settings:setLaunchAtStartup', (_, enabled: boolean) => {
     setLaunchAtStartup(enabled)
+    return { ...getSettings(), effectiveTheme: effectiveTheme() }
+  })
+  ipcMain.handle('settings:setAutoUpdate', (_, enabled: boolean) => {
+    setAutoUpdate(enabled)
     return { ...getSettings(), effectiveTheme: effectiveTheme() }
   })
   ipcMain.handle('settings:setLayout', (_, p: Partial<Layout> | null) => {

@@ -16,7 +16,7 @@ export interface ModuleSource {
   label: string
   list(): Promise<CatalogModule[]>
   /** Copie ou télécharge le zip du module vers `dest`. */
-  fetch(mod: CatalogModule, dest: string, onProgress: (ratio: number) => void): Promise<void>
+  fetch(mod: CatalogModule, dest: string, onProgress: (ratio: number) => void, signal?: AbortSignal): Promise<void>
 }
 
 function localDir(): string | null {
@@ -49,11 +49,11 @@ const githubSource: ModuleSource = {
     if (!asset) return []
     return (await getJson<{ modules: CatalogModule[] }>(asset.browser_download_url, 'application/octet-stream')).modules
   },
-  async fetch(mod, dest, onProgress) {
+  async fetch(mod, dest, onProgress, signal) {
     const rel = await fetchLatestRelease(OWNER, REPO)
     const asset = rel.assets.find((a) => a.name === mod.file)
     if (!asset) throw new Error(`${mod.file} est introuvable dans la dernière version publiée.`)
-    await downloadTo(asset.browser_download_url, dest, onProgress)
+    await downloadTo(asset.browser_download_url, dest, onProgress, signal)
   }
 }
 

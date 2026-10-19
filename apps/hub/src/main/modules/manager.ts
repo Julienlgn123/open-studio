@@ -9,6 +9,8 @@ import { compareVersions } from '../github'
 import { broadcast } from '../events'
 import { moduleSource } from './source'
 import { activate, deactivate, entryUrlFor, isVisible, moduleError } from './runtime'
+import { beginModuleBatch, endModuleBatch, setUpdateState } from '../updates'
+import { getAutoUpdate } from '../store'
 import { hasLegacyData, isLegacyRunning, legacyExecPath, uninstallLegacy } from './legacy'
 
 // Installation, mise à jour et retrait des modules. Un module installé vit dans
@@ -125,8 +127,11 @@ export async function activateInstalled(): Promise<void> {
 // ─── Installation ──────────────────────────────────────────────────────────────────────────
 
 const busy = new Set<string>()
+/** Reçoit l'avancement de l'installation en cours (bandeau des mises à jour automatiques). */
+let onPct: ((phase: ModuleProgress['phase'], pct: number) => void) | null = null
 
 function progress(id: string, phase: ModuleProgress['phase'], pct: number): void {
+  onPct?.(phase, pct)
   broadcast('modules:progress', { id, phase, pct } satisfies ModuleProgress)
 }
 
@@ -141,7 +146,7 @@ function sha256(file: string): Promise<string> {
 }
 
 /** Installe ou met à jour un module, puis le démarre. Les données ne sont jamais touchées. */
-export async function installModule(id: string): Promise<void> {
+export async function installModule(id: string, signal?: AbortSignal): Promise<void> {
   if (busy.has(id)) throw new Error('Une installation de ce module est déjà en cours.')
   busy.add(id)
   try {
@@ -159,7 +164,7 @@ export async function installModule(id: string): Promise<void> {
       // Tout est préparé à côté : en cas d'échec (réseau, fichier abîmé), la version en place reste intacte.
       const zip = join(tmp, cat.file)
       progress(id, 'downloading', 0)
-      await moduleSource().fetch(cat, zip, (r) => progress(id, 'downloading', r))
+      await moduleSource().fetch(cat, zip, (r) => progress(id, 'downloading', r), signal)
       progress(id, 'installing', 0)
       if ((await sha256(zip)) !== cat.sha256) throw new Error('Le fichier téléchargé est abîmé (empreinte différente) : réessaie.')
       const unpacked = join(tmp, 'module')
@@ -167,6 +172,8 @@ export async function installModule(id: string): Promise<void> {
       const manifest = JSON.parse(readFileSync(join(unpacked, 'manifest.json'), 'utf-8')) as ModuleManifest
       if (manifest.id !== id) throw new Error('Ce zip ne contient pas le bon module.')
 
+      // Dernier moment où la personne peut annuler : ensuite l'ancienne version est remplacée.
+      if (signal?.aborted) throw new Error('Annulé')
       const reg = readRegistry()
       const previous = reg[id]
       await deactivate(id)
@@ -208,19 +215,46 @@ export async function removeLegacyApp(id: string): Promise<void> {
   broadcast('modules:changed', null)
 }
 
+/** Mises à jour refusées (annulées) : on n'y revient qu'au prochain lancement. */
+const declined = new Set<string>()
+let batchRunning = false
+
 /**
- * Mises à jour automatiques : un module se met à jour tout seul, sauf s'il est affiché à
- * l'écran (on ne recharge pas une interface sous les yeux de la personne : il attendra).
+ * Mises à jour automatiques des modules. Au lancement, tout est mis à jour ; ensuite, un module
+ * affiché à l'écran attend (on ne recharge pas une interface sous les yeux de la personne).
+ * Un bandeau montre l'avancement et propose d'annuler.
  */
-export async function autoUpdate(): Promise<void> {
+export async function autoUpdate(opts: { atLaunch?: boolean } = {}): Promise<void> {
+  if (batchRunning || !getAutoUpdate()) return
   const list = await listModules({ refresh: true }).catch(() => [])
-  for (const m of list) {
-    if (m.status !== 'update' || busy.has(m.id) || isVisible(m.id)) continue
-    try {
-      await installModule(m.id)
-      broadcast('modules:autoUpdated', { id: m.id, name: m.name, version: m.latestVersion })
-    } catch (err) {
-      console.error('[modules] mise à jour automatique', m.id, err)
+  const todo = list.filter(
+    (m) => m.status === 'update' && !busy.has(m.id) && !declined.has(`${m.id}@${m.latestVersion}`) && (opts.atLaunch || !isVisible(m.id))
+  )
+  if (!todo.length) return
+  const ctl = beginModuleBatch()
+  if (!ctl) return
+  batchRunning = true
+  try {
+    for (let i = 0; i < todo.length; i++) {
+      const m = todo[i]
+      const label = `Mise à jour de ${m.name}${todo.length > 1 ? ` (${i + 1}/${todo.length})` : ''}`
+      setUpdateState({ phase: 'downloading', kind: 'module', label, pct: -1 })
+      onPct = (phase, pct) => setUpdateState({ phase: 'downloading', kind: 'module', label, pct: phase === 'downloading' ? pct : 1 })
+      try {
+        await installModule(m.id, ctl.signal)
+        broadcast('modules:autoUpdated', { id: m.id, name: m.name, version: m.latestVersion })
+      } catch (err) {
+        if (ctl.signal.aborted) {
+          for (const r of todo.slice(i)) declined.add(`${r.id}@${r.latestVersion}`)
+          broadcast('modules:updateCancelled', null)
+          break
+        }
+        console.error('[modules] mise à jour automatique', m.id, err)
+      }
     }
+  } finally {
+    onPct = null
+    batchRunning = false
+    endModuleBatch()
   }
 }

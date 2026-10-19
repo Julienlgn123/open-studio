@@ -76,6 +76,8 @@ export interface AppSettings {
   lastModule: string | null
   /** Visite guidée d'Open Studio 2 déjà vue. */
   tourSeen: boolean
+  /** Mises à jour automatiques au lancement (Open Studio et modules). */
+  autoUpdate: boolean
   layout: Layout
 }
 
@@ -85,4 +87,15 @@ export interface CatalogState {
   error: string | null
   /** « GitHub » ou le dossier local utilisé pour les tests. */
   source: string
+}
+
+/** Avancement des mises à jour automatiques (bandeau en bas de la fenêtre). */
+export interface UpdateState {
+  phase: 'idle' | 'available' | 'downloading' | 'ready'
+  kind: 'module' | 'app' | null
+  label: string
+  /** 0..1, -1 si inconnu. */
+  pct: number
+  /** Secondes avant le redémarrage (phase « ready »). */
+  seconds?: number
 }

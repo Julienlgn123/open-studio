@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { Loader2 } from 'lucide-react'
 import { isInstalled, sortModules, useStore } from './store'
 import TitleBar from './components/TitleBar'
 import Rail from './components/Rail'
@@ -11,11 +10,11 @@ import Launcher from './components/Launcher'
 import ToastStack from './components/Toast'
 import ConfirmDialog from './components/ConfirmDialog'
 import Tour from './components/Tour'
+import UpdateBanner from './components/UpdateBanner'
 
 export default function App(): JSX.Element {
   const { view, loadSettings, loadModules, setProgress, applyTheme, openModule, go } = useStore()
   const [palette, setPalette] = useState(false)
-  const [selfUpdate, setSelfUpdate] = useState<string | null>(null)
 
   useEffect(() => {
     ;(async () => {
@@ -56,8 +55,7 @@ export default function App(): JSX.Element {
       window.api.settings.onTheme(applyTheme),
       window.api.app.onNavigate(openModule),
       window.api.app.onLauncher(() => setPalette(true)),
-      window.api.app.onShortcut((k) => k.startsWith('digit:') && digit(k.slice(6))),
-      window.api.app.onUpdateReady((p) => setSelfUpdate(p.version))
+      window.api.app.onShortcut((k) => k.startsWith('digit:') && digit(k.slice(6)))
     ]
     return () => {
       window.removeEventListener('keydown', onKey)
@@ -78,12 +76,7 @@ export default function App(): JSX.Element {
         </main>
       </div>
 
-      {selfUpdate && (
-        <div className="update-pill">
-          <Loader2 size={14} className="spin-icon" />
-          Open Studio v{selfUpdate} est prêt : redémarrage dans quelques secondes…
-        </div>
-      )}
+      <UpdateBanner />
       <ToastStack />
       <ConfirmDialog />
       <Tour />

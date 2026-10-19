@@ -43,6 +43,7 @@ interface Store {
   setTheme: (t: ThemeSetting) => Promise<void>
   applyTheme: (t: Theme) => void
   setLaunchAtStartup: (enabled: boolean) => Promise<void>
+  setAutoUpdate: (enabled: boolean) => Promise<void>
   /** Modifie la personnalisation (null = tout réinitialiser). */
   setLayout: (p: Partial<Layout> | null) => Promise<void>
   /** Visite guidée affichée. */
@@ -68,7 +69,7 @@ const clean = (err: unknown): string =>
   (err instanceof Error ? err.message : String(err)).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
 
 export const useStore = create<Store>((set, get) => ({
-  settings: { theme: 'dark', launchAtStartup: false, lastModule: null, tourSeen: true, layout: DEFAULT_LAYOUT, effectiveTheme: 'dark' },
+  settings: { theme: 'dark', launchAtStartup: false, lastModule: null, tourSeen: true, autoUpdate: true, layout: DEFAULT_LAYOUT, effectiveTheme: 'dark' },
   modules: [],
   catalog: null,
   loaded: false,
@@ -111,6 +112,9 @@ export const useStore = create<Store>((set, get) => ({
   closeTour: () => {
     set({ tour: false })
     if (!get().settings.tourSeen) void api.settings.setTourSeen().then((settings) => set({ settings }))
+  },
+  setAutoUpdate: async (enabled) => {
+    set({ settings: await api.settings.setAutoUpdate(enabled) })
   },
   setLaunchAtStartup: async (enabled) => {
     set({ settings: await api.settings.setLaunchAtStartup(enabled) })

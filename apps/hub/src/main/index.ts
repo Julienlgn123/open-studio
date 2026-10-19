@@ -1,8 +1,8 @@
 import { app, BrowserWindow, shell, ipcMain, session, protocol } from 'electron'
 import { delimiter, join, resolve } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { autoUpdater } from 'electron-updater'
 import { registerIpc } from './ipc'
+import { checkAppUpdate, setupAppUpdater } from './updates'
 import { broadcast, setEventTarget } from './events'
 import { hideOnClose, iconPath, refreshTray, setupTray } from './tray'
 import { syncLoginItem } from './store'
@@ -129,25 +129,20 @@ if (!app.requestSingleInstanceLock()) {
     void modulesChanged()
     app.on('activate', () => void showWindow())
 
-    // Mises à jour des modules, en arrière-plan.
-    setTimeout(() => void autoUpdate(), 60_000)
+    // Mises à jour au lancement (modules, puis Open Studio) : automatiques, avec un bandeau pour annuler.
+    // Ensuite, une vérification régulière en arrière-plan.
+    ipcMain.once('renderer:ready', () => setTimeout(() => void autoUpdate({ atLaunch: true }), 2500))
     setInterval(() => void autoUpdate(), UPDATE_INTERVAL_MS)
 
     if (app.isPackaged && !PROFILE) {
-      autoUpdater.autoDownload = true
-      autoUpdater.autoInstallOnAppQuit = true
-      autoUpdater.on('update-downloaded', (info) => {
-        broadcast('app:updateReady', { version: info.version })
-        setTimeout(() => autoUpdater.quitAndInstall(false, true), 5000)
-      })
-      autoUpdater.on('error', (err) => console.error('[autoUpdater]', err))
+      setupAppUpdater(() => !!mainWindow && mainWindow.isVisible() && !mainWindow.isMinimized())
       let checked = false
       ipcMain.on('renderer:ready', () => {
         if (checked) return
         checked = true
-        autoUpdater.checkForUpdates().catch(() => null)
+        setTimeout(checkAppUpdate, 1500)
       })
-      setInterval(() => autoUpdater.checkForUpdates().catch(() => null), UPDATE_INTERVAL_MS)
+      setInterval(checkAppUpdate, UPDATE_INTERVAL_MS)
     }
   })
 

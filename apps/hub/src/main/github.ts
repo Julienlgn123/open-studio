@@ -184,9 +184,11 @@ export function pickAsset(
 export function downloadTo(
   url: string,
   destPath: string,
-  onProgress?: (ratio: number) => void
+  onProgress?: (ratio: number) => void,
+  signal?: AbortSignal
 ): Promise<void> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new Error('Annulé'))
     let settled = false
     const finish = (fn: () => void): void => {
       if (settled) return
@@ -231,5 +233,9 @@ export function downloadTo(
       })
       .on('error', (err) => finish(() => reject(err)))
     resetIdleTimer()
+    signal?.addEventListener('abort', () => {
+      req.destroy()
+      finish(() => reject(new Error('Annulé')))
+    })
   })
 }
